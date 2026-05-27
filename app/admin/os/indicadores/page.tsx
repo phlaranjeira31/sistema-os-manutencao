@@ -109,10 +109,10 @@ export default async function IndicadoresOSPage({ searchParams }: PageProps) {
 
   const totalOS = ordens.length;
   const totalConcluidas = ordens.filter(
-    (os) => os.status === "CONCLUIDA"
-  ).length;
+  (os: any) => os.status === "CONCLUIDA"
+).length;
   const totalPendentes = ordens.filter(
-    (os) =>
+  (os: any) =>
       os.status === "NAO_INICIADA" || os.status === "EM_ANDAMENTO"
   ).length;
   const totalCanceladas = ordens.filter(
