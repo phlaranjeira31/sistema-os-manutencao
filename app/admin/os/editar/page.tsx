@@ -177,7 +177,7 @@ export default async function EditarOSPage({ searchParams }: PageProps) {
             </div>
           ) : (
             <div className="grid gap-4">
-              {ordens.map((os) => (
+              {ordens.map((os: any) =>(
                 <div
                   key={os.id}
                   className="flex flex-col gap-5 rounded-3xl border border-white/10 bg-[#080d1f] p-5 shadow-lg shadow-black/20 transition hover:border-cyan-400/40 hover:bg-[#0b1228] md:flex-row md:items-center md:justify-between"
