@@ -200,7 +200,7 @@ export default async function IndicadoresOSPage({ searchParams }: PageProps) {
             <div className="flex items-end sm:col-span-2 xl:col-span-1">
               <div className="w-full">
                 <BotaoPDFIndicadoresOS
-                  ordens={ordens.map((os) => ({
+                  ordens={ordens.map((os: any) => ({
                     numero: os.numero,
                     setor: os.setor?.nome ?? "-",
                     titulo: os.titulo,
