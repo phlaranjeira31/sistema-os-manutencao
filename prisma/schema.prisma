@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PerfilUsuario {
+  ADMIN
+  COLABORADOR
+}
+
+enum StatusOS {
+  NAO_INICIADA
+  EM_ANDAMENTO
+  CONCLUIDA
+  CANCELADA
+}
+
+enum PrioridadeOS {
+  BAIXA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+model User {
+  id        String   @id @default(cuid())
+  nome      String
+  email     String   @unique
+  senha     String
+  fotoUrl   String?
+  perfil    PerfilUsuario @default(COLABORADOR)
+  ativo     Boolean  @default(true)
+
+  ordensCriadas OrdemServico[] @relation("CriadorOS")
+  ordensResponsavel ResponsavelOS[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Setor {
+  id        String   @id @default(cuid())
+  nome      String   @unique
+  ativo     Boolean  @default(true)
+
+  ordens    OrdemServico[]
+  preventivas OrdemPreventiva[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OrdemServico {
+  id              String       @id @default(cuid())
+  numero          Int          @unique
+  titulo          String
+  descricao       String
+  status          StatusOS     @default(NAO_INICIADA)
+  prioridade      PrioridadeOS @default(MEDIA)
+
+  dataInicio      DateTime?
+  dataPrevista    DateTime?
+  dataConclusao   DateTime?
+
+  anotacoes       String?
+  registroFinal   String?
+
+  setorId         String
+  setor           Setor        @relation(fields: [setorId], references: [id])
+
+  criadoPorId     String?
+  criadoPor       User?        @relation("CriadorOS", fields: [criadoPorId], references: [id])
+
+  responsaveis    ResponsavelOS[]
+  fotos           FotoOS[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ResponsavelOS {
+  id        String @id @default(cuid())
+
+  osId      String
+  os        OrdemServico @relation(fields: [osId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([osId, userId])
+}
+
+model FotoOS {
+  id        String @id @default(cuid())
+  url       String
+  publicId  String?
+
+  osId      String
+  os        OrdemServico @relation(fields: [osId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model OrdemPreventiva {
+  id              String       @id @default(cuid())
+
+  titulo          String
+  descricao       String
+  prioridade      PrioridadeOS @default(MEDIA)
+
+  setorId         String
+  setor           Setor        @relation(fields: [setorId], references: [id])
+
+  status String @default("PENDENTE")
+
+  dataAgendada    DateTime
+  diasAntesAviso  Int          @default(1)
+
+  notificado      Boolean      @default(false)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
