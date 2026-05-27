@@ -127,21 +127,21 @@ export default async function DashboardColaboradoresPage({
             </form>
 
             <div className="grid gap-5 xl:grid-cols-2">
-              {colaboradores.map((colaborador) => {
-                const ordens = colaborador.ordensResponsavel.map((item) => item.os);
+              {colaboradores.map((colaborador: any) => {
+                const ordens = colaborador.ordensResponsavel.map((item: any) => item.os);
 
                 const total = ordens.length;
                 const naoIniciadas = ordens.filter(
-                  (os) => os.status === "NAO_INICIADA"
+                  (os: any) => os.status === "NAO_INICIADA"
                 ).length;
                 const emAndamento = ordens.filter(
-                  (os) => os.status === "EM_ANDAMENTO"
+                  (os: any) => os.status === "EM_ANDAMENTO"
                 ).length;
                 const concluidas = ordens.filter(
-                  (os) => os.status === "CONCLUIDA"
+                 (os: any) => os.status === "CONCLUIDA"
                 ).length;
                 const canceladas = ordens.filter(
-                  (os) => os.status === "CANCELADA"
+                  (os: any) => os.status === "CANCELADA"
                 ).length;
 
                 const abertas = naoIniciadas + emAndamento;
