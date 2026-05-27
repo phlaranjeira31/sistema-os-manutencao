@@ -314,7 +314,7 @@ concluidaEm: os.status === "CONCLUIDA" ? formatDate(os.updatedAt) : "-",
                         <td className="border border-white/10 px-3 py-3">
                           {os.responsaveis.length
                             ? os.responsaveis
-                                .map((r) => r.user.nome)
+                                .map((r: any) => r.user.nome)
                                 .join(", ")
                             : "-"}
                         </td>
