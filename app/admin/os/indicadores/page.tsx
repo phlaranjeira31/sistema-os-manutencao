@@ -281,7 +281,7 @@ concluidaEm: os.status === "CONCLUIDA" ? formatDate(os.updatedAt) : "-",
                       </td>
                     </tr>
                   ) : (
-                    ordens.map((os) => (
+                    ordens.map((os: any) => (
                       <tr
                         key={os.id}
                         className={
