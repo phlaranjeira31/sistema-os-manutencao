@@ -75,21 +75,21 @@ export default async function IndicadoresOSPage({ searchParams }: PageProps) {
 
   const dadosPorSetor = setores.map((setor: any) => {
     const ordensSetor = ordens.filter(
-      (os) => (os.setor?.nome ?? "Sem setor") === setor
-    );
+  (os: any) => (os.setor?.nome ?? "Sem setor") === setor
+);
 
     const concluidas = ordensSetor.filter(
-      (os) => os.status === "CONCLUIDA"
-    ).length;
+  (os: any) => os.status === "CONCLUIDA"
+).length;
 
     const pendentes = ordensSetor.filter(
-      (os) =>
+  (os: any) =>
         os.status === "NAO_INICIADA" || os.status === "EM_ANDAMENTO"
     ).length;
 
     const canceladas = ordensSetor.filter(
-      (os) => os.status === "CANCELADA"
-    ).length;
+  (os: any) => os.status === "CANCELADA"
+).length;
 
     return {
       setor,
