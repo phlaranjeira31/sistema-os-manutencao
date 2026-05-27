@@ -70,10 +70,10 @@ export default async function IndicadoresOSPage({ searchParams }: PageProps) {
   });
 
   const setores = Array.from(
-    new Set(ordens.map((os) => os.setor?.nome ?? "Sem setor"))
+    new Set(ordens.map((os: any) => os.setor?.nome ?? "Sem setor"))
   );
 
-  const dadosPorSetor = setores.map((setor) => {
+  const dadosPorSetor = setores.map((setor: any) => {
     const ordensSetor = ordens.filter(
       (os) => (os.setor?.nome ?? "Sem setor") === setor
     );
