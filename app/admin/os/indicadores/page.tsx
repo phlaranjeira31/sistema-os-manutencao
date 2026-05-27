@@ -208,7 +208,7 @@ export default async function IndicadoresOSPage({ searchParams }: PageProps) {
                     geradaEm: formatDate(os.createdAt),
 concluidaEm: os.status === "CONCLUIDA" ? formatDate(os.updatedAt) : "-",
                     responsavel: os.responsaveis.length
-                      ? os.responsaveis.map((r) => r.user.nome).join(", ")
+                      ? os.responsaveis.map((r: any) => r.user.nome).join(", ")
                       : "-",
                   }))}
                 />
