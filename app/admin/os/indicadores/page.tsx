@@ -116,8 +116,8 @@ export default async function IndicadoresOSPage({ searchParams }: PageProps) {
       os.status === "NAO_INICIADA" || os.status === "EM_ANDAMENTO"
   ).length;
   const totalCanceladas = ordens.filter(
-    (os) => os.status === "CANCELADA"
-  ).length;
+  (os: any) => os.status === "CANCELADA"
+).length;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#050816] px-3 py-6 text-white sm:px-4 md:px-10">
