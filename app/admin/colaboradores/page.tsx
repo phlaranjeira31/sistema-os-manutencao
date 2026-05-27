@@ -75,7 +75,14 @@ export default async function ColaboradoresPage() {
                 xl:grid-cols-3
               "
             >
-              {colaboradores.map((colaborador) => (
+              {colaboradores.map((colaborador: {
+  id: string;
+  nome: string;
+  email: string;
+  perfil: string;
+  ativo: boolean;
+  fotoUrl?: string | null;
+}) => (
                 <div
                   key={colaborador.id}
                   className="
