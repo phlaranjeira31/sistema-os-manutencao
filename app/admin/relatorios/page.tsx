@@ -304,7 +304,7 @@ export default async function RelatoriosPage({ searchParams }: PageProps) {
 
                       <p className="mt-2 line-clamp-2 font-bold text-white">
                         {os.responsaveis.length
-                          ? os.responsaveis.map((r) => r.user.nome).join(", ")
+                          ? os.responsaveis.map((r: any) => r.user.nome).join(", ")
                           : "-"}
                       </p>
                     </div>
