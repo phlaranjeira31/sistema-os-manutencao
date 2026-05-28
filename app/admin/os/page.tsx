@@ -200,7 +200,7 @@ export default async function OrdensServicoPage({ searchParams }: PageProps) {
               >
                 <option value="">Todos</option>
 
-                {colaboradores.map((c) => (
+                {colaboradores.map((c: any) => (
                   <option key={c.id} value={c.id}>
                     {c.nome}
                   </option>
