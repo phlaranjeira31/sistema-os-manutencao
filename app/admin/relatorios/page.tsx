@@ -212,7 +212,7 @@ export default async function RelatoriosPage({ searchParams }: PageProps) {
                 className="w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white outline-none focus:border-cyan-400"
               >
                 <option value="">Todos</option>
-                {setores.map((setor) => (
+                {setores.map((setor: any) => (
                   <option key={setor.id} value={setor.id}>
                     {setor.nome}
                   </option>
