@@ -14,6 +14,7 @@ import {
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 
 export default function LoginPage() {
   return (
