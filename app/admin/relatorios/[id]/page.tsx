@@ -124,7 +124,7 @@ export default async function RelatorioOSPage({ params }: PageProps) {
     atualizadaEm: formatDate(os.updatedAt),
     descricao: os.descricao || "-",
     responsavel: os.responsaveis.length
-      ? os.responsaveis.map((r) => r.user.nome).join(", ")
+      ? os.responsaveis.map((r: any) => r.user.nome).join(", ")
       : "Ainda não atribuído",
   }}
 />
