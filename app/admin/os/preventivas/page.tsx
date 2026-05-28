@@ -96,7 +96,7 @@ export default async function PreventivasPage() {
                   Selecione o setor
                 </option>
 
-                {setores.map((setor) => (
+                {setores.map((setor: any) => (
                   <option key={setor.id} value={setor.id}>
                     {setor.nome}
                   </option>
