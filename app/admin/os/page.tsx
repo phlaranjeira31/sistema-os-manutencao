@@ -260,9 +260,9 @@ export default async function OrdensServicoPage({ searchParams }: PageProps) {
             </div>
           ) : (
             <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-3">
-              {ordens.map((os) => {
+              {ordens.map((os: any) => {
                 const responsaveisTexto = os.responsaveis.length
-                  ? os.responsaveis.map((r) => r.user.nome).join(", ")
+                  ? os.responsaveis.map((r: any) => r.user.nome).join(", ")
                   : "Não atribuído";
 
                 const jaAtribuida = os.responsaveis.length > 0;
