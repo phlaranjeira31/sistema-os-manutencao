@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bell, LogOut, Plus, User } from "lucide-react";
 import Link from "next/link";
+import MobileAdminMenu from "@/components/MobileAdminMenu";
 
 type Usuario = {
   id?: string;
@@ -99,6 +100,7 @@ export default function HeaderUsuario() {
         </div>
 
         <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto lg:justify-end">
+          <MobileAdminMenu />
           <div className="relative">
             <button
               type="button"
