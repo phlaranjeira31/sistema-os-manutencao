@@ -53,13 +53,14 @@ export default async function SetoresPage({ searchParams }: PageProps) {
   });
 
   const totalSetores = setores.length;
-  const setoresAtivos = setores.filter((setor) => setor.ativo).length;
-  const totalOS = setores.reduce((acc, setor) => acc + setor.ordens.length, 0);
-  const totalConcluidas = setores.reduce(
-    (acc, setor) =>
-      acc + setor.ordens.filter((os) => os.status === "CONCLUIDA").length,
-    0
-  );
+  const setoresAtivos = setores.filter((setor: any) => setor.ativo).length;
+  const totalOS = setores.reduce((acc: number, setor: any) => acc + setor.ordens.length, 0);
+
+const totalConcluidas = setores.reduce(
+  (acc: number, setor: any) =>
+    acc + setor.ordens.filter((os: any) => os.status === "CONCLUIDA").length,
+  0
+);
 
   return (
     <main className="min-h-screen bg-[#050816] px-4 py-8 text-white md:px-10">
