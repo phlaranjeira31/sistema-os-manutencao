@@ -253,7 +253,7 @@ export default async function RelatoriosPage({ searchParams }: PageProps) {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-              {relatorios.map((os) => (
+              {relatorios.map((os: any) => (
                 <div
                   key={os.id}
                   className="overflow-hidden rounded-3xl border border-white/10 bg-[#060b1a] shadow-xl transition hover:-translate-y-1 hover:border-cyan-400/20"
