@@ -51,13 +51,28 @@ export async function GET(_req: Request, { params }: RouteProps) {
     );
   }
 
-  const ordens = colaborador.ordensResponsavel.map((item) => item.os);
+  const ordens = colaborador.ordensResponsavel.map(
+    (item: any) => item.os
+  );
 
   const total = ordens.length;
-  const naoIniciadas = ordens.filter((os) => os.status === "NAO_INICIADA").length;
-  const emAndamento = ordens.filter((os) => os.status === "EM_ANDAMENTO").length;
-  const concluidas = ordens.filter((os) => os.status === "CONCLUIDA").length;
-  const canceladas = ordens.filter((os) => os.status === "CANCELADA").length;
+
+  const naoIniciadas = ordens.filter(
+    (os: any) => os.status === "NAO_INICIADA"
+  ).length;
+
+  const emAndamento = ordens.filter(
+    (os: any) => os.status === "EM_ANDAMENTO"
+  ).length;
+
+  const concluidas = ordens.filter(
+    (os: any) => os.status === "CONCLUIDA"
+  ).length;
+
+  const canceladas = ordens.filter(
+    (os: any) => os.status === "CANCELADA"
+  ).length;
+
   const abertas = naoIniciadas + emAndamento;
   const resolucao = total > 0 ? Math.round((concluidas / total) * 100) : 0;
 
@@ -142,7 +157,7 @@ export async function GET(_req: Request, { params }: RouteProps) {
     doc.setFontSize(11);
     doc.text("Nenhuma OS vinculada a este colaborador.", 15, y);
   } else {
-    for (const os of ordens.slice(0, 18)) {
+    for (const os of ordens.slice(0, 18) as any[]) {
       if (y > 270) {
         doc.addPage();
         doc.setFillColor(2, 6, 23);
