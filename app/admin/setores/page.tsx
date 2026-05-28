@@ -194,8 +194,8 @@ const totalConcluidas = setores.reduce(
               {setores.map((setor: any) => {
                 const total = setor.ordens.length;
                 const naoIniciadas = setor.ordens.filter(
-                  setor.ordens.filter((os: any) => os.status === "NAO_INICIADA")
-                ).length;
+  (os: any) => os.status === "NAO_INICIADA"
+).length;
                 const emAndamento = setor.ordens.filter(
                   (os: any) => os.status === "EM_ANDAMENTO"
                 ).length;
