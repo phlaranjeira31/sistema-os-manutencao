@@ -104,7 +104,7 @@ export default async function EditarPreventivaPage({ params }: Props) {
                 defaultValue={preventiva.setorId}
                 className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-white outline-none focus:border-cyan-400"
               >
-                {setores.map((setor) => (
+                {setores.map((setor: any) => (
                   <option key={setor.id} value={setor.id}>
                     {setor.nome}
                   </option>
