@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../src/lib/prisma";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
+import cloudinary from "../../../../src/lib/cloudinary";
 
 export const runtime = "nodejs";
 
@@ -17,80 +16,73 @@ async function gerarNumeroOS() {
 
 function parseDate(value: unknown) {
   const text = String(value ?? "").trim();
+
   if (!text) return undefined;
+
   return new Date(`${text}T00:00:00`);
 }
 
-function sanitizeFileName(fileName: string) {
-  return fileName
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9._-]/g, "-")
-    .replace(/-+/g, "-")
-    .toLowerCase();
-}
-
-async function salvarArquivoOS(file: File) {
+async function uploadParaCloudinary(file: File) {
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "os");
-  await mkdir(uploadDir, { recursive: true });
+  return new Promise<{
+    url: string;
+    publicId: string;
+  }>((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "os",
+        resource_type: "auto",
+      },
+      (error, result) => {
+        if (error || !result) {
+          reject(error);
+          return;
+        }
 
-  const nomeArquivo = `${Date.now()}-${sanitizeFileName(file.name)}`;
-  const caminho = path.join(uploadDir, nomeArquivo);
+        resolve({
+          url: result.secure_url,
+          publicId: result.public_id,
+        });
+      }
+    );
 
-  await writeFile(caminho, buffer);
-
-  return {
-    url: `/uploads/os/${nomeArquivo}`,
-    publicId: nomeArquivo,
-  };
+    stream.end(buffer);
+  });
 }
 
 export async function POST(req: Request) {
   try {
-    const contentType = req.headers.get("content-type") || "";
+    const formData = await req.formData();
 
-    let titulo = "";
-    let descricao = "";
-    let setorNome = "";
-    let status = "NAO_INICIADA";
-    let prioridade = "MEDIA";
-    let criadoPorId = "";
-    let dataInicio: Date | undefined;
-    let dataPrevista: Date | undefined;
-    let arquivos: File[] = [];
+    const titulo = String(formData.get("titulo") ?? "").trim();
+    const descricao = String(formData.get("descricao") ?? "").trim();
+    const setorNome = String(formData.get("setor") ?? "").trim();
+    const status = String(
+      formData.get("status") ?? "NAO_INICIADA"
+    ).trim();
 
-    if (contentType.includes("multipart/form-data")) {
-      const formData = await req.formData();
+    const prioridade = String(
+      formData.get("prioridade") ?? "MEDIA"
+    ).trim();
 
-      titulo = String(formData.get("titulo") ?? "").trim();
-      descricao = String(formData.get("descricao") ?? "").trim();
-      setorNome = String(formData.get("setor") ?? "").trim();
-      status = String(formData.get("status") ?? "NAO_INICIADA").trim();
-      prioridade = String(formData.get("prioridade") ?? "MEDIA").trim();
-      criadoPorId = String(formData.get("criadoPorId") ?? "").trim();
+    const criadoPorId = String(
+      formData.get("criadoPorId") ?? ""
+    ).trim();
 
-      dataInicio = parseDate(formData.get("dataInicio"));
-      dataPrevista = parseDate(formData.get("dataPrevista"));
+    const dataInicio = parseDate(formData.get("dataInicio"));
 
-      arquivos = formData
-        .getAll("arquivos")
-        .filter((item): item is File => item instanceof File && item.size > 0);
-    } else {
-      const body = await req.json();
+    const dataPrevista = parseDate(
+      formData.get("dataPrevista")
+    );
 
-      titulo = String(body?.titulo ?? "").trim();
-      descricao = String(body?.descricao ?? "").trim();
-      setorNome = String(body?.setor ?? "").trim();
-      status = String(body?.status ?? "NAO_INICIADA").trim();
-      prioridade = String(body?.prioridade ?? "MEDIA").trim();
-      criadoPorId = String(body?.criadoPorId ?? "").trim();
-
-      dataInicio = parseDate(body?.dataInicio);
-      dataPrevista = parseDate(body?.dataPrevista);
-    }
+    const arquivos = formData
+      .getAll("arquivos")
+      .filter(
+        (item): item is File =>
+          item instanceof File && item.size > 0
+      );
 
     if (!titulo) {
       return NextResponse.json(
@@ -140,17 +132,21 @@ export async function POST(req: Request) {
     const arquivosSalvos = [];
 
     for (const arquivo of arquivos) {
-      const arquivoSalvo = await salvarArquivoOS(arquivo);
-      arquivosSalvos.push(arquivoSalvo);
+      const upload = await uploadParaCloudinary(arquivo);
+
+      arquivosSalvos.push(upload);
     }
 
     const os = await prisma.ordemServico.create({
       data: {
         numero: await gerarNumeroOS(),
+
         titulo,
         descricao,
+
         status: status as any,
         prioridade: prioridade as any,
+
         dataInicio,
         dataPrevista,
 
@@ -164,9 +160,13 @@ export async function POST(req: Request) {
           `Descrição: ${descricao}`,
           `Prioridade: ${prioridade}`,
           dataPrevista &&
-            `Data prevista: ${dataPrevista.toLocaleDateString("pt-BR")}`,
+            `Data prevista: ${dataPrevista.toLocaleDateString(
+              "pt-BR"
+            )}`,
           dataInicio &&
-            `Data de início: ${dataInicio.toLocaleDateString("pt-BR")}`,
+            `Data de início: ${dataInicio.toLocaleDateString(
+              "pt-BR"
+            )}`,
           `Criada por: ${usuarioCriador.nome}`,
         ]
           .filter(Boolean)
@@ -190,6 +190,7 @@ export async function POST(req: Request) {
           })),
         },
       },
+
       include: {
         fotos: true,
         criadoPor: true,
@@ -204,7 +205,9 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          error instanceof Error ? error.message : "Erro interno ao criar OS.",
+          error instanceof Error
+            ? error.message
+            : "Erro interno ao criar OS.",
       },
       { status: 500 }
     );
