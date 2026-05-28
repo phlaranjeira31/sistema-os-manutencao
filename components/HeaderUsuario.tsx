@@ -63,13 +63,10 @@ export default function HeaderUsuario() {
       <div className="flex flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:py-6">
         <div className="flex min-w-0 items-center gap-4">
           <div className="flex shrink-0 items-center justify-center">
-  <Image
-  src="/logo.sequoia.png?v=2"
+  <img
+  src="/logo.sequoia.png"
   alt="Sequoia"
-  width={110}
-  height={40}
-  className="h-10 w-auto object-contain"
-  priority
+  className="h-14 w-auto object-contain"
 />
 </div>
 
