@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Bell, LogOut, Plus, User } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 
 type Usuario = {
   id?: string;
@@ -36,23 +35,41 @@ export default function HeaderUsuario() {
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
 
   useEffect(() => {
-    const user = localStorage.getItem("user");
+    async function carregarUsuario() {
+      try {
+        const sessionRes = await fetch("/api/auth/session");
+        const session = await sessionRes.json();
 
-    if (user) {
-      const parsed = JSON.parse(user);
-      setUsuario(parsed);
+        if (session?.user) {
+          const usuarioSessao = {
+            id: session.user.id,
+            nome: session.user.name,
+            email: session.user.email,
+            fotoUrl: session.user.image || null,
+          };
 
-      if (parsed.id) {
-        fetch(`/api/admin/notificacoes?userId=${parsed.id}`)
-          .then((res) => res.json())
-          .then((data) => setNotificacoes(data))
-          .catch(() => setNotificacoes([]));
+          setUsuario(usuarioSessao);
+
+          if (usuarioSessao.id) {
+            fetch(`/api/admin/notificacoes?userId=${usuarioSessao.id}`)
+              .then((res) => res.json())
+              .then((data) => setNotificacoes(data))
+              .catch(() => setNotificacoes([]));
+          }
+        }
+      } catch (error) {
+        console.error(error);
       }
     }
+
+    carregarUsuario();
   }, []);
 
-  function logout() {
-    localStorage.removeItem("user");
+  async function logout() {
+    await fetch("/api/auth/signout", {
+      method: "POST",
+    });
+
     window.location.href = "/login";
   }
 
@@ -63,12 +80,12 @@ export default function HeaderUsuario() {
       <div className="flex flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:py-6">
         <div className="flex min-w-0 items-center gap-4">
           <div className="flex shrink-0 items-center justify-center">
-  <img
-  src="/logo.sequoia.png"
-  alt="Sequoia"
-  className="h-14 w-auto object-contain"
-/>
-</div>
+            <img
+              src="/logo.sequoia.png"
+              alt="Sequoia"
+              className="h-14 w-auto object-contain"
+            />
+          </div>
 
           <div className="min-w-0">
             <h2 className="truncate text-xl font-extrabold tracking-tight text-white sm:text-2xl">
@@ -173,6 +190,7 @@ export default function HeaderUsuario() {
                 <p className="max-w-56 truncate text-sm font-bold text-white">
                   {usuario.nome || "Usuário"}
                 </p>
+
                 <p className="max-w-56 truncate text-xs text-slate-400">
                   {usuario.email || "Online"}
                 </p>
