@@ -1,8 +1,6 @@
 import "dotenv/config";
-import { PrismaClient, PerfilUsuario } from "@prisma/client";
+import { prisma } from "../src/lib/prisma";
 import bcrypt from "bcryptjs";
-
-const prisma = new PrismaClient();
 
 async function main() {
   const senhaHash = await bcrypt.hash("admin123", 10);
@@ -14,7 +12,7 @@ async function main() {
       nome: "Administrador",
       email: "admin@sistema.com",
       senha: senhaHash,
-      perfil: PerfilUsuario.ADMIN,
+      perfil: "ADMIN",
     },
   });
 
@@ -34,7 +32,9 @@ async function main() {
 }
 
 main()
-  .then(async () => prisma.$disconnect())
+  .then(async () => {
+    await prisma.$disconnect();
+  })
   .catch(async (error) => {
     console.error(error);
     await prisma.$disconnect();
