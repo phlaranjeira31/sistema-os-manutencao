@@ -7,12 +7,17 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@sistema.com" },
-    update: {},
+    update: {
+      senha: senhaHash,
+      perfil: "ADMIN",
+      ativo: true,
+    },
     create: {
       nome: "Administrador",
       email: "admin@sistema.com",
       senha: senhaHash,
       perfil: "ADMIN",
+      ativo: true,
     },
   });
 
@@ -28,7 +33,7 @@ async function main() {
     skipDuplicates: true,
   });
 
-  console.log("Admin criado:", admin.email);
+  console.log("Admin criado/atualizado:", admin.email);
 }
 
 main()

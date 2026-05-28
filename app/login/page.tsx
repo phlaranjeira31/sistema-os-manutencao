@@ -32,41 +32,35 @@ function LoginContent() {
   const [carregando, setCarregando] = useState(false);
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setCarregando(true);
+  e.preventDefault();
 
-    try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          senha,
-        }),
-      });
+  setCarregando(true);
 
-      const data = await res.json();
+  try {
+    const { signIn } = await import("next-auth/react");
 
-      if (!res.ok) {
-        alert(data.error || "Erro ao fazer login");
-        setCarregando(false);
-        return;
-      }
+    const result = await signIn("credentials", {
+      email,
+      senha,
+      redirect: false,
+    });
 
-      localStorage.setItem("user", JSON.stringify(data));
-
-      const callbackUrl = searchParams.get("callbackUrl") || "/admin";
-
-      window.location.href = callbackUrl;
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao conectar com o servidor");
+    if (!result || result.error) {
+      alert("Email ou senha inválidos");
+      setCarregando(false);
+      return;
     }
 
-    setCarregando(false);
+    const callbackUrl = searchParams.get("callbackUrl") || "/admin";
+
+    window.location.href = callbackUrl;
+  } catch (error) {
+    console.error(error);
+    alert("Erro ao conectar com o servidor");
   }
+
+  setCarregando(false);
+}
 
   return (
     <main className="relative min-h-dvh w-full overflow-hidden bg-slate-950">
