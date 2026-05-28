@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   });
 
   return NextResponse.json(
-    notificacoes.map((item) => ({
+    notificacoes.map((item: any) => ({
       id: item.id,
       enviadaEm: item.createdAt,
       osId: item.os.id,
