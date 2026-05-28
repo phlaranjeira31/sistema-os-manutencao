@@ -99,7 +99,7 @@ export default async function RelatorioOSPage({ params }: PageProps) {
             </p>
             <div className="rounded-2xl border border-white/10 bg-[#080d1f] p-4 text-slate-300">
               {os.responsaveis.length
-                ? os.responsaveis.map((r) => r.user.nome).join(", ")
+                ? os.responsaveis.map((r: any) => r.user.nome).join(", ")
                 : "Ainda não atribuído"}
             </div>
           </div>
