@@ -171,7 +171,7 @@ export default async function RelatoriosPage({ searchParams }: PageProps) {
                 className="w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white outline-none focus:border-cyan-400"
               >
                 <option value="">Todos</option>
-                {colaboradores.map((colaborador) => (
+                {colaboradores.map((colaborador: any) => (
                   <option key={colaborador.id} value={colaborador.id}>
                     {colaborador.nome}
                   </option>
