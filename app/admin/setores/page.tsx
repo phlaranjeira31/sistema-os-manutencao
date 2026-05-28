@@ -191,20 +191,20 @@ const totalConcluidas = setores.reduce(
             </div>
           ) : (
             <div className="grid gap-5">
-              {setores.map((setor) => {
+              {setores.map((setor: any) => {
                 const total = setor.ordens.length;
                 const naoIniciadas = setor.ordens.filter(
-                  (os) => os.status === "NAO_INICIADA"
+                  setor.ordens.filter((os: any) => os.status === "NAO_INICIADA")
                 ).length;
                 const emAndamento = setor.ordens.filter(
-                  (os) => os.status === "EM_ANDAMENTO"
+                  (os: any) => os.status === "EM_ANDAMENTO"
                 ).length;
                 const abertas = naoIniciadas + emAndamento;
                 const concluidas = setor.ordens.filter(
-                  (os) => os.status === "CONCLUIDA"
+                  (os: any) => os.status === "CONCLUIDA"
                 ).length;
                 const canceladas = setor.ordens.filter(
-                  (os) => os.status === "CANCELADA"
+                  (os: any) => os.status === "CANCELADA"
                 ).length;
 
                 const percentual =
