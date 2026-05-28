@@ -64,13 +64,13 @@ export default function HeaderUsuario() {
         <div className="flex min-w-0 items-center gap-4">
           <div className="flex shrink-0 items-center justify-center">
   <Image
-    src="/logo.sequoia.png"
-    alt="Sequoia"
-    width={80}
-    height={80}
-    className="object-contain"
-    priority
-  />
+  src="/logo.sequoia.png?v=2"
+  alt="Sequoia"
+  width={110}
+  height={40}
+  className="h-10 w-auto object-contain"
+  priority
+/>
 </div>
 
           <div className="min-w-0">
