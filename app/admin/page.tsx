@@ -55,7 +55,7 @@ export default async function AdminPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#020617] text-white">
       <div className="flex min-w-0">
-        <aside className="hidden min-h-screen w-72 shrink-0 border-r border-white/10 bg-[#020617] text-white lg:block">
+        <aside className="min-h-screen w-72 shrink-0 border-r border-white/10 bg-[#020617] text-white">
           <div className="p-6">
             <h1 className="text-2xl font-extrabold">Sistema de OS</h1>
             <p className="mt-1 text-sm text-slate-400">Painel de manutenção</p>
