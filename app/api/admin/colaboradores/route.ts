@@ -1,8 +1,23 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/src/lib/prisma";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import cloudinary from "@/src/lib/cloudinary";
+
+async function uploadFotoCloudinary(foto: File, email: string) {
+  const bytes = await foto.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+
+  const base64 = buffer.toString("base64");
+  const dataUri = `data:${foto.type};base64,${base64}`;
+
+  const upload = await cloudinary.uploader.upload(dataUri, {
+    folder: "sistema-os/colaboradores",
+    public_id: `${Date.now()}-${email.replace(/[^a-zA-Z0-9]/g, "")}`,
+    overwrite: true,
+  });
+
+  return upload.secure_url;
+}
 
 export async function POST(req: Request) {
   try {
@@ -40,36 +55,6 @@ export async function POST(req: Request) {
       );
     }
 
-    let fotoUrl: string | undefined;
-
-    if (foto && foto.size > 0) {
-      const bytes = await foto.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-
-      const ext = foto.name.split(".").pop() || "jpg";
-      const fileName = `${Date.now()}-${email.replace(
-        /[^a-zA-Z0-9]/g,
-        ""
-      )}.${ext}`;
-
-      const uploadDir = path.join(
-        process.cwd(),
-        "public",
-        "uploads",
-        "colaboradores"
-      );
-
-      await mkdir(uploadDir, { recursive: true });
-
-      const filePath = path.join(uploadDir, fileName);
-
-      await writeFile(filePath, buffer);
-
-      fotoUrl = `/uploads/colaboradores/${fileName}`;
-    }
-
-    const senhaHash = await bcrypt.hash(senha, 10);
-
     const existe = await prisma.user.findUnique({
       where: { email },
     });
@@ -80,6 +65,14 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
+    let fotoUrl: string | undefined;
+
+    if (foto && foto.size > 0) {
+      fotoUrl = await uploadFotoCloudinary(foto, email);
+    }
+
+    const senhaHash = await bcrypt.hash(senha, 10);
 
     if (existe && !existe.ativo) {
       const colaboradorReativado = await prisma.user.update({
