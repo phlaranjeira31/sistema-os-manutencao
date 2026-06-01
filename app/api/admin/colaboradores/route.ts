@@ -17,8 +17,7 @@ export async function POST(req: Request) {
       formData.get("perfil") ?? "COLABORADOR"
     ).trim();
 
-    const perfil =
-      perfilRecebido === "ADMIN" ? "ADMIN" : "COLABORADOR";
+    const perfil = perfilRecebido === "ADMIN" ? "ADMIN" : "COLABORADOR";
 
     if (!nome) {
       return NextResponse.json(
@@ -41,17 +40,6 @@ export async function POST(req: Request) {
       );
     }
 
-    const existe = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existe) {
-      return NextResponse.json(
-        { error: "Já existe um colaborador com esse email." },
-        { status: 400 }
-      );
-    }
-
     let fotoUrl: string | undefined;
 
     if (foto && foto.size > 0) {
@@ -59,7 +47,10 @@ export async function POST(req: Request) {
       const buffer = Buffer.from(bytes);
 
       const ext = foto.name.split(".").pop() || "jpg";
-      const fileName = `${Date.now()}-${email.replace(/[^a-zA-Z0-9]/g, "")}.${ext}`;
+      const fileName = `${Date.now()}-${email.replace(
+        /[^a-zA-Z0-9]/g,
+        ""
+      )}.${ext}`;
 
       const uploadDir = path.join(
         process.cwd(),
@@ -78,6 +69,32 @@ export async function POST(req: Request) {
     }
 
     const senhaHash = await bcrypt.hash(senha, 10);
+
+    const existe = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existe && existe.ativo) {
+      return NextResponse.json(
+        { error: "Já existe um colaborador ativo com esse email." },
+        { status: 400 }
+      );
+    }
+
+    if (existe && !existe.ativo) {
+      const colaboradorReativado = await prisma.user.update({
+        where: { email },
+        data: {
+          nome,
+          senha: senhaHash,
+          perfil,
+          ativo: true,
+          ...(fotoUrl ? { fotoUrl } : {}),
+        },
+      });
+
+      return NextResponse.json(colaboradorReativado, { status: 200 });
+    }
 
     const colaborador = await prisma.user.create({
       data: {
