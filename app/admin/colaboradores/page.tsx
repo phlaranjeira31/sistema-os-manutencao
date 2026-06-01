@@ -41,23 +41,23 @@ export default async function ColaboradoresPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:scale-[1.02] hover:bg-cyan-50"
-            >
-              <ArrowLeft size={17} />
-              Voltar
-            </Link>
+         <div className="grid w-full grid-cols-1 gap-3 md:flex md:w-auto md:flex-wrap">
+  <Link
+    href="/admin"
+    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:scale-[1.02] hover:bg-cyan-50 md:w-auto"
+  >
+    <ArrowLeft size={17} />
+    Voltar
+  </Link>
 
-            <Link
-              href="/admin/colaboradores/novo"
-              className="inline-flex items-center gap-2 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.02] hover:bg-cyan-300"
-            >
-              <Plus size={18} />
-              Novo colaborador
-            </Link>
-          </div>
+  <Link
+    href="/admin/colaboradores/novo"
+    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.02] hover:bg-cyan-300 md:w-auto"
+  >
+    <Plus size={18} />
+    Novo colaborador
+  </Link>
+</div>
         </header>
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl shadow-black/30 backdrop-blur sm:p-6">
