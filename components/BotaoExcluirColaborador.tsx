@@ -33,7 +33,11 @@ export default function BotaoExcluirColaborador({
         return;
       }
 
-      router.refresh();
+      router.push("/admin");
+
+      setTimeout(() => {
+        window.location.href = "/admin/colaboradores";
+      }, 300);
     } catch {
       alert("Erro ao excluir colaborador.");
     } finally {
