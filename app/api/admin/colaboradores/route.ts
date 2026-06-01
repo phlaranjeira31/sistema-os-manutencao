@@ -3,6 +3,8 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/src/lib/prisma";
 import cloudinary from "@/src/lib/cloudinary";
 
+export const runtime = "nodejs";
+
 async function uploadFotoCloudinary(foto: File, email: string) {
   const bytes = await foto.arrayBuffer();
   const buffer = Buffer.from(bytes);
