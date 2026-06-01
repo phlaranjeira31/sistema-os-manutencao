@@ -4,6 +4,9 @@ import BotaoEditarColaborador from "@/components/BotaoEditarColaborador";
 import BotaoExcluirColaborador from "@/components/BotaoExcluirColaborador";
 import { prisma } from "@/src/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function formatDate(date: Date | string | null | undefined) {
   if (!date) return "-";
   return new Intl.DateTimeFormat("pt-BR").format(new Date(date));
