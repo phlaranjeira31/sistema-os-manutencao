@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 
+export const runtime = "nodejs";
+
 type Props = {
   params: Promise<{ id: string }>;
 };
@@ -20,9 +22,16 @@ async function enviarEmail({
   setor?: string;
   id: string;
 }) {
-  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) return;
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error("RESEND_API_KEY não configurada no Vercel.");
+  }
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  if (!process.env.EMAIL_FROM) {
+    throw new Error("EMAIL_FROM não configurado no Vercel.");
+  }
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL || "https://sequoiamanutencao.vercel.app";
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -32,10 +41,10 @@ async function enviarEmail({
     },
     body: JSON.stringify({
       from: process.env.EMAIL_FROM,
-      to,
+      to: [to],
       subject: `Você foi atribuído à OS #${numero} - ${titulo}`,
       html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #020617;">
           <h2>Nova Ordem de Serviço atribuída</h2>
 
           <p>Você foi atribuído a uma nova Ordem de Serviço no sistema.</p>
@@ -43,7 +52,7 @@ async function enviarEmail({
           <p><strong>OS:</strong> #${numero}</p>
           <p><strong>Título:</strong> ${titulo}</p>
           <p><strong>Setor:</strong> ${setor || "Não informado"}</p>
-          <p><strong>Descrição:</strong> ${descricao}</p>
+          <p><strong>Descrição:</strong> ${descricao || "Sem descrição"}</p>
 
           <div style="margin-top: 24px;">
             <a href="${baseUrl}/admin/os/${id}"
@@ -78,8 +87,7 @@ async function enviarEmail({
             Ou acesse o sistema completo:
           </p>
 
-          <a href="${baseUrl}/admin"
-            style="color:#2563eb; font-weight:bold;">
+          <a href="${baseUrl}/admin" style="color:#2563eb; font-weight:bold;">
             Acessar sistema
           </a>
         </div>
@@ -87,10 +95,14 @@ async function enviarEmail({
     }),
   });
 
+  const data = await res.text();
+
   if (!res.ok) {
-    const data = await res.text();
-    console.error("Erro ao enviar e-mail:", data);
+    console.error("Erro Resend:", data);
+    throw new Error(`Erro ao enviar email pelo Resend: ${data}`);
   }
+
+  console.log("Email de atribuição enviado para:", to);
 }
 
 export async function POST(req: Request, { params }: Props) {
@@ -132,6 +144,13 @@ export async function POST(req: Request, { params }: Props) {
       );
     }
 
+    if (!user.email) {
+      return NextResponse.json(
+        { error: "O colaborador selecionado não possui email cadastrado." },
+        { status: 400 }
+      );
+    }
+
     await prisma.responsavelOS.upsert({
       where: {
         osId_userId: {
@@ -170,12 +189,21 @@ export async function POST(req: Request, { params }: Props) {
       id: os.id,
     });
 
-    return NextResponse.json(osAtualizada);
+    return NextResponse.json({
+      ...osAtualizada,
+      emailEnviado: true,
+      emailPara: user.email,
+    });
   } catch (error) {
     console.error("Erro ao atribuir OS:", error);
 
     return NextResponse.json(
-      { error: "Erro interno ao atribuir OS." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Erro interno ao atribuir OS.",
+      },
       { status: 500 }
     );
   }
