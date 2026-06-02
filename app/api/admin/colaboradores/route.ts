@@ -9,16 +9,26 @@ async function uploadFotoCloudinary(foto: File, email: string) {
   const bytes = await foto.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
-  const base64 = buffer.toString("base64");
-  const dataUri = `data:${foto.type};base64,${base64}`;
+  return new Promise<string>((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: "sistema-os/colaboradores",
+        public_id: `${Date.now()}-${email.replace(/[^a-zA-Z0-9]/g, "")}`,
+        overwrite: true,
+        resource_type: "image",
+      },
+      (error, result) => {
+        if (error || !result) {
+          reject(error || new Error("Erro ao enviar foto para o Cloudinary."));
+          return;
+        }
 
-  const upload = await cloudinary.uploader.upload(dataUri, {
-    folder: "sistema-os/colaboradores",
-    public_id: `${Date.now()}-${email.replace(/[^a-zA-Z0-9]/g, "")}`,
-    overwrite: true,
+        resolve(result.secure_url);
+      }
+    );
+
+    uploadStream.end(buffer);
   });
-
-  return upload.secure_url;
 }
 
 export async function POST(req: Request) {
