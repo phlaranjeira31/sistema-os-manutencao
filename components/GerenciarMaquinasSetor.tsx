@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  BarChart3,
   Check,
   Cpu,
   Pencil,
@@ -123,7 +125,6 @@ export default function GerenciarMaquinasSetor({
           className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-cyan-400 px-5 text-sm font-black text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Plus size={17} />
-
           {loading ? "Adicionando..." : "Adicionar"}
         </button>
       </div>
@@ -317,7 +318,16 @@ function MaquinaItem({ maquina }: { maquina: Maquina }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 sm:flex">
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <Link
+              href={`/admin/maquinas/${maquina.id}`}
+              title="Abrir dashboard da máquina"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 text-xs font-bold text-cyan-300 transition hover:bg-cyan-400 hover:text-slate-950"
+            >
+              <BarChart3 size={15} />
+              <span>Dashboard</span>
+            </Link>
+
             <button
               type="button"
               onClick={() => setEditando(true)}
@@ -341,6 +351,7 @@ function MaquinaItem({ maquina }: { maquina: Maquina }) {
               }`}
             >
               {maquina.ativo ? <X size={15} /> : <Check size={15} />}
+
               <span className="hidden lg:inline">
                 {maquina.ativo ? "Desativar" : "Ativar"}
               </span>
