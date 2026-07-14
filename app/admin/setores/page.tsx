@@ -13,6 +13,7 @@ import {
 import { prisma } from "@/src/lib/prisma";
 import NovoSetorForm from "@/components/NovoSetorForm";
 import EditarSetorInline from "@/components/EditarSetorInline";
+import GerenciarMaquinasSetor from "@/components/GerenciarMaquinasSetor";
 
 type PageProps = {
   searchParams?: Promise<{
@@ -46,6 +47,11 @@ export default async function SetoresPage({ searchParams }: PageProps) {
     },
     include: {
       ordens: true,
+      maquinas: {
+        orderBy: {
+          nome: "asc",
+        },
+      },
     },
     orderBy: {
       nome: "asc",
@@ -54,13 +60,17 @@ export default async function SetoresPage({ searchParams }: PageProps) {
 
   const totalSetores = setores.length;
   const setoresAtivos = setores.filter((setor: any) => setor.ativo).length;
-  const totalOS = setores.reduce((acc: number, setor: any) => acc + setor.ordens.length, 0);
+  const totalOS = setores.reduce(
+    (acc: number, setor: any) => acc + setor.ordens.length,
+    0
+  );
 
-const totalConcluidas = setores.reduce(
-  (acc: number, setor: any) =>
-    acc + setor.ordens.filter((os: any) => os.status === "CONCLUIDA").length,
-  0
-);
+  const totalConcluidas = setores.reduce(
+    (acc: number, setor: any) =>
+      acc +
+      setor.ordens.filter((os: any) => os.status === "CONCLUIDA").length,
+    0
+  );
 
   return (
     <main className="min-h-screen bg-[#050816] px-4 py-8 text-white md:px-10">
@@ -89,57 +99,56 @@ const totalConcluidas = setores.reduce(
             Voltar
           </Link>
         </header>
-<section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/30 backdrop-blur">
-  
-  {/* CARDS */}
-  <div className="mb-6 grid gap-4 md:grid-cols-2">
-    <Card title="Setores" value={totalSetores} icon={<Building2 />} />
-    <Card title="Ativos" value={setoresAtivos} icon={<CheckCircle2 />} />
-  </div>
 
-  {/* FILTRO */}
-  <form className="grid gap-4 md:grid-cols-[1fr_220px_160px_130px]">
-    <div>
-      <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
-        <Search size={16} />
-        Pesquisar setor
-      </label>
+        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/30 backdrop-blur">
+          {/* CARDS */}
+          <div className="mb-6 grid gap-4 md:grid-cols-2">
+            <Card title="Setores" value={totalSetores} icon={<Building2 />} />
+            <Card title="Ativos" value={setoresAtivos} icon={<CheckCircle2 />} />
+          </div>
 
-      <input
-        name="q"
-        defaultValue={q}
-        placeholder="Ex: Manutenção, TI, Administrativo..."
-        className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400"
-      />
-    </div>
+          {/* FILTRO */}
+          <form className="grid gap-4 md:grid-cols-[1fr_220px_160px_130px]">
+            <div>
+              <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+                <Search size={16} />
+                Pesquisar setor
+              </label>
 
-    <div>
-      <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
-        <CheckCircle2 size={16} />
-        Status
-      </label>
+              <input
+                name="q"
+                defaultValue={q}
+                placeholder="Ex: Manutenção, TI, Administrativo..."
+                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400"
+              />
+            </div>
 
-      <select
-        name="status"
-        defaultValue={status}
-        className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
-      >
-        <option value="">Todos</option>
-        <option value="ativo">Ativos</option>
-        <option value="inativo">Inativos</option>
-      </select>
-    </div>
+            <div>
+              <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+                <CheckCircle2 size={16} />
+                Status
+              </label>
 
-    <div className="flex items-end">
-      <button
-        type="submit"
-        className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.02] hover:bg-cyan-300"
-      >
-        <Search size={17} />
-        Filtrar
-      </button>
-    </div>
-        
+              <select
+                name="status"
+                defaultValue={status}
+                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
+              >
+                <option value="">Todos</option>
+                <option value="ativo">Ativos</option>
+                <option value="inativo">Inativos</option>
+              </select>
+            </div>
+
+            <div className="flex items-end">
+              <button
+                type="submit"
+                className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.02] hover:bg-cyan-300"
+              >
+                <Search size={17} />
+                Filtrar
+              </button>
+            </div>
 
             <div className="flex items-end">
               <Link
@@ -193,16 +202,21 @@ const totalConcluidas = setores.reduce(
             <div className="grid gap-5">
               {setores.map((setor: any) => {
                 const total = setor.ordens.length;
+
                 const naoIniciadas = setor.ordens.filter(
-  (os: any) => os.status === "NAO_INICIADA"
-).length;
+                  (os: any) => os.status === "NAO_INICIADA"
+                ).length;
+
                 const emAndamento = setor.ordens.filter(
                   (os: any) => os.status === "EM_ANDAMENTO"
                 ).length;
+
                 const abertas = naoIniciadas + emAndamento;
+
                 const concluidas = setor.ordens.filter(
                   (os: any) => os.status === "CONCLUIDA"
                 ).length;
+
                 const canceladas = setor.ordens.filter(
                   (os: any) => os.status === "CANCELADA"
                 ).length;
@@ -347,6 +361,12 @@ const totalConcluidas = setores.reduce(
                             </div>
                           </div>
                         </div>
+
+                        <GerenciarMaquinasSetor
+                          setorId={setor.id}
+                          setorNome={setor.nome}
+                          maquinas={setor.maquinas}
+                        />
 
                         {abertas > 0 && (
                           <div className="flex items-center gap-2 rounded-2xl border border-orange-400/20 bg-orange-500/10 px-4 py-3 text-sm font-bold text-orange-300">

@@ -26,15 +26,15 @@ enum PrioridadeOS {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  nome      String
-  email     String   @unique
-  senha     String
-  fotoUrl   String?
-  perfil    PerfilUsuario @default(COLABORADOR)
-  ativo     Boolean  @default(true)
+  id      String        @id @default(cuid())
+  nome    String
+  email   String        @unique
+  senha   String
+  fotoUrl String?
+  perfil  PerfilUsuario @default(COLABORADOR)
+  ativo   Boolean       @default(true)
 
-  ordensCriadas OrdemServico[] @relation("CriadorOS")
+  ordensCriadas     OrdemServico[]  @relation("CriadorOS")
   ordensResponsavel ResponsavelOS[]
 
   createdAt DateTime @default(now())
@@ -42,87 +42,119 @@ model User {
 }
 
 model Setor {
-  id        String   @id @default(cuid())
-  nome      String   @unique
-  ativo     Boolean  @default(true)
+  id    String  @id @default(cuid())
+  nome  String  @unique
+  ativo Boolean @default(true)
 
-  ordens    OrdemServico[]
+  ordens      OrdemServico[]
   preventivas OrdemPreventiva[]
+  maquinas    Maquina[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+model Maquina {
+  id    String  @id @default(cuid())
+  nome  String
+  ativo Boolean @default(true)
+
+  setorId String
+  setor   Setor  @relation(fields: [setorId], references: [id], onDelete: Cascade)
+
+  ordens OrdemServico[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([nome, setorId])
+  @@index([setorId])
+}
+
 model OrdemServico {
-  id              String       @id @default(cuid())
-  numero          Int          @unique
-  titulo          String
-  descricao       String
-  status          StatusOS     @default(NAO_INICIADA)
-  prioridade      PrioridadeOS @default(MEDIA)
+  id         String       @id @default(cuid())
+  numero     Int          @unique
+  titulo     String
+  descricao  String
+  status     StatusOS     @default(NAO_INICIADA)
+  prioridade PrioridadeOS @default(MEDIA)
 
-  dataInicio      DateTime?
-  dataPrevista    DateTime?
-  dataConclusao   DateTime?
+  dataInicio    DateTime?
+  dataPrevista  DateTime?
+  dataConclusao DateTime?
 
-  anotacoes       String?
-  registroFinal   String?
+  anotacoes     String?
+  registroFinal String?
 
-  setorId         String
-  setor           Setor        @relation(fields: [setorId], references: [id])
+  setorId String
+  setor   Setor  @relation(fields: [setorId], references: [id])
 
-  criadoPorId     String?
-  criadoPor       User?        @relation("CriadorOS", fields: [criadoPorId], references: [id])
+  maquinaId String?
+  maquina   Maquina? @relation(fields: [maquinaId], references: [id], onDelete: SetNull)
 
-  responsaveis    ResponsavelOS[]
-  fotos           FotoOS[]
+  criadoPorId String?
+  criadoPor   User?   @relation("CriadorOS", fields: [criadoPorId], references: [id])
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  responsaveis ResponsavelOS[]
+  fotos        FotoOS[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([setorId])
+  @@index([maquinaId])
+  @@index([status])
+  @@index([prioridade])
 }
 
 model ResponsavelOS {
-  id        String @id @default(cuid())
+  id String @id @default(cuid())
 
-  osId      String
-  os        OrdemServico @relation(fields: [osId], references: [id], onDelete: Cascade)
+  osId String
+  os   OrdemServico @relation(fields: [osId], references: [id], onDelete: Cascade)
 
-  userId    String
-  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@unique([osId, userId])
+  @@index([userId])
 }
 
 model FotoOS {
-  id        String @id @default(cuid())
-  url       String
-  publicId  String?
+  id       String  @id @default(cuid())
+  url      String
+  publicId String?
 
-  osId      String
-  os        OrdemServico @relation(fields: [osId], references: [id], onDelete: Cascade)
+  osId String
+  os   OrdemServico @relation(fields: [osId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+
+  @@index([osId])
 }
 
 model OrdemPreventiva {
-  id              String       @id @default(cuid())
+  id String @id @default(cuid())
 
-  titulo          String
-  descricao       String
-  prioridade      PrioridadeOS @default(MEDIA)
+  titulo     String
+  descricao  String
+  prioridade PrioridadeOS @default(MEDIA)
 
-  setorId         String
-  setor           Setor        @relation(fields: [setorId], references: [id])
+  setorId String
+  setor   Setor  @relation(fields: [setorId], references: [id])
 
   status String @default("PENDENTE")
 
-  dataAgendada    DateTime
-  diasAntesAviso  Int          @default(1)
+  dataAgendada   DateTime
+  diasAntesAviso Int      @default(1)
 
-  notificado      Boolean      @default(false)
+  notificado Boolean @default(false)
 
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([setorId])
+  @@index([dataAgendada])
 }

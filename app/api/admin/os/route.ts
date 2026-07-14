@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "../../../../src/lib/prisma";
-import cloudinary from "../../../../src/lib/cloudinary";
+import { prisma } from "@/src/lib/prisma";
+import cloudinary from "@/src/lib/cloudinary";
 
 export const runtime = "nodejs";
 
@@ -19,7 +19,9 @@ function parseDate(value: unknown) {
 
   if (!text) return undefined;
 
-  return new Date(`${text}T00:00:00`);
+  const date = new Date(`${text}T00:00:00`);
+
+  return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 async function uploadParaCloudinary(file: File) {
@@ -37,7 +39,7 @@ async function uploadParaCloudinary(file: File) {
       },
       (error, result) => {
         if (error || !result) {
-          reject(error);
+          reject(error || new Error("Erro ao enviar arquivo."));
           return;
         }
 
@@ -56,9 +58,10 @@ export async function POST(req: Request) {
   try {
     const formData = await req.formData();
 
-    const titulo = String(formData.get("titulo") ?? "").trim();
+    const setorId = String(formData.get("setorId") ?? "").trim();
+    const maquinaId = String(formData.get("maquinaId") ?? "").trim();
     const descricao = String(formData.get("descricao") ?? "").trim();
-    const setorNome = String(formData.get("setor") ?? "").trim();
+
     const status = String(
       formData.get("status") ?? "NAO_INICIADA"
     ).trim();
@@ -72,10 +75,7 @@ export async function POST(req: Request) {
     ).trim();
 
     const dataInicio = parseDate(formData.get("dataInicio"));
-
-    const dataPrevista = parseDate(
-      formData.get("dataPrevista")
-    );
+    const dataPrevista = parseDate(formData.get("dataPrevista"));
 
     const arquivos = formData
       .getAll("arquivos")
@@ -84,9 +84,16 @@ export async function POST(req: Request) {
           item instanceof File && item.size > 0
       );
 
-    if (!titulo) {
+    if (!setorId) {
       return NextResponse.json(
-        { error: "O título é obrigatório." },
+        { error: "Selecione o setor." },
+        { status: 400 }
+      );
+    }
+
+    if (!maquinaId) {
+      return NextResponse.json(
+        { error: "Selecione a máquina ou equipamento." },
         { status: 400 }
       );
     }
@@ -98,13 +105,6 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!setorNome) {
-      return NextResponse.json(
-        { error: "O setor é obrigatório." },
-        { status: 400 }
-      );
-    }
-
     if (!criadoPorId) {
       return NextResponse.json(
         { error: "Selecione quem criou a OS." },
@@ -112,15 +112,107 @@ export async function POST(req: Request) {
       );
     }
 
-    const usuarioCriador = await prisma.user.findUnique({
-      where: {
-        id: criadoPorId,
-      },
-      select: {
-        id: true,
-        nome: true,
-      },
-    });
+    const statusPermitidos = [
+      "NAO_INICIADA",
+      "EM_ANDAMENTO",
+      "CONCLUIDA",
+      "CANCELADA",
+    ];
+
+    const prioridadesPermitidas = [
+      "BAIXA",
+      "MEDIA",
+      "ALTA",
+      "URGENTE",
+    ];
+
+    if (!statusPermitidos.includes(status)) {
+      return NextResponse.json(
+        { error: "Status inválido." },
+        { status: 400 }
+      );
+    }
+
+    if (!prioridadesPermitidas.includes(prioridade)) {
+      return NextResponse.json(
+        { error: "Prioridade inválida." },
+        { status: 400 }
+      );
+    }
+
+    const [setor, maquina, usuarioCriador] = await Promise.all([
+      prisma.setor.findUnique({
+        where: {
+          id: setorId,
+        },
+        select: {
+          id: true,
+          nome: true,
+          ativo: true,
+        },
+      }),
+
+      prisma.maquina.findUnique({
+        where: {
+          id: maquinaId,
+        },
+        select: {
+          id: true,
+          nome: true,
+          ativo: true,
+          setorId: true,
+        },
+      }),
+
+      prisma.user.findUnique({
+        where: {
+          id: criadoPorId,
+        },
+        select: {
+          id: true,
+          nome: true,
+          ativo: true,
+        },
+      }),
+    ]);
+
+    if (!setor) {
+      return NextResponse.json(
+        { error: "Setor não encontrado." },
+        { status: 404 }
+      );
+    }
+
+    if (!setor.ativo) {
+      return NextResponse.json(
+        { error: "O setor selecionado está inativo." },
+        { status: 400 }
+      );
+    }
+
+    if (!maquina) {
+      return NextResponse.json(
+        { error: "Máquina ou equipamento não encontrado." },
+        { status: 404 }
+      );
+    }
+
+    if (!maquina.ativo) {
+      return NextResponse.json(
+        { error: "A máquina selecionada está inativa." },
+        { status: 400 }
+      );
+    }
+
+    if (maquina.setorId !== setor.id) {
+      return NextResponse.json(
+        {
+          error:
+            "A máquina selecionada não pertence ao setor informado.",
+        },
+        { status: 400 }
+      );
+    }
 
     if (!usuarioCriador) {
       return NextResponse.json(
@@ -129,26 +221,58 @@ export async function POST(req: Request) {
       );
     }
 
-    const arquivosSalvos = [];
+    if (!usuarioCriador.ativo) {
+      return NextResponse.json(
+        { error: "O usuário criador está inativo." },
+        { status: 400 }
+      );
+    }
+
+    const arquivosSalvos: {
+      url: string;
+      publicId: string;
+    }[] = [];
 
     for (const arquivo of arquivos) {
       const upload = await uploadParaCloudinary(arquivo);
-
       arquivosSalvos.push(upload);
     }
 
+    const numero = await gerarNumeroOS();
+
     const os = await prisma.ordemServico.create({
       data: {
-        numero: await gerarNumeroOS(),
+        numero,
 
-        titulo,
+        titulo: maquina.nome,
         descricao,
 
-        status: status as any,
-        prioridade: prioridade as any,
+        status: status as
+          | "NAO_INICIADA"
+          | "EM_ANDAMENTO"
+          | "CONCLUIDA"
+          | "CANCELADA",
+
+        prioridade: prioridade as
+          | "BAIXA"
+          | "MEDIA"
+          | "ALTA"
+          | "URGENTE",
 
         dataInicio,
         dataPrevista,
+
+        setor: {
+          connect: {
+            id: setor.id,
+          },
+        },
+
+        maquina: {
+          connect: {
+            id: maquina.id,
+          },
+        },
 
         criadoPor: {
           connect: {
@@ -157,31 +281,18 @@ export async function POST(req: Request) {
         },
 
         anotacoes: [
+          `Equipamento: ${maquina.nome}`,
+          `Setor: ${setor.nome}`,
           `Descrição: ${descricao}`,
           `Prioridade: ${prioridade}`,
           dataPrevista &&
-            `Data prevista: ${dataPrevista.toLocaleDateString(
-              "pt-BR"
-            )}`,
+            `Data prevista: ${dataPrevista.toLocaleDateString("pt-BR")}`,
           dataInicio &&
-            `Data de início: ${dataInicio.toLocaleDateString(
-              "pt-BR"
-            )}`,
+            `Data de início: ${dataInicio.toLocaleDateString("pt-BR")}`,
           `Criada por: ${usuarioCriador.nome}`,
         ]
           .filter(Boolean)
           .join("\n"),
-
-        setor: {
-          connectOrCreate: {
-            where: {
-              nome: setorNome,
-            },
-            create: {
-              nome: setorNome,
-            },
-          },
-        },
 
         fotos: {
           create: arquivosSalvos.map((arquivo) => ({
@@ -195,12 +306,13 @@ export async function POST(req: Request) {
         fotos: true,
         criadoPor: true,
         setor: true,
+        maquina: true,
       },
     });
 
     return NextResponse.json(os, { status: 201 });
   } catch (error) {
-    console.error("🔥 ERRO REAL AO CRIAR OS:", error);
+    console.error("ERRO REAL AO CRIAR OS:", error);
 
     return NextResponse.json(
       {

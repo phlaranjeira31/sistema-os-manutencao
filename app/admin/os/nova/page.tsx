@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ClipboardList,
-  FileText,
   Building2,
   AlertTriangle,
   ArrowLeft,
@@ -13,11 +12,18 @@ import {
   ImagePlus,
   X,
   UserRound,
+  Cpu,
 } from "lucide-react";
 
 type Setor = {
   id: string;
   nome: string;
+};
+
+type Maquina = {
+  id: string;
+  nome: string;
+  setorId: string;
 };
 
 type Usuario = {
@@ -35,15 +41,18 @@ export default function NovaOSPage() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
+  const [loadingMaquinas, setLoadingMaquinas] = useState(false);
   const [erro, setErro] = useState("");
+
   const [setores, setSetores] = useState<Setor[]>([]);
+  const [maquinas, setMaquinas] = useState<Maquina[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [arquivos, setArquivos] = useState<PreviewArquivo[]>([]);
 
   const [form, setForm] = useState({
-    titulo: "",
+    setorId: "",
+    maquinaId: "",
     descricao: "",
-    setor: "",
     status: "NAO_INICIADA",
     prioridade: "MEDIA",
     criadoPorId: "",
@@ -53,8 +62,12 @@ export default function NovaOSPage() {
     async function carregarDados() {
       try {
         const [setoresRes, usuariosRes] = await Promise.all([
-          fetch("/api/admin/setores"),
-          fetch("/api/admin/usuarios-os")
+          fetch("/api/admin/setores", {
+            cache: "no-store",
+          }),
+          fetch("/api/admin/usuarios-os", {
+            cache: "no-store",
+          }),
         ]);
 
         const setoresData = await setoresRes.json();
@@ -69,17 +82,67 @@ export default function NovaOSPage() {
         }
       } catch (error) {
         console.error("Erro ao buscar dados:", error);
+        setErro("Não foi possível carregar os dados do formulário.");
       }
     }
 
     carregarDados();
   }, []);
 
+  useEffect(() => {
+    async function carregarMaquinas() {
+      if (!form.setorId) {
+        setMaquinas([]);
+        return;
+      }
+
+      try {
+        setLoadingMaquinas(true);
+        setErro("");
+
+        const res = await fetch(
+          `/api/admin/maquinas?setorId=${encodeURIComponent(form.setorId)}`,
+          {
+            cache: "no-store",
+          }
+        );
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data?.error || "Erro ao buscar máquinas.");
+        }
+
+        setMaquinas(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Erro ao buscar máquinas:", error);
+
+        setMaquinas([]);
+        setErro(
+          error instanceof Error
+            ? error.message
+            : "Erro ao carregar máquinas."
+        );
+      } finally {
+        setLoadingMaquinas(false);
+      }
+    }
+
+    carregarMaquinas();
+  }, [form.setorId]);
+
   function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "setorId" ? { maquinaId: "" } : {}),
+    }));
   }
 
   function handleArquivosChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -92,13 +155,17 @@ export default function NovaOSPage() {
     }));
 
     setArquivos((prev) => [...prev, ...novosArquivos]);
+
+    e.target.value = "";
   }
 
   function removerArquivo(index: number) {
     setArquivos((prev) => {
       const copia = [...prev];
+
       URL.revokeObjectURL(copia[index].url);
       copia.splice(index, 1);
+
       return copia;
     });
   }
@@ -107,18 +174,34 @@ export default function NovaOSPage() {
     e.preventDefault();
     setErro("");
 
-    if (!form.titulo.trim()) return setErro("Informe o título.");
-    if (!form.descricao.trim()) return setErro("Informe a descrição.");
-    if (!form.setor) return setErro("Selecione o setor.");
-    if (!form.criadoPorId) return setErro("Selecione quem criou a OS.");
+    if (!form.setorId) {
+      setErro("Selecione o setor.");
+      return;
+    }
+
+    if (!form.maquinaId) {
+      setErro("Selecione a máquina ou equipamento.");
+      return;
+    }
+
+    if (!form.descricao.trim()) {
+      setErro("Informe a descrição do problema.");
+      return;
+    }
+
+    if (!form.criadoPorId) {
+      setErro("Selecione quem criou a OS.");
+      return;
+    }
 
     try {
       setLoading(true);
 
       const data = new FormData();
-      data.append("titulo", form.titulo);
+
+      data.append("setorId", form.setorId);
+      data.append("maquinaId", form.maquinaId);
       data.append("descricao", form.descricao);
-      data.append("setor", form.setor);
       data.append("status", form.status);
       data.append("prioridade", form.prioridade);
       data.append("criadoPorId", form.criadoPorId);
@@ -138,84 +221,133 @@ export default function NovaOSPage() {
         throw new Error(response?.error || "Erro ao criar OS.");
       }
 
-      router.push("/admin");
+      router.push("/admin/os");
       router.refresh();
     } catch (error) {
-      setErro(error instanceof Error ? error.message : "Erro ao criar OS.");
+      setErro(
+        error instanceof Error ? error.message : "Erro ao criar OS."
+      );
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#050816] px-4 py-8 text-white md:px-10">
-      <div className="mx-auto max-w-3xl space-y-8">
-        <div className="flex items-center justify-between border-b border-white/10 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 shadow-lg shadow-cyan-950/30">
+    <main className="min-h-screen overflow-x-hidden bg-[#050816] px-3 py-6 text-white sm:px-4 md:px-8 lg:px-10">
+      <div className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
+        <header className="flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 shadow-lg shadow-cyan-950/30">
               <ClipboardList size={22} />
             </div>
 
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-bold text-cyan-300">Cadastro</p>
 
-              <h1 className="text-2xl font-black text-white md:text-3xl">
+              <h1 className="break-words text-2xl font-black text-white sm:text-3xl">
                 Nova Ordem de Serviço
               </h1>
 
               <p className="text-sm text-slate-400">
-                Crie uma nova solicitação
+                Selecione o setor e o equipamento
               </p>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={() => router.back()}
-            className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white px-5 py-2 text-sm font-bold text-slate-950 shadow-lg transition hover:scale-[1.03] hover:bg-cyan-50"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-bold text-slate-950 shadow-lg transition hover:bg-cyan-50 sm:w-auto"
           >
             <ArrowLeft size={16} />
             Voltar
           </button>
-        </div>
+        </header>
 
         <form
           onSubmit={handleSubmit}
-          className="space-y-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/30 backdrop-blur"
+          className="w-full min-w-0 space-y-6 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl shadow-black/30 backdrop-blur sm:p-6"
         >
           {erro && (
-            <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300">
+            <div className="break-words rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300">
               {erro}
             </div>
           )}
 
           <div>
             <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
-              <FileText size={17} />
-              Título
+              <Building2 size={17} />
+              Setor
             </label>
 
-            <input
-              name="titulo"
-              value={form.titulo}
+            <select
+              name="setorId"
+              value={form.setorId}
               onChange={handleChange}
-              placeholder="Ex: Troca de iluminação"
-              className="w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white placeholder:text-slate-500 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
-            />
+              className="w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+            >
+              <option value="">Selecione o setor</option>
+
+              {setores.map((setor) => (
+                <option key={setor.id} value={setor.id}>
+                  {setor.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+              <Cpu size={17} />
+              Máquina ou equipamento
+            </label>
+
+            <select
+              name="maquinaId"
+              value={form.maquinaId}
+              onChange={handleChange}
+              disabled={!form.setorId || loadingMaquinas}
+              className="w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="">
+                {!form.setorId
+                  ? "Selecione primeiro o setor"
+                  : loadingMaquinas
+                    ? "Carregando equipamentos..."
+                    : maquinas.length === 0
+                      ? "Nenhum equipamento cadastrado"
+                      : "Selecione a máquina ou equipamento"}
+              </option>
+
+              {maquinas.map((maquina) => (
+                <option key={maquina.id} value={maquina.id}>
+                  {maquina.nome}
+                </option>
+              ))}
+            </select>
+
+            {form.setorId &&
+              !loadingMaquinas &&
+              maquinas.length === 0 && (
+                <p className="mt-2 text-xs font-semibold text-orange-300">
+                  Cadastre uma máquina neste setor antes de criar a OS.
+                </p>
+              )}
           </div>
 
           <div>
             <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
               <ClipboardList size={17} />
-              Descrição
+              Descrição do problema
             </label>
 
             <textarea
               name="descricao"
               value={form.descricao}
               onChange={handleChange}
-              rows={4}
-              placeholder="Descreva detalhadamente o problema..."
-              className="w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white placeholder:text-slate-500 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+              rows={5}
+              placeholder="Descreva detalhadamente o problema encontrado..."
+              className="w-full resize-y rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white placeholder:text-slate-500 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
             />
           </div>
 
@@ -230,14 +362,14 @@ export default function NovaOSPage() {
               accept="image/*,video/*"
               multiple
               onChange={handleArquivosChange}
-              className="block w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-bold file:text-slate-950"
+              className="block w-full min-w-0 rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-bold file:text-slate-950"
             />
 
             {arquivos.length > 0 && (
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {arquivos.map((arquivo, index) => (
                   <div
-                    key={arquivo.url}
+                    key={`${arquivo.url}-${index}`}
                     className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#050816]"
                   >
                     <button
@@ -251,7 +383,7 @@ export default function NovaOSPage() {
                     {arquivo.tipo === "imagem" ? (
                       <img
                         src={arquivo.url}
-                        alt="Preview"
+                        alt="Preview do arquivo"
                         className="h-40 w-full object-cover"
                       />
                     ) : (
@@ -265,28 +397,6 @@ export default function NovaOSPage() {
                 ))}
               </div>
             )}
-          </div>
-
-          <div>
-            <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
-              <Building2 size={17} />
-              Setor
-            </label>
-
-            <select
-              name="setor"
-              value={form.setor}
-              onChange={handleChange}
-              className="w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
-            >
-              <option value="">Selecione o setor</option>
-
-              {setores.map((setor) => (
-                <option key={setor.id} value={setor.nome}>
-                  {setor.nome}
-                </option>
-              ))}
-            </select>
           </div>
 
           <div>
@@ -345,19 +455,25 @@ export default function NovaOSPage() {
               <option value="NAO_INICIADA">Não iniciada</option>
               <option value="EM_ANDAMENTO">Em andamento</option>
               <option value="CONCLUIDA">Concluída</option>
+              <option value="CANCELADA">Cancelada</option>
             </select>
           </div>
 
           <button
             type="submit"
-            disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 py-3 font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.03] hover:bg-cyan-300 disabled:opacity-60"
+            disabled={
+              loading ||
+              loadingMaquinas ||
+              !form.setorId ||
+              !form.maquinaId
+            }
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 py-3 font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60 sm:hover:scale-[1.02]"
           >
             <Save size={16} />
             {loading ? "Criando..." : "Criar OS"}
           </button>
         </form>
       </div>
-    </div>
+    </main>
   );
 }
