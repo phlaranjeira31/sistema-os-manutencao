@@ -13,12 +13,35 @@ import { prisma } from "../../../src/lib/prisma";
 import AtribuirOSForm from "@/components/AtribuirOSForm";
 
 type PageProps = {
-  searchParams?: Promise<{ q?: string; status?: string; colaborador?: string }>;
+  searchParams?: Promise<{
+    q?: string;
+    status?: string;
+    colaborador?: string;
+  }>;
 };
 
-function formatDate(date: Date | string | null | undefined) {
+function formatDateTime(date: Date | string | null | undefined) {
   if (!date) return "-";
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(date));
+
+  const valor = new Date(date);
+
+  if (Number.isNaN(valor.getTime())) return "-";
+
+  const dataFormatada = new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "America/Sao_Paulo",
+  }).format(valor);
+
+  const horarioFormatado = new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "America/Sao_Paulo",
+  }).format(valor);
+
+  return `${dataFormatada} às ${horarioFormatado}`;
 }
 
 function statusLabel(status: string) {
@@ -45,9 +68,12 @@ function prioridadeLabel(prioridade: string | null | undefined) {
 
 function statusClasses(status: string) {
   const map: Record<string, string> = {
-    NAO_INICIADA: "border-yellow-500/20 bg-yellow-500/10 text-yellow-300",
-    EM_ANDAMENTO: "border-cyan-500/20 bg-cyan-500/10 text-cyan-300",
-    CONCLUIDA: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+    NAO_INICIADA:
+      "border-yellow-500/20 bg-yellow-500/10 text-yellow-300",
+    EM_ANDAMENTO:
+      "border-cyan-500/20 bg-cyan-500/10 text-cyan-300",
+    CONCLUIDA:
+      "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
     CANCELADA: "border-red-500/20 bg-red-500/10 text-red-300",
   };
 
@@ -56,21 +82,31 @@ function statusClasses(status: string) {
 
 function prioridadeClasses(prioridade: string | null | undefined) {
   const map: Record<string, string> = {
-    BAIXA: "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
-    MEDIA: "border-yellow-500/20 bg-yellow-500/10 text-yellow-300",
-    ALTA: "border-orange-500/20 bg-orange-500/10 text-orange-300",
+    BAIXA:
+      "border-emerald-500/20 bg-emerald-500/10 text-emerald-300",
+    MEDIA:
+      "border-yellow-500/20 bg-yellow-500/10 text-yellow-300",
+    ALTA:
+      "border-orange-500/20 bg-orange-500/10 text-orange-300",
     URGENTE: "border-red-500/20 bg-red-500/10 text-red-300",
   };
 
-  return map[prioridade ?? ""] ?? "border-white/10 bg-white/5 text-white";
+  return (
+    map[prioridade ?? ""] ??
+    "border-white/10 bg-white/5 text-white"
+  );
 }
 
-export default async function OrdensServicoPage({ searchParams }: PageProps) {
+export default async function OrdensServicoPage({
+  searchParams,
+}: PageProps) {
   const params = await searchParams;
 
   const q = String(params?.q ?? "").trim();
   const status = String((params as any)?.status ?? "").trim();
-  const colaboradorId = String((params as any)?.colaborador ?? "").trim();
+  const colaboradorId = String(
+    (params as any)?.colaborador ?? ""
+  ).trim();
 
   const [ordens, colaboradores] = await Promise.all([
     prisma.ordemServico.findMany({
@@ -90,8 +126,18 @@ export default async function OrdensServicoPage({ searchParams }: PageProps) {
         ...(q
           ? {
               OR: [
-                { titulo: { contains: q, mode: "insensitive" } },
-                { descricao: { contains: q, mode: "insensitive" } },
+                {
+                  titulo: {
+                    contains: q,
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  descricao: {
+                    contains: q,
+                    mode: "insensitive",
+                  },
+                },
                 {
                   setor: {
                     nome: {
@@ -171,6 +217,7 @@ export default async function OrdensServicoPage({ searchParams }: PageProps) {
             </Link>
           </div>
         </header>
+
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl shadow-black/30 backdrop-blur sm:p-6">
           <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div>
@@ -245,9 +292,12 @@ export default async function OrdensServicoPage({ searchParams }: PageProps) {
             </div>
           </form>
         </section>
+
         <section className="space-y-5">
           <div>
-            <h2 className="text-xl font-black md:text-2xl">Planner de OS</h2>
+            <h2 className="text-xl font-black md:text-2xl">
+              Planner de OS
+            </h2>
 
             <p className="mt-1 text-sm text-slate-400">
               Clique em uma OS para visualizar detalhes completos.
@@ -262,7 +312,9 @@ export default async function OrdensServicoPage({ searchParams }: PageProps) {
             <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-3">
               {ordens.map((os: any) => {
                 const responsaveisTexto = os.responsaveis.length
-                  ? os.responsaveis.map((r: any) => r.user.nome).join(", ")
+                  ? os.responsaveis
+                      .map((r: any) => r.user.nome)
+                      .join(", ")
                   : "Não atribuído";
 
                 const jaAtribuida = os.responsaveis.length > 0;
@@ -314,9 +366,11 @@ export default async function OrdensServicoPage({ searchParams }: PageProps) {
                       </div>
 
                       <p className="mt-4 line-clamp-2 min-h-[44px] text-sm leading-relaxed text-slate-400">
-                        {os.descricao || "Sem descrição cadastrada."}
+                        {os.descricao ||
+                          "Sem descrição cadastrada."}
                       </p>
                     </div>
+
                     <div className="grid flex-1 content-start gap-3 p-4">
                       <InfoCard
                         icon={<Building2 size={16} />}
@@ -327,7 +381,7 @@ export default async function OrdensServicoPage({ searchParams }: PageProps) {
                       <InfoCard
                         icon={<Calendar size={16} />}
                         label="Criada em"
-                        value={formatDate(os.createdAt)}
+                        value={formatDateTime(os.createdAt)}
                       />
 
                       <InfoCard
@@ -336,6 +390,7 @@ export default async function OrdensServicoPage({ searchParams }: PageProps) {
                         value={responsaveisTexto}
                       />
                     </div>
+
                     <div className="mt-auto border-t border-white/10 bg-[#050816]/80 p-4">
                       {jaAtribuida ? (
                         <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
@@ -384,6 +439,7 @@ function InfoCard({
     <div className="min-h-[76px] rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       <div className="flex items-center gap-2 text-slate-400">
         {icon}
+
         <span className="text-xs font-bold uppercase tracking-wide">
           {label}
         </span>

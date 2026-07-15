@@ -11,7 +11,34 @@ type PageProps = {
 
 function formatDate(date: Date | string | null | undefined) {
   if (!date) return "-";
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(date));
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date(date));
+}
+
+function formatDateTime(date: Date | string | null | undefined) {
+  if (!date) return "-";
+
+  const valor = new Date(date);
+
+  if (Number.isNaN(valor.getTime())) return "-";
+
+  const dataFormatada = new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "America/Sao_Paulo",
+  }).format(valor);
+
+  const horarioFormatado = new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "America/Sao_Paulo",
+  }).format(valor);
+
+  return `${dataFormatada} às ${horarioFormatado}`;
 }
 
 function statusLabel(status: string) {
@@ -40,22 +67,22 @@ export default async function OSDetalhePage({ params }: PageProps) {
   const { id } = await params;
 
   const os = await prisma.ordemServico.findUnique({
-  where: {
-    id,
-  },
-
-  include: {
-    fotos: true,
-    setor: true,
-    responsaveis: {
-      include: {
-        user: true,
-      },
+    where: {
+      id,
     },
 
-    criadoPor: true,
-  },
-});
+    include: {
+      fotos: true,
+      setor: true,
+      responsaveis: {
+        include: {
+          user: true,
+        },
+      },
+
+      criadoPor: true,
+    },
+  });
 
   if (!os) return notFound();
 
@@ -72,6 +99,7 @@ export default async function OSDetalhePage({ params }: PageProps) {
               <h1 className="text-3xl font-black text-white">
                 OS #{os.numero}
               </h1>
+
               <p className="text-slate-400">{os.titulo}</p>
             </div>
           </div>
@@ -104,12 +132,16 @@ export default async function OSDetalhePage({ params }: PageProps) {
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <Info label="Título" value={os.titulo} />
+
             <Info label="Setor" value={os.setor?.nome ?? "-"} />
 
             <Info
               label="Status"
               value={
-                <AtualizarStatusOS osId={os.id} statusAtual={os.status} />
+                <AtualizarStatusOS
+                  osId={os.id}
+                  statusAtual={os.status}
+                />
               }
             />
 
@@ -121,35 +153,52 @@ export default async function OSDetalhePage({ params }: PageProps) {
               <div className="mt-3">
                 <span
                   className={`
-        inline-flex items-center rounded-full px-4 py-2 text-sm font-black border
-        ${
-          os.prioridade === "BAIXA"
-            ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
-            : os.prioridade === "MEDIA"
-            ? "border-yellow-500/30 bg-yellow-500/15 text-yellow-300"
-            : os.prioridade === "ALTA"
-            ? "border-orange-500/30 bg-orange-500/15 text-orange-300"
-            : "border-red-500/30 bg-red-500/15 text-red-300"
-        }
-      `}
+                    inline-flex items-center rounded-full border px-4 py-2 text-sm font-black
+                    ${
+                      os.prioridade === "BAIXA"
+                        ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                        : os.prioridade === "MEDIA"
+                          ? "border-yellow-500/30 bg-yellow-500/15 text-yellow-300"
+                          : os.prioridade === "ALTA"
+                            ? "border-orange-500/30 bg-orange-500/15 text-orange-300"
+                            : "border-red-500/30 bg-red-500/15 text-red-300"
+                    }
+                  `}
                 >
                   {prioridadeLabel(os.prioridade)}
                 </span>
               </div>
             </div>
 
-            <Info label="Criada em" value={formatDate(os.createdAt)} />
+            <Info
+              label="Criada em"
+              value={formatDateTime(os.createdAt)}
+            />
 
-<Info
-  label="Criada por"
-  value={
-    <span className="text-cyan-300 font-black">
-      {os.criadoPor?.nome ?? "-"}
-    </span>
-  }
-/>
+            <Info
+              label="Criada por"
+              value={
+                <span className="font-black text-cyan-300">
+                  {os.criadoPor?.nome ?? "-"}
+                </span>
+              }
+            />
 
-<Info label="Atualizada em" value={formatDate(os.updatedAt)} />
+            {os.dataParada && (
+              <Info
+                label="Máquina parada desde"
+                value={
+                  <span className="font-black text-orange-300">
+                    {formatDateTime(os.dataParada)}
+                  </span>
+                }
+              />
+            )}
+
+            <Info
+              label="Atualizada em"
+              value={formatDate(os.updatedAt)}
+            />
           </div>
 
           <div className="mt-6">
@@ -177,10 +226,17 @@ export default async function OSDetalhePage({ params }: PageProps) {
   );
 }
 
-function Info({ label, value }: { label: string; value: React.ReactNode }) {
+function Info({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
   return (
     <div className="rounded-2xl border border-white/10 bg-[#020617]/70 p-4 shadow-sm">
       <p className="text-sm font-bold text-slate-400">{label}</p>
+
       <div className="mt-1 font-bold text-white">{value}</div>
     </div>
   );

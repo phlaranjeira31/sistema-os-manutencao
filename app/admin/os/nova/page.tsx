@@ -13,6 +13,7 @@ import {
   X,
   UserRound,
   Cpu,
+  CalendarClock,
 } from "lucide-react";
 
 type Setor = {
@@ -53,6 +54,7 @@ export default function NovaOSPage() {
     setorId: "",
     maquinaId: "",
     descricao: "",
+    dataParada: "",
     status: "NAO_INICIADA",
     prioridade: "MEDIA",
     criadoPorId: "",
@@ -206,6 +208,10 @@ export default function NovaOSPage() {
       data.append("prioridade", form.prioridade);
       data.append("criadoPorId", form.criadoPorId);
 
+      if (form.dataParada) {
+        data.append("dataParada", form.dataParada);
+      }
+
       arquivos.forEach((arquivo) => {
         data.append("arquivos", arquivo.file);
       });
@@ -349,6 +355,26 @@ export default function NovaOSPage() {
               placeholder="Descreva detalhadamente o problema encontrado..."
               className="w-full resize-y rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white placeholder:text-slate-500 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
             />
+          </div>
+
+          <div>
+            <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+              <CalendarClock size={17} />
+              Data e horário em que a máquina parou
+            </label>
+
+            <input
+              name="dataParada"
+              value={form.dataParada}
+              onChange={handleChange}
+              type="datetime-local"
+              className="w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+            />
+
+            <p className="mt-2 text-xs font-medium text-slate-500">
+              Campo opcional. Deixe vazio se a máquina não estiver parada ou
+              se o horário não for conhecido.
+            </p>
           </div>
 
           <div>

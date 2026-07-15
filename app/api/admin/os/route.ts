@@ -24,6 +24,28 @@ function parseDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+function parseDateTime(value: unknown) {
+  const text = String(value ?? "").trim();
+
+  if (!text) return undefined;
+
+  const possuiSegundos = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(text);
+
+  const date = new Date(
+    possuiSegundos ? `${text}-03:00` : `${text}:00-03:00`
+  );
+
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function formatDateTime(date: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "America/Sao_Paulo",
+  }).format(date);
+}
+
 async function uploadParaCloudinary(file: File) {
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
@@ -76,6 +98,7 @@ export async function POST(req: Request) {
 
     const dataInicio = parseDate(formData.get("dataInicio"));
     const dataPrevista = parseDate(formData.get("dataPrevista"));
+    const dataParada = parseDateTime(formData.get("dataParada"));
 
     const arquivos = formData
       .getAll("arquivos")
@@ -261,6 +284,7 @@ export async function POST(req: Request) {
 
         dataInicio,
         dataPrevista,
+        dataParada,
 
         setor: {
           connect: {
@@ -285,6 +309,8 @@ export async function POST(req: Request) {
           `Setor: ${setor.nome}`,
           `Descrição: ${descricao}`,
           `Prioridade: ${prioridade}`,
+          dataParada &&
+            `Máquina parada desde: ${formatDateTime(dataParada)}`,
           dataPrevista &&
             `Data prevista: ${dataPrevista.toLocaleDateString("pt-BR")}`,
           dataInicio &&

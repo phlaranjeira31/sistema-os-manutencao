@@ -82,6 +82,7 @@ model OrdemServico {
   dataInicio    DateTime?
   dataPrevista  DateTime?
   dataConclusao DateTime?
+  dataParada    DateTime?
 
   anotacoes     String?
   registroFinal String?
