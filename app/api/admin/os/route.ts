@@ -41,12 +41,450 @@ function parseDateTime(value: unknown) {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
-function formatDateTime(date: Date) {
+function formatDateTime(date: Date | string) {
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
     timeZone: "America/Sao_Paulo",
-  }).format(date);
+  }).format(new Date(date));
+}
+
+function prioridadeLabel(prioridade: string) {
+  const map: Record<string, string> = {
+    BAIXA: "Baixa",
+    MEDIA: "Média",
+    ALTA: "Alta",
+    URGENTE: "Urgente",
+  };
+
+  return map[prioridade] ?? prioridade;
+}
+
+function statusLabel(status: string) {
+  const map: Record<string, string> = {
+    NAO_INICIADA: "Não iniciada",
+    EM_ANDAMENTO: "Em andamento",
+    CONCLUIDA: "Concluída",
+    CANCELADA: "Cancelada",
+  };
+
+  return map[status] ?? status;
+}
+
+function escaparHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+async function enviarEmailNovaOS({
+  to,
+  osId,
+  numero,
+  maquina,
+  setor,
+  descricao,
+  prioridade,
+  status,
+  criadaPor,
+  criadaEm,
+  dataParada,
+}: {
+  to: string;
+  osId: string;
+  numero: number;
+  maquina: string;
+  setor: string;
+  descricao: string;
+  prioridade: string;
+  status: string;
+  criadaPor: string;
+  criadaEm: Date;
+  dataParada?: Date;
+}) {
+  if (!process.env.MAILERSEND_API_TOKEN) {
+    console.error(
+      "E-mail da nova OS não enviado: MAILERSEND_API_TOKEN não configurado."
+    );
+
+    return {
+      enviado: false,
+      erro: "MAILERSEND_API_TOKEN não configurado.",
+    };
+  }
+
+  if (!process.env.MAILERSEND_FROM_EMAIL) {
+    console.error(
+      "E-mail da nova OS não enviado: MAILERSEND_FROM_EMAIL não configurado."
+    );
+
+    return {
+      enviado: false,
+      erro: "MAILERSEND_FROM_EMAIL não configurado.",
+    };
+  }
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.NEXTAUTH_URL ||
+    "http://localhost:3000";
+
+  const urlOS = `${baseUrl}/admin/os/${osId}`;
+
+  const resposta = await fetch("https://api.mailersend.com/v1/email", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.MAILERSEND_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: {
+        email: process.env.MAILERSEND_FROM_EMAIL,
+        name: process.env.MAILERSEND_FROM_NAME || "Sistema de OS",
+      },
+      to: [
+        {
+          email: to,
+        },
+      ],
+      subject: `Nova OS #${numero} criada - ${maquina}`,
+      html: `
+        <div
+          style="
+            margin: 0;
+            padding: 24px;
+            background-color: #f1f5f9;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #0f172a;
+          "
+        >
+          <div
+            style="
+              max-width: 680px;
+              margin: 0 auto;
+              overflow: hidden;
+              border: 1px solid #dbeafe;
+              border-radius: 16px;
+              background-color: #ffffff;
+            "
+          >
+            <div
+              style="
+                padding: 24px;
+                background-color: #050816;
+                color: #ffffff;
+              "
+            >
+              <p
+                style="
+                  margin: 0 0 6px;
+                  color: #67e8f9;
+                  font-size: 13px;
+                  font-weight: bold;
+                  text-transform: uppercase;
+                "
+              >
+                Sistema de Manutenção
+              </p>
+
+              <h1
+                style="
+                  margin: 0;
+                  font-size: 24px;
+                  line-height: 1.3;
+                "
+              >
+                Nova Ordem de Serviço criada
+              </h1>
+
+              <p
+                style="
+                  margin: 10px 0 0;
+                  color: #cbd5e1;
+                  font-size: 14px;
+                "
+              >
+                Uma nova ocorrência foi registrada no sistema.
+              </p>
+            </div>
+
+            <div style="padding: 24px;">
+              <div
+                style="
+                  margin-bottom: 20px;
+                  padding: 16px;
+                  border: 1px solid #bae6fd;
+                  border-radius: 12px;
+                  background-color: #ecfeff;
+                "
+              >
+                <p
+                  style="
+                    margin: 0;
+                    color: #0891b2;
+                    font-size: 13px;
+                    font-weight: bold;
+                  "
+                >
+                  OS #${numero}
+                </p>
+
+                <p
+                  style="
+                    margin: 5px 0 0;
+                    font-size: 21px;
+                    font-weight: bold;
+                  "
+                >
+                  ${escaparHtml(maquina)}
+                </p>
+              </div>
+
+              <table
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                  width: 100%;
+                  border-collapse: collapse;
+                  font-size: 14px;
+                "
+              >
+                <tr>
+                  <td
+                    style="
+                      width: 160px;
+                      padding: 10px;
+                      border-bottom: 1px solid #e2e8f0;
+                      color: #64748b;
+                      font-weight: bold;
+                    "
+                  >
+                    Setor
+                  </td>
+
+                  <td
+                    style="
+                      padding: 10px;
+                      border-bottom: 1px solid #e2e8f0;
+                      font-weight: bold;
+                    "
+                  >
+                    ${escaparHtml(setor)}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td
+                    style="
+                      padding: 10px;
+                      border-bottom: 1px solid #e2e8f0;
+                      color: #64748b;
+                      font-weight: bold;
+                    "
+                  >
+                    Prioridade
+                  </td>
+
+                  <td
+                    style="
+                      padding: 10px;
+                      border-bottom: 1px solid #e2e8f0;
+                      font-weight: bold;
+                    "
+                  >
+                    ${escaparHtml(prioridadeLabel(prioridade))}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td
+                    style="
+                      padding: 10px;
+                      border-bottom: 1px solid #e2e8f0;
+                      color: #64748b;
+                      font-weight: bold;
+                    "
+                  >
+                    Status
+                  </td>
+
+                  <td
+                    style="
+                      padding: 10px;
+                      border-bottom: 1px solid #e2e8f0;
+                      font-weight: bold;
+                    "
+                  >
+                    ${escaparHtml(statusLabel(status))}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td
+                    style="
+                      padding: 10px;
+                      border-bottom: 1px solid #e2e8f0;
+                      color: #64748b;
+                      font-weight: bold;
+                    "
+                  >
+                    Criada por
+                  </td>
+
+                  <td
+                    style="
+                      padding: 10px;
+                      border-bottom: 1px solid #e2e8f0;
+                      font-weight: bold;
+                    "
+                  >
+                    ${escaparHtml(criadaPor)}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td
+                    style="
+                      padding: 10px;
+                      border-bottom: 1px solid #e2e8f0;
+                      color: #64748b;
+                      font-weight: bold;
+                    "
+                  >
+                    Criada em
+                  </td>
+
+                  <td
+                    style="
+                      padding: 10px;
+                      border-bottom: 1px solid #e2e8f0;
+                      font-weight: bold;
+                    "
+                  >
+                    ${formatDateTime(criadaEm)}
+                  </td>
+                </tr>
+
+                ${
+                  dataParada
+                    ? `
+                      <tr>
+                        <td
+                          style="
+                            padding: 10px;
+                            border-bottom: 1px solid #e2e8f0;
+                            color: #c2410c;
+                            font-weight: bold;
+                          "
+                        >
+                          Máquina parada desde
+                        </td>
+
+                        <td
+                          style="
+                            padding: 10px;
+                            border-bottom: 1px solid #e2e8f0;
+                            color: #c2410c;
+                            font-weight: bold;
+                          "
+                        >
+                          ${formatDateTime(dataParada)}
+                        </td>
+                      </tr>
+                    `
+                    : ""
+                }
+              </table>
+
+              <div style="margin-top: 22px;">
+                <p
+                  style="
+                    margin: 0 0 8px;
+                    color: #64748b;
+                    font-size: 13px;
+                    font-weight: bold;
+                  "
+                >
+                  Descrição do problema
+                </p>
+
+                <div
+                  style="
+                    padding: 15px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    background-color: #f8fafc;
+                    color: #334155;
+                    font-size: 14px;
+                    line-height: 1.6;
+                    white-space: pre-wrap;
+                  "
+                >${escaparHtml(descricao)}</div>
+              </div>
+
+              <div style="margin-top: 26px; text-align: center;">
+                <a
+                  href="${urlOS}"
+                  style="
+                    display: inline-block;
+                    padding: 13px 22px;
+                    border-radius: 10px;
+                    background-color: #06b6d4;
+                    color: #020617;
+                    font-size: 14px;
+                    font-weight: bold;
+                    text-decoration: none;
+                  "
+                >
+                  Abrir Ordem de Serviço
+                </a>
+              </div>
+            </div>
+
+            <div
+              style="
+                padding: 16px 24px;
+                border-top: 1px solid #e2e8f0;
+                background-color: #f8fafc;
+                color: #64748b;
+                font-size: 12px;
+                text-align: center;
+              "
+            >
+              Notificação automática do Sistema de OS da Sequoia.
+            </div>
+          </div>
+        </div>
+      `,
+    }),
+  });
+
+  const respostaTexto = await resposta.text();
+
+  if (!resposta.ok) {
+    console.error(
+      `Erro ao enviar e-mail da nova OS para ${to}:`,
+      resposta.status,
+      respostaTexto
+    );
+
+    return {
+      enviado: false,
+      erro: `MailerSend retornou ${resposta.status}: ${respostaTexto}`,
+    };
+  }
+
+  console.log(
+    `E-mail da nova OS #${numero} enviado para o supervisor: ${to}`
+  );
+
+  return {
+    enviado: true,
+    erro: null,
+  };
 }
 
 async function uploadParaCloudinary(file: File) {
@@ -345,7 +783,56 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json(os, { status: 201 });
+    const supervisorEmail =
+      process.env.SUPERVISOR_EMAIL?.trim() ||
+      "npinto@tortillas.com.br";
+
+    let notificacaoSupervisor: {
+      enviado: boolean;
+      erro: string | null;
+    };
+
+    try {
+      notificacaoSupervisor = await enviarEmailNovaOS({
+        to: supervisorEmail,
+        osId: os.id,
+        numero: os.numero,
+        maquina: maquina.nome,
+        setor: setor.nome,
+        descricao: os.descricao,
+        prioridade: os.prioridade,
+        status: os.status,
+        criadaPor: usuarioCriador.nome,
+        criadaEm: os.createdAt,
+        dataParada: os.dataParada ?? undefined,
+      });
+    } catch (erroEmail) {
+      console.error(
+        "Erro inesperado ao notificar supervisor sobre nova OS:",
+        erroEmail
+      );
+
+      notificacaoSupervisor = {
+        enviado: false,
+        erro:
+          erroEmail instanceof Error
+            ? erroEmail.message
+            : "Erro inesperado no envio do e-mail.",
+      };
+    }
+
+    return NextResponse.json(
+      {
+        ...os,
+
+        notificacaoSupervisor: {
+          destinatario: supervisorEmail,
+          enviado: notificacaoSupervisor.enviado,
+          erro: notificacaoSupervisor.erro,
+        },
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("ERRO REAL AO CRIAR OS:", error);
 
