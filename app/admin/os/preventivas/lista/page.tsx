@@ -8,6 +8,8 @@ import {
 import { prisma } from "@/src/lib/prisma";
 import CardPreventiva from "@/components/CardPreventiva";
 
+export const dynamic = "force-dynamic";
+
 export default async function ListaPreventivasPage() {
   const preventivas = await prisma.ordemPreventiva.findMany({
     include: {
