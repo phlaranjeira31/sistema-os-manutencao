@@ -1,13 +1,22 @@
 "use client";
 
 import {
+  ArrowLeft,
+  BarChart3,
   Bot,
+  ChevronRight,
+  ClipboardList,
   HelpCircle,
+  House,
   LoaderCircle,
   MessageCircle,
   Send,
+  Settings,
+  ShieldCheck,
   Sparkles,
   UserRound,
+  Users,
+  Wrench,
   X,
 } from "lucide-react";
 import {
@@ -25,11 +34,114 @@ type Mensagem = {
   texto: string;
 };
 
-const perguntasSugeridas = [
+type CategoriaId =
+  | "ordens"
+  | "cadastros"
+  | "preventivas"
+  | "relatorios"
+  | "acesso";
+
+type CategoriaGuia = {
+  id: CategoriaId;
+  titulo: string;
+  descricao: string;
+  perguntas: string[];
+};
+
+const perguntasDestaque = [
   "Como criar uma nova OS?",
   "Como atribuir uma OS?",
-  "Como cadastrar uma máquina?",
+  "Como alterar o status de uma OS?",
   "Como gerar um relatório?",
+  "Como cadastrar uma máquina?",
+  "Como criar uma preventiva?",
+];
+
+const categoriasGuia: CategoriaGuia[] = [
+  {
+    id: "ordens",
+    titulo: "Ordens de Serviço",
+    descricao: "Criação, consulta, atribuição e andamento das OS.",
+    perguntas: [
+      "Como criar uma nova OS?",
+      "Como consultar uma OS?",
+      "Como pesquisar uma OS?",
+      "Como atribuir uma OS a um colaborador?",
+      "Como alterar o status de uma OS?",
+      "Como ver os detalhes de uma OS?",
+      "Como informar quando a máquina parou?",
+      "Como anexar fotos ou vídeos em uma OS?",
+      "Quem aparece no campo criada por?",
+      "Por que uma máquina não aparece na nova OS?",
+    ],
+  },
+  {
+    id: "cadastros",
+    titulo: "Cadastros",
+    descricao: "Colaboradores, usuários, setores e máquinas.",
+    perguntas: [
+      "Como cadastrar um colaborador?",
+      "Como editar um colaborador?",
+      "Como desativar um colaborador?",
+      "Como cadastrar um setor?",
+      "Como editar um setor?",
+      "Como cadastrar uma máquina?",
+      "Como relacionar uma máquina a um setor?",
+      "Por que um setor não aparece no formulário?",
+      "Por que uma máquina não aparece no formulário?",
+      "Como criar um novo usuário de acesso?",
+    ],
+  },
+  {
+    id: "preventivas",
+    titulo: "Manutenções Preventivas",
+    descricao: "Agendamentos e acompanhamento das preventivas.",
+    perguntas: [
+      "Como criar uma preventiva?",
+      "Como consultar as preventivas agendadas?",
+      "Como alterar o status de uma preventiva?",
+      "Como editar uma preventiva?",
+      "Como definir a data de uma preventiva?",
+      "Como escolher quando os administradores serão avisados?",
+      "Onde vejo as preventivas cadastradas?",
+      "Por que uma preventiva não aparece na lista?",
+    ],
+  },
+  {
+    id: "relatorios",
+    titulo: "Relatórios e Indicadores",
+    descricao: "Relatórios finais, dashboards, PDF e Excel.",
+    perguntas: [
+      "Como gerar um relatório?",
+      "Como preencher o relatório de manutenção?",
+      "Onde informar o defeito encontrado?",
+      "Onde informar a causa do problema?",
+      "Onde registrar a solução aplicada?",
+      "Como registrar as peças utilizadas?",
+      "Como consultar os indicadores das OS?",
+      "Como ver os dados por colaborador?",
+      "Como ver os dados por máquina?",
+      "Como exportar um relatório em PDF?",
+      "Como exportar os dados para Excel?",
+      "Como funcionam os filtros dos indicadores?",
+    ],
+  },
+  {
+    id: "acesso",
+    titulo: "Acesso e Notificações",
+    descricao: "Login, segurança, permissões e envio de e-mails.",
+    perguntas: [
+      "Não consigo entrar no sistema. O que faço?",
+      "Como funciona o login do sistema?",
+      "Como o sistema identifica quem criou uma OS?",
+      "Como funcionam as permissões dos usuários?",
+      "Quando o supervisor recebe uma notificação?",
+      "Quando o colaborador recebe o e-mail da OS?",
+      "O que fazer quando o e-mail não chega?",
+      "Como manter minha conta segura?",
+      "Posso compartilhar meu login com outra pessoa?",
+    ],
+  },
 ];
 
 const mensagemInicial: Mensagem = {
@@ -45,12 +157,22 @@ export default function AssistenteSistema() {
   const [pergunta, setPergunta] = useState("");
   const [carregando, setCarregando] = useState(false);
 
+  const [categoriaSelecionada, setCategoriaSelecionada] =
+    useState<CategoriaId | null>(null);
+
   const [mensagens, setMensagens] = useState<Mensagem[]>([
     mensagemInicial,
   ]);
 
   const listaMensagensRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const categoriaAtual = categoriasGuia.find(
+    (categoria) => categoria.id === categoriaSelecionada
+  );
+
+  const exibindoInicio =
+    mensagens.length === 1 && !carregando;
 
   useEffect(() => {
     setMontado(true);
@@ -70,7 +192,7 @@ export default function AssistenteSistema() {
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [mensagens, carregando, aberto]);
+  }, [mensagens, carregando, aberto, categoriaSelecionada]);
 
   useEffect(() => {
     if (!aberto) return;
@@ -149,6 +271,62 @@ export default function AssistenteSistema() {
       .slice(2)}`;
   }
 
+  function voltarAoInicio() {
+    if (carregando) return;
+
+    setMensagens([mensagemInicial]);
+    setCategoriaSelecionada(null);
+    setPergunta("");
+
+    window.requestAnimationFrame(() => {
+      if (listaMensagensRef.current) {
+        listaMensagensRef.current.scrollTop = 0;
+      }
+    });
+  }
+
+  function abrirCategoria(categoriaId: CategoriaId) {
+    setCategoriaSelecionada(categoriaId);
+
+    window.requestAnimationFrame(() => {
+      if (listaMensagensRef.current) {
+        listaMensagensRef.current.scrollTop =
+          listaMensagensRef.current.scrollHeight;
+      }
+    });
+  }
+
+  function voltarParaCategorias() {
+    setCategoriaSelecionada(null);
+
+    window.requestAnimationFrame(() => {
+      if (listaMensagensRef.current) {
+        listaMensagensRef.current.scrollTop =
+          listaMensagensRef.current.scrollHeight;
+      }
+    });
+  }
+
+  function iconeCategoria(categoriaId: CategoriaId) {
+    if (categoriaId === "ordens") {
+      return <ClipboardList size={19} />;
+    }
+
+    if (categoriaId === "cadastros") {
+      return <Users size={19} />;
+    }
+
+    if (categoriaId === "preventivas") {
+      return <Wrench size={19} />;
+    }
+
+    if (categoriaId === "relatorios") {
+      return <BarChart3 size={19} />;
+    }
+
+    return <ShieldCheck size={19} />;
+  }
+
   async function enviarPergunta(textoRecebido?: string) {
     const texto = String(
       textoRecebido ?? pergunta
@@ -181,6 +359,7 @@ export default function AssistenteSistema() {
       mensagemUsuario,
     ]);
 
+    setCategoriaSelecionada(null);
     setPergunta("");
     setCarregando(true);
 
@@ -331,23 +510,47 @@ export default function AssistenteSistema() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setAberto(false)}
-                aria-label="Fechar guia do sistema"
-                className="
-                  flex h-11 w-11 shrink-0
-                  items-center justify-center
-                  rounded-xl border border-red-400/20
-                  bg-red-500/10 text-red-300
-                  transition
-                  hover:border-red-400/40
-                  hover:bg-red-500/20
-                  active:scale-95
-                "
-              >
-                <X size={21} />
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={voltarAoInicio}
+                  disabled={carregando}
+                  aria-label="Voltar ao início do guia"
+                  title="Voltar ao início"
+                  className="
+                    flex h-11 w-11 shrink-0
+                    items-center justify-center
+                    rounded-xl border border-cyan-400/20
+                    bg-cyan-500/10 text-cyan-300
+                    transition
+                    hover:border-cyan-400/40
+                    hover:bg-cyan-500/20
+                    active:scale-95
+                    disabled:cursor-not-allowed
+                    disabled:opacity-40
+                  "
+                >
+                  <House size={19} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAberto(false)}
+                  aria-label="Fechar guia do sistema"
+                  className="
+                    flex h-11 w-11 shrink-0
+                    items-center justify-center
+                    rounded-xl border border-red-400/20
+                    bg-red-500/10 text-red-300
+                    transition
+                    hover:border-red-400/40
+                    hover:bg-red-500/20
+                    active:scale-95
+                  "
+                >
+                  <X size={21} />
+                </button>
+              </div>
             </header>
 
             <div
@@ -432,42 +635,193 @@ export default function AssistenteSistema() {
                   </div>
                 )}
 
-                {mensagens.length === 1 &&
-                  !carregando && (
-                    <div className="pt-2">
-                      <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                        <HelpCircle size={14} />
-                        Perguntas rápidas
-                      </div>
+                {exibindoInicio && (
+                  <div className="space-y-5 pt-2">
+                    {!categoriaAtual ? (
+                      <>
+                        <div>
+                          <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                            <HelpCircle size={14} />
+                            Perguntas em destaque
+                          </div>
 
-                      <div className="grid gap-2">
-                        {perguntasSugeridas.map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            onClick={() =>
-                              enviarPergunta(item)
-                            }
-                            className="
-                              w-full rounded-xl
-                              border border-white/10
-                              bg-white/[0.04]
-                              px-4 py-3
-                              text-left text-sm
-                              font-semibold text-slate-300
-                              transition
-                              hover:border-cyan-400/30
-                              hover:bg-cyan-400/10
-                              hover:text-white
-                              active:scale-[0.99]
-                            "
-                          >
-                            {item}
-                          </button>
-                        ))}
+                          <div className="grid gap-2">
+                            {perguntasDestaque.map((item) => (
+                              <button
+                                key={item}
+                                type="button"
+                                onClick={() =>
+                                  enviarPergunta(item)
+                                }
+                                className="
+                                  w-full rounded-xl
+                                  border border-white/10
+                                  bg-white/[0.04]
+                                  px-4 py-3
+                                  text-left text-sm
+                                  font-semibold text-slate-300
+                                  transition
+                                  hover:border-cyan-400/30
+                                  hover:bg-cyan-400/10
+                                  hover:text-white
+                                  active:scale-[0.99]
+                                "
+                              >
+                                {item}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                            <Settings size={14} />
+                            Explore por assunto
+                          </div>
+
+                          <div className="grid gap-2">
+                            {categoriasGuia.map((categoria) => (
+                              <button
+                                key={categoria.id}
+                                type="button"
+                                onClick={() =>
+                                  abrirCategoria(categoria.id)
+                                }
+                                className="
+                                  group flex w-full
+                                  items-center gap-3
+                                  rounded-2xl
+                                  border border-white/10
+                                  bg-white/[0.04]
+                                  p-3 text-left
+                                  transition
+                                  hover:border-cyan-400/30
+                                  hover:bg-cyan-400/10
+                                  active:scale-[0.99]
+                                "
+                              >
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/10 text-cyan-300">
+                                  {iconeCategoria(categoria.id)}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <p className="break-words text-sm font-black text-white">
+                                    {categoria.titulo}
+                                  </p>
+
+                                  <p className="mt-1 break-words text-xs font-medium leading-relaxed text-slate-500">
+                                    {categoria.descricao}
+                                  </p>
+                                </div>
+
+                                <ChevronRight
+                                  size={18}
+                                  className="shrink-0 text-slate-600 transition group-hover:translate-x-1 group-hover:text-cyan-300"
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={voltarParaCategorias}
+                          className="
+                            mb-4 inline-flex
+                            items-center gap-2
+                            rounded-xl
+                            border border-white/10
+                            bg-white/[0.04]
+                            px-3 py-2
+                            text-xs font-bold text-slate-300
+                            transition
+                            hover:border-cyan-400/30
+                            hover:bg-cyan-400/10
+                            hover:text-white
+                          "
+                        >
+                          <ArrowLeft size={15} />
+                          Voltar aos assuntos
+                        </button>
+
+                        <div className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-300">
+                              {iconeCategoria(
+                                categoriaAtual.id
+                              )}
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="break-words text-sm font-black text-white">
+                                {categoriaAtual.titulo}
+                              </p>
+
+                              <p className="mt-1 break-words text-xs font-medium text-slate-400">
+                                {categoriaAtual.descricao}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-2">
+                          {categoriaAtual.perguntas.map(
+                            (item) => (
+                              <button
+                                key={item}
+                                type="button"
+                                onClick={() =>
+                                  enviarPergunta(item)
+                                }
+                                className="
+                                  w-full rounded-xl
+                                  border border-white/10
+                                  bg-white/[0.04]
+                                  px-4 py-3
+                                  text-left text-sm
+                                  font-semibold text-slate-300
+                                  transition
+                                  hover:border-cyan-400/30
+                                  hover:bg-cyan-400/10
+                                  hover:text-white
+                                  active:scale-[0.99]
+                                "
+                              >
+                                {item}
+                              </button>
+                            )
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                )}
+
+                {mensagens.length > 1 && !carregando && (
+                  <div className="flex justify-center pt-3">
+                    <button
+                      type="button"
+                      onClick={voltarAoInicio}
+                      className="
+                        inline-flex items-center gap-2
+                        rounded-xl
+                        border border-cyan-400/20
+                        bg-cyan-500/10
+                        px-4 py-2.5
+                        text-xs font-black text-cyan-300
+                        transition
+                        hover:border-cyan-400/40
+                        hover:bg-cyan-500/20
+                        active:scale-95
+                      "
+                    >
+                      <House size={16} />
+                      Voltar ao início
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
