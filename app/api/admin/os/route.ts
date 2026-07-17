@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import { prisma } from "@/src/lib/prisma";
+import { authOptions } from "@/src/lib/auth";
 import cloudinary from "@/src/lib/cloudinary";
 
 export const runtime = "nodejs";
@@ -29,7 +31,8 @@ function parseDateTime(value: unknown) {
 
   if (!text) return undefined;
 
-  const possuiSegundos = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(text);
+  const possuiSegundos =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(text);
 
   const date = new Date(
     possuiSegundos ? `${text}-03:00` : `${text}:00-03:00`
@@ -78,6 +81,19 @@ async function uploadParaCloudinary(file: File) {
 
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+
+    const usuarioLogadoId = String(
+      (session?.user as { id?: string } | undefined)?.id ?? ""
+    ).trim();
+
+    if (!usuarioLogadoId) {
+      return NextResponse.json(
+        { error: "Usuário não autenticado." },
+        { status: 401 }
+      );
+    }
+
     const formData = await req.formData();
 
     const setorId = String(formData.get("setorId") ?? "").trim();
@@ -90,10 +106,6 @@ export async function POST(req: Request) {
 
     const prioridade = String(
       formData.get("prioridade") ?? "MEDIA"
-    ).trim();
-
-    const criadoPorId = String(
-      formData.get("criadoPorId") ?? ""
     ).trim();
 
     const dataInicio = parseDate(formData.get("dataInicio"));
@@ -124,13 +136,6 @@ export async function POST(req: Request) {
     if (!descricao) {
       return NextResponse.json(
         { error: "A descrição é obrigatória." },
-        { status: 400 }
-      );
-    }
-
-    if (!criadoPorId) {
-      return NextResponse.json(
-        { error: "Selecione quem criou a OS." },
         { status: 400 }
       );
     }
@@ -189,7 +194,7 @@ export async function POST(req: Request) {
 
       prisma.user.findUnique({
         where: {
-          id: criadoPorId,
+          id: usuarioLogadoId,
         },
         select: {
           id: true,
@@ -239,15 +244,15 @@ export async function POST(req: Request) {
 
     if (!usuarioCriador) {
       return NextResponse.json(
-        { error: "Usuário criador não encontrado." },
+        { error: "Usuário da sessão não encontrado." },
         { status: 404 }
       );
     }
 
     if (!usuarioCriador.ativo) {
       return NextResponse.json(
-        { error: "O usuário criador está inativo." },
-        { status: 400 }
+        { error: "O usuário da sessão está inativo." },
+        { status: 403 }
       );
     }
 
@@ -312,9 +317,13 @@ export async function POST(req: Request) {
           dataParada &&
             `Máquina parada desde: ${formatDateTime(dataParada)}`,
           dataPrevista &&
-            `Data prevista: ${dataPrevista.toLocaleDateString("pt-BR")}`,
+            `Data prevista: ${dataPrevista.toLocaleDateString(
+              "pt-BR"
+            )}`,
           dataInicio &&
-            `Data de início: ${dataInicio.toLocaleDateString("pt-BR")}`,
+            `Data de início: ${dataInicio.toLocaleDateString(
+              "pt-BR"
+            )}`,
           `Criada por: ${usuarioCriador.nome}`,
         ]
           .filter(Boolean)

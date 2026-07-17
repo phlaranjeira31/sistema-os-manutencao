@@ -27,9 +27,9 @@ type Maquina = {
   setorId: string;
 };
 
-type Usuario = {
-  id: string;
-  nome: string;
+type UsuarioLogado = {
+  name?: string | null;
+  email?: string | null;
 };
 
 type PreviewArquivo = {
@@ -43,11 +43,13 @@ export default function NovaOSPage() {
 
   const [loading, setLoading] = useState(false);
   const [loadingMaquinas, setLoadingMaquinas] = useState(false);
+  const [loadingSessao, setLoadingSessao] = useState(true);
   const [erro, setErro] = useState("");
 
   const [setores, setSetores] = useState<Setor[]>([]);
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [usuarioLogado, setUsuarioLogado] =
+    useState<UsuarioLogado | null>(null);
   const [arquivos, setArquivos] = useState<PreviewArquivo[]>([]);
 
   const [form, setForm] = useState({
@@ -57,34 +59,45 @@ export default function NovaOSPage() {
     dataParada: "",
     status: "NAO_INICIADA",
     prioridade: "MEDIA",
-    criadoPorId: "",
   });
 
   useEffect(() => {
     async function carregarDados() {
       try {
-        const [setoresRes, usuariosRes] = await Promise.all([
+        const [setoresRes, sessaoRes] = await Promise.all([
           fetch("/api/admin/setores", {
             cache: "no-store",
           }),
-          fetch("/api/admin/usuarios-os", {
+
+          fetch("/api/auth/session", {
             cache: "no-store",
           }),
         ]);
 
         const setoresData = await setoresRes.json();
-        const usuariosData = await usuariosRes.json();
+        const sessaoData = await sessaoRes.json();
 
         if (setoresRes.ok) {
           setSetores(Array.isArray(setoresData) ? setoresData : []);
         }
 
-        if (usuariosRes.ok) {
-          setUsuarios(Array.isArray(usuariosData) ? usuariosData : []);
+        if (sessaoRes.ok && sessaoData?.user) {
+          setUsuarioLogado({
+            name: sessaoData.user.name,
+            email: sessaoData.user.email,
+          });
+        } else {
+          setUsuarioLogado(null);
+          setErro(
+            "Não foi possível identificar o usuário logado. Entre novamente no sistema."
+          );
         }
       } catch (error) {
         console.error("Erro ao buscar dados:", error);
+
         setErro("Não foi possível carregar os dados do formulário.");
+      } finally {
+        setLoadingSessao(false);
       }
     }
 
@@ -103,7 +116,9 @@ export default function NovaOSPage() {
         setErro("");
 
         const res = await fetch(
-          `/api/admin/maquinas?setorId=${encodeURIComponent(form.setorId)}`,
+          `/api/admin/maquinas?setorId=${encodeURIComponent(
+            form.setorId
+          )}`,
           {
             cache: "no-store",
           }
@@ -120,6 +135,7 @@ export default function NovaOSPage() {
         console.error("Erro ao buscar máquinas:", error);
 
         setMaquinas([]);
+
         setErro(
           error instanceof Error
             ? error.message
@@ -147,7 +163,9 @@ export default function NovaOSPage() {
     }));
   }
 
-  function handleArquivosChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleArquivosChange(
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
     const files = Array.from(e.target.files ?? []);
 
     const novosArquivos: PreviewArquivo[] = files.map((file) => ({
@@ -176,6 +194,13 @@ export default function NovaOSPage() {
     e.preventDefault();
     setErro("");
 
+    if (!usuarioLogado) {
+      setErro(
+        "Não foi possível identificar o usuário logado. Entre novamente no sistema."
+      );
+      return;
+    }
+
     if (!form.setorId) {
       setErro("Selecione o setor.");
       return;
@@ -191,11 +216,6 @@ export default function NovaOSPage() {
       return;
     }
 
-    if (!form.criadoPorId) {
-      setErro("Selecione quem criou a OS.");
-      return;
-    }
-
     try {
       setLoading(true);
 
@@ -206,7 +226,6 @@ export default function NovaOSPage() {
       data.append("descricao", form.descricao);
       data.append("status", form.status);
       data.append("prioridade", form.prioridade);
-      data.append("criadoPorId", form.criadoPorId);
 
       if (form.dataParada) {
         data.append("dataParada", form.dataParada);
@@ -248,7 +267,9 @@ export default function NovaOSPage() {
             </div>
 
             <div className="min-w-0">
-              <p className="text-sm font-bold text-cyan-300">Cadastro</p>
+              <p className="text-sm font-bold text-cyan-300">
+                Cadastro
+              </p>
 
               <h1 className="break-words text-2xl font-black text-white sm:text-3xl">
                 Nova Ordem de Serviço
@@ -372,8 +393,8 @@ export default function NovaOSPage() {
             />
 
             <p className="mt-2 text-xs font-medium text-slate-500">
-              Campo opcional. Deixe vazio se a máquina não estiver parada ou
-              se o horário não for conhecido.
+              Campo opcional. Deixe vazio se a máquina não estiver
+              parada ou se o horário não for conhecido.
             </p>
           </div>
 
@@ -431,20 +452,45 @@ export default function NovaOSPage() {
               Criada por
             </label>
 
-            <select
-              name="criadoPorId"
-              value={form.criadoPorId}
-              onChange={handleChange}
-              className="w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+            <div
+              className={`rounded-xl border px-4 py-4 ${
+                usuarioLogado
+                  ? "border-cyan-400/20 bg-cyan-500/10"
+                  : "border-red-500/30 bg-red-500/10"
+              }`}
             >
-              <option value="">Selecione o colaborador</option>
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                    usuarioLogado
+                      ? "bg-cyan-400/15 text-cyan-300"
+                      : "bg-red-500/15 text-red-300"
+                  }`}
+                >
+                  <UserRound size={19} />
+                </div>
 
-              {usuarios.map((usuario) => (
-                <option key={usuario.id} value={usuario.id}>
-                  {usuario.nome}
-                </option>
-              ))}
-            </select>
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-black text-white">
+                    {loadingSessao
+                      ? "Identificando usuário..."
+                      : usuarioLogado?.name ||
+                        "Usuário não identificado"}
+                  </p>
+
+                  {usuarioLogado?.email && (
+                    <p className="break-words text-xs font-semibold text-slate-400">
+                      {usuarioLogado.email}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <p className="mt-2 text-xs font-medium text-slate-500">
+              O criador da OS é definido automaticamente pelo usuário
+              conectado ao sistema.
+            </p>
           </div>
 
           <div>
@@ -489,7 +535,9 @@ export default function NovaOSPage() {
             type="submit"
             disabled={
               loading ||
+              loadingSessao ||
               loadingMaquinas ||
+              !usuarioLogado ||
               !form.setorId ||
               !form.maquinaId
             }
