@@ -17,6 +17,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 
 type Mensagem = {
   id: string;
@@ -39,35 +40,60 @@ const mensagemInicial: Mensagem = {
 };
 
 export default function AssistenteSistema() {
+  const [montado, setMontado] = useState(false);
   const [aberto, setAberto] = useState(false);
   const [pergunta, setPergunta] = useState("");
   const [carregando, setCarregando] = useState(false);
+
   const [mensagens, setMensagens] = useState<Mensagem[]>([
     mensagemInicial,
   ]);
 
-  const fimMensagensRef = useRef<HTMLDivElement | null>(null);
+  const listaMensagensRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
+    setMontado(true);
+  }, []);
+
+  useEffect(() => {
     if (!aberto) return;
+
+    const lista = listaMensagensRef.current;
+
+    if (!lista) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      lista.scrollTop = lista.scrollHeight;
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [mensagens, carregando, aberto]);
+
+  useEffect(() => {
+    if (!aberto) return;
+
+    const telaDesktop = window.matchMedia(
+      "(min-width: 768px)"
+    ).matches;
+
+    if (!telaDesktop) return;
 
     const timeout = window.setTimeout(() => {
       inputRef.current?.focus();
     }, 200);
 
-    return () => window.clearTimeout(timeout);
+    return () => {
+      window.clearTimeout(timeout);
+    };
   }, [aberto]);
 
   useEffect(() => {
-    fimMensagensRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "end",
-    });
-  }, [mensagens, carregando]);
-
-  useEffect(() => {
-    function fecharComEscape(event: globalThis.KeyboardEvent) {
+    function fecharComEscape(
+      event: globalThis.KeyboardEvent
+    ) {
       if (event.key === "Escape") {
         setAberto(false);
       }
@@ -83,17 +109,37 @@ export default function AssistenteSistema() {
   useEffect(() => {
     if (!aberto) return;
 
-    const overflowBodyAnterior = document.body.style.overflow;
-    const overflowHtmlAnterior =
+    const scrollAtual = window.scrollY;
+
+    const bodyPositionAnterior =
+      document.body.style.position;
+    const bodyTopAnterior = document.body.style.top;
+    const bodyWidthAnterior = document.body.style.width;
+    const bodyOverflowAnterior =
+      document.body.style.overflow;
+
+    const htmlOverflowAnterior =
       document.documentElement.style.overflow;
 
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollAtual}px`;
+    document.body.style.width = "100%";
     document.body.style.overflow = "hidden";
+
     document.documentElement.style.overflow = "hidden";
 
     return () => {
-      document.body.style.overflow = overflowBodyAnterior;
+      document.body.style.position =
+        bodyPositionAnterior;
+      document.body.style.top = bodyTopAnterior;
+      document.body.style.width = bodyWidthAnterior;
+      document.body.style.overflow =
+        bodyOverflowAnterior;
+
       document.documentElement.style.overflow =
-        overflowHtmlAnterior;
+        htmlOverflowAnterior;
+
+      window.scrollTo(0, scrollAtual);
     };
   }, [aberto]);
 
@@ -104,7 +150,9 @@ export default function AssistenteSistema() {
   }
 
   async function enviarPergunta(textoRecebido?: string) {
-    const texto = String(textoRecebido ?? pergunta).trim();
+    const texto = String(
+      textoRecebido ?? pergunta
+    ).trim();
 
     if (!texto || carregando) return;
 
@@ -114,7 +162,8 @@ export default function AssistenteSistema() {
         {
           id: criarId(),
           autor: "assistente",
-          texto: "A pergunta deve ter no máximo 500 caracteres.",
+          texto:
+            "A pergunta deve ter no máximo 500 caracteres.",
         },
       ]);
 
@@ -138,9 +187,11 @@ export default function AssistenteSistema() {
     try {
       const resposta = await fetch("/api/assistente", {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           pergunta: texto,
         }),
@@ -169,7 +220,10 @@ export default function AssistenteSistema() {
         },
       ]);
     } catch (error) {
-      console.error("Erro no assistente do sistema:", error);
+      console.error(
+        "Erro no assistente do sistema:",
+        error
+      );
 
       setMensagens((mensagensAtuais) => [
         ...mensagensAtuais,
@@ -187,7 +241,9 @@ export default function AssistenteSistema() {
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
     enviarPergunta();
   }
@@ -201,40 +257,59 @@ export default function AssistenteSistema() {
     }
   }
 
-  return (
+  if (!montado) {
+    return null;
+  }
+
+  return createPortal(
     <>
       {aberto && (
-        <div className="fixed inset-0 z-[1000]">
-          <button
-            type="button"
-            aria-label="Fechar assistente"
-            onClick={() => setAberto(false)}
-            className="absolute inset-0 h-full w-full cursor-default bg-black/75 backdrop-blur-sm"
-          />
+        <div
+          className="
+            fixed inset-0 z-[2147483646]
+            flex items-stretch justify-stretch
+            bg-black/80 backdrop-blur-sm
 
+            md:items-end md:justify-end
+            md:p-5
+          "
+          onClick={() => setAberto(false)}
+        >
           <section
             role="dialog"
             aria-modal="true"
             aria-label="Assistente do Sistema de OS"
+            onClick={(event) => event.stopPropagation()}
             className="
-              absolute inset-0 z-[1]
-              grid h-[100dvh] w-full
-              grid-rows-[auto_minmax(0,1fr)_auto]
+              relative z-[1]
+              flex h-[100dvh] w-full
+              min-w-0 flex-col
               overflow-hidden
-              border-white/10 bg-[#050816]
-              shadow-[0_24px_100px_rgba(0,0,0,0.8)]
+              bg-[#050816]
+              text-white
+              shadow-[0_24px_100px_rgba(0,0,0,0.85)]
 
-              sm:inset-auto
-              sm:bottom-24 sm:right-6
-              sm:h-[min(680px,calc(100dvh-120px))]
-              sm:w-[440px]
-              sm:rounded-3xl
-              sm:border
+              md:h-[min(700px,calc(100dvh-40px))]
+              md:w-[440px]
+              md:rounded-3xl
+              md:border md:border-cyan-400/20
             "
           >
-            <header className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 bg-[#071021] px-4 py-3 shadow-lg sm:px-5 sm:py-4">
+            <header
+              className="
+                z-10 flex shrink-0
+                items-center justify-between gap-3
+                border-b border-white/10
+                bg-[#071021]
+                px-4 pb-4
+                pt-[max(16px,env(safe-area-inset-top))]
+                shadow-[0_10px_35px_rgba(0,0,0,0.28)]
+
+                md:px-5 md:py-4
+              "
+            >
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.12)]">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.14)]">
                   <Bot size={22} />
                 </div>
 
@@ -259,22 +334,45 @@ export default function AssistenteSistema() {
               <button
                 type="button"
                 onClick={() => setAberto(false)}
-                aria-label="Fechar assistente"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 transition hover:border-red-400/30 hover:bg-red-500/10 hover:text-red-300"
+                aria-label="Fechar guia do sistema"
+                className="
+                  flex h-11 w-11 shrink-0
+                  items-center justify-center
+                  rounded-xl border border-red-400/20
+                  bg-red-500/10 text-red-300
+                  transition
+                  hover:border-red-400/40
+                  hover:bg-red-500/20
+                  active:scale-95
+                "
               >
-                <X size={19} />
+                <X size={21} />
               </button>
             </header>
 
-            <div className="min-h-0 overflow-y-auto overscroll-contain bg-[#050816] px-3 py-4 sm:px-4 sm:py-5">
+            <div
+              ref={listaMensagensRef}
+              aria-live="polite"
+              className="
+                min-h-0 flex-1
+                overflow-y-auto overscroll-contain
+                bg-[#050816]
+                px-3 py-4
+                touch-pan-y
+
+                sm:px-4
+                md:py-5
+              "
+            >
               <div className="mx-auto w-full max-w-2xl space-y-4">
                 {mensagens.map((mensagem) => {
-                  const usuario = mensagem.autor === "usuario";
+                  const usuario =
+                    mensagem.autor === "usuario";
 
                   return (
                     <div
                       key={mensagem.id}
-                      className={`flex items-end gap-2 ${
+                      className={`flex min-w-0 items-end gap-2 ${
                         usuario
                           ? "justify-end"
                           : "justify-start"
@@ -287,13 +385,23 @@ export default function AssistenteSistema() {
                       )}
 
                       <div
-                        className={`max-w-[86%] break-words rounded-2xl px-4 py-3 text-sm font-medium leading-relaxed shadow-sm sm:max-w-[82%] ${
-                          usuario
-                            ? "rounded-br-md bg-cyan-400 text-slate-950"
-                            : "rounded-bl-md border border-white/10 bg-white/[0.06] text-slate-200"
-                        }`}
+                        className={`
+                          max-w-[calc(100%-42px)]
+                          min-w-0 break-words
+                          rounded-2xl px-4 py-3
+                          text-sm font-medium
+                          leading-relaxed shadow-sm
+
+                          sm:max-w-[84%]
+
+                          ${
+                            usuario
+                              ? "rounded-br-md bg-cyan-400 text-slate-950"
+                              : "rounded-bl-md border border-white/10 bg-white/[0.06] text-slate-200"
+                          }
+                        `}
                       >
-                        <p className="whitespace-pre-wrap">
+                        <p className="whitespace-pre-wrap break-words">
                           {mensagem.texto}
                         </p>
                       </div>
@@ -324,42 +432,57 @@ export default function AssistenteSistema() {
                   </div>
                 )}
 
-                {mensagens.length === 1 && !carregando && (
-                  <div className="pt-2">
-                    <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                      <HelpCircle size={14} />
-                      Perguntas rápidas
-                    </div>
+                {mensagens.length === 1 &&
+                  !carregando && (
+                    <div className="pt-2">
+                      <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                        <HelpCircle size={14} />
+                        Perguntas rápidas
+                      </div>
 
-                    <div className="grid gap-2">
-                      {perguntasSugeridas.map((item) => (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() =>
-                            enviarPergunta(item)
-                          }
-                          className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-sm font-semibold text-slate-300 transition hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-white active:scale-[0.99]"
-                        >
-                          {item}
-                        </button>
-                      ))}
+                      <div className="grid gap-2">
+                        {perguntasSugeridas.map((item) => (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() =>
+                              enviarPergunta(item)
+                            }
+                            className="
+                              w-full rounded-xl
+                              border border-white/10
+                              bg-white/[0.04]
+                              px-4 py-3
+                              text-left text-sm
+                              font-semibold text-slate-300
+                              transition
+                              hover:border-cyan-400/30
+                              hover:bg-cyan-400/10
+                              hover:text-white
+                              active:scale-[0.99]
+                            "
+                          >
+                            {item}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-
-                <div ref={fimMensagensRef} />
+                  )}
               </div>
             </div>
 
             <form
               onSubmit={handleSubmit}
               className="
+                z-10 shrink-0
                 border-t border-white/10
-                bg-[#071021] px-3 pt-3
-                pb-[max(12px,env(safe-area-inset-bottom))]
-                shadow-[0_-15px_40px_rgba(0,0,0,0.3)]
-                sm:p-4
+                bg-[#071021]
+                px-3 pt-3
+                pb-[max(14px,env(safe-area-inset-bottom))]
+                shadow-[0_-12px_35px_rgba(0,0,0,0.32)]
+
+                sm:px-4
+                md:pb-4
               "
             >
               <div className="flex min-w-0 items-end gap-2 rounded-2xl border border-white/10 bg-[#020617] p-2 transition focus-within:border-cyan-400/40 focus-within:ring-2 focus-within:ring-cyan-400/10">
@@ -377,33 +500,53 @@ export default function AssistenteSistema() {
                   maxLength={500}
                   placeholder="Digite sua dúvida..."
                   aria-label="Digite sua dúvida sobre o sistema"
-                  className="max-h-28 min-h-[44px] min-w-0 flex-1 resize-none bg-transparent px-2 py-3 text-sm font-medium text-white outline-none placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="
+                    max-h-28 min-h-[46px]
+                    min-w-0 flex-1 resize-none
+                    bg-transparent
+                    px-2 py-3
+                    text-base font-medium text-white
+                    outline-none
+                    placeholder:text-slate-500
+                    disabled:cursor-not-allowed
+                    disabled:opacity-60
+
+                    md:text-sm
+                  "
                 />
 
                 <button
                   type="submit"
-                  disabled={!pergunta.trim() || carregando}
+                  disabled={
+                    !pergunta.trim() || carregando
+                  }
                   aria-label="Enviar pergunta"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/10 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="
+                    flex h-12 w-12 shrink-0
+                    items-center justify-center
+                    rounded-xl bg-cyan-400
+                    text-slate-950
+                    shadow-lg shadow-cyan-500/10
+                    transition
+                    hover:bg-cyan-300
+                    active:scale-95
+                    disabled:cursor-not-allowed
+                    disabled:opacity-50
+                  "
                 >
                   {carregando ? (
                     <LoaderCircle
-                      size={18}
+                      size={19}
                       className="animate-spin"
                     />
                   ) : (
-                    <Send size={18} />
+                    <Send size={20} />
                   )}
                 </button>
               </div>
 
               <div className="mt-2 flex items-center justify-between gap-3 px-1">
-                <p className="hidden text-[11px] font-medium text-slate-500 sm:block">
-                  Enter para enviar • Shift + Enter para quebrar
-                  linha
-                </p>
-
-                <p className="text-[11px] font-medium text-slate-500 sm:hidden">
+                <p className="text-[11px] font-medium text-slate-500">
                   Digite sua dúvida sobre o sistema
                 </p>
 
@@ -423,12 +566,17 @@ export default function AssistenteSistema() {
           aria-label="Abrir guia do sistema"
           aria-expanded={false}
           className="
-            fixed bottom-4 right-4 z-[999]
-            flex h-14 w-14 items-center justify-center
-            rounded-full border border-cyan-300/40
+            fixed bottom-4 right-4
+            z-[2147483645]
+            flex h-14 w-14
+            items-center justify-center
+            rounded-full
+            border border-cyan-300/40
             bg-cyan-400 text-slate-950
             shadow-[0_10px_40px_rgba(34,211,238,0.35)]
-            transition hover:scale-105 hover:bg-cyan-300
+            transition
+            hover:scale-105
+            hover:bg-cyan-300
             active:scale-95
 
             sm:bottom-6 sm:right-6
@@ -442,6 +590,7 @@ export default function AssistenteSistema() {
           </span>
         </button>
       )}
-    </>
+    </>,
+    document.body
   );
 }
