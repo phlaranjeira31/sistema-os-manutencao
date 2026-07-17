@@ -9,6 +9,8 @@ import {
 
 import { prisma } from "@/src/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export default async function PreventivasPage() {
   const setores = await prisma.setor.findMany({
     where: {
