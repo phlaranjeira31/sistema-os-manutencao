@@ -8,24 +8,44 @@ export async function POST(req: Request) {
     const titulo = String(formData.get("titulo") ?? "").trim();
     const descricao = String(formData.get("descricao") ?? "").trim();
     const setorId = String(formData.get("setorId") ?? "").trim();
-    const prioridade = String(formData.get("prioridade") ?? "MEDIA").trim();
-    const dataAgendadaTexto = String(formData.get("dataAgendada") ?? "").trim();
-    const diasAntesAviso = Number(formData.get("diasAntesAviso") ?? 1);
+    const prioridade = String(
+      formData.get("prioridade") ?? "MEDIA"
+    ).trim();
+
+    const dataAgendadaTexto = String(
+      formData.get("dataAgendada") ?? ""
+    ).trim();
+
+    const diasAntesAviso = Number(
+      formData.get("diasAntesAviso") ?? 1
+    );
 
     if (!titulo) {
-      return NextResponse.json({ error: "Título obrigatório." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Título obrigatório." },
+        { status: 400 }
+      );
     }
 
     if (!descricao) {
-      return NextResponse.json({ error: "Descrição obrigatória." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Descrição obrigatória." },
+        { status: 400 }
+      );
     }
 
     if (!setorId) {
-      return NextResponse.json({ error: "Setor obrigatório." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Setor obrigatório." },
+        { status: 400 }
+      );
     }
 
     if (!dataAgendadaTexto) {
-      return NextResponse.json({ error: "Data agendada obrigatória." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Data agendada obrigatória." },
+        { status: 400 }
+      );
     }
 
     const preventiva = await prisma.ordemPreventiva.create({
@@ -34,12 +54,17 @@ export async function POST(req: Request) {
         descricao,
         prioridade: prioridade as any,
         setorId,
-        dataAgendada: new Date(`${dataAgendadaTexto}T00:00:00`),
+        dataAgendada: new Date(
+          `${dataAgendadaTexto}T00:00:00`
+        ),
         diasAntesAviso,
       },
     });
 
-    return NextResponse.redirect(new URL("/admin/os/preventivas", req.url));
+    return NextResponse.redirect(
+      new URL("/admin/os/preventivas", req.url),
+      303
+    );
   } catch (error) {
     console.error("Erro ao criar OS preventiva:", error);
 

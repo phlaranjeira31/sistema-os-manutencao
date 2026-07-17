@@ -16,6 +16,7 @@ import Link from "next/link";
 import { authOptions } from "@/src/lib/auth";
 import HeaderUsuario from "@/components/HeaderUsuario";
 import AdminMenu from "@/components/AdminMenu";
+import AssistenteSistema from "@/components/AssistenteSistema";
 import { prisma } from "@/src/lib/prisma";
 
 export default async function AdminPage() {
@@ -197,6 +198,7 @@ export default async function AdminPage() {
           </div>
         </section>
       </div>
+       <AssistenteSistema />
     </main>
   );
 }
