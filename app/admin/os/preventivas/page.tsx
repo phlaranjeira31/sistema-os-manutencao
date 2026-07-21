@@ -3,23 +3,70 @@ import {
   ArrowLeft,
   CalendarClock,
   ListChecks,
-  Save,
-  ShieldAlert,
 } from "lucide-react";
 
 import { prisma } from "@/src/lib/prisma";
+import FormularioPreventiva from "@/components/FormularioPreventiva";
 
 export const dynamic = "force-dynamic";
 
 export default async function PreventivasPage() {
-  const setores = await prisma.setor.findMany({
-    where: {
-      ativo: true,
-    },
-    orderBy: {
-      nome: "asc",
-    },
-  });
+  const [setoresBanco, colaboradoresBanco] = await Promise.all([
+    prisma.setor.findMany({
+      where: {
+        ativo: true,
+      },
+      select: {
+        id: true,
+        nome: true,
+        maquinas: {
+          where: {
+            ativo: true,
+          },
+          select: {
+            id: true,
+            nome: true,
+          },
+          orderBy: {
+            nome: "asc",
+          },
+        },
+      },
+      orderBy: {
+        nome: "asc",
+      },
+    }),
+
+    prisma.user.findMany({
+      where: {
+        ativo: true,
+        perfil: "COLABORADOR",
+      },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+      },
+      orderBy: {
+        nome: "asc",
+      },
+    }),
+  ]);
+
+  const setores = setoresBanco.map((setor) => ({
+    id: setor.id,
+    nome: setor.nome,
+    maquinas: setor.maquinas.map((maquina) => ({
+      id: maquina.id,
+      nome: maquina.nome,
+    })),
+  }));
+
+  const colaboradores = colaboradoresBanco.map((colaborador) => ({
+    id: colaborador.id,
+    nome: colaborador.nome,
+    email: colaborador.email,
+  }));
 
   return (
     <main className="min-h-screen bg-[#050816] px-4 py-8 text-white md:px-10">
@@ -40,7 +87,7 @@ export default async function PreventivasPage() {
               </h1>
 
               <p className="mt-1 text-slate-400">
-                Agende manutenções preventivas automáticas.
+                Agende manutenções preventivas.
               </p>
             </div>
           </div>
@@ -64,117 +111,10 @@ export default async function PreventivasPage() {
           </div>
         </div>
 
-        <form
-          action="/api/admin/os/preventivas"
-          method="POST"
-          className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/30"
-        >
-          <div className="grid gap-5 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-300">
-                Título
-              </label>
-
-              <input
-                type="text"
-                name="titulo"
-                required
-                placeholder="Ex: Troca de rolamento"
-                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-white outline-none focus:border-cyan-400"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-300">
-                Setor
-              </label>
-
-              <select
-                name="setorId"
-                required
-                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-white outline-none focus:border-cyan-400"
-              >
-                <option value="">
-                  Selecione o setor
-                </option>
-
-                {setores.map((setor: any) => (
-                  <option key={setor.id} value={setor.id}>
-                    {setor.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="mb-2 block text-sm font-bold text-slate-300">
-                Descrição
-              </label>
-
-              <textarea
-                name="descricao"
-                required
-                rows={5}
-                placeholder="Detalhes da preventiva..."
-                className="w-full rounded-2xl border border-white/10 bg-[#050816] p-4 text-white outline-none focus:border-cyan-400"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-300">
-                Prioridade
-              </label>
-
-              <select
-                name="prioridade"
-                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-white outline-none focus:border-cyan-400"
-              >
-                <option value="BAIXA">Baixa</option>
-                <option value="MEDIA">Média</option>
-                <option value="ALTA">Alta</option>
-                <option value="URGENTE">Urgente</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-300">
-                Data agendada
-              </label>
-
-              <input
-                type="date"
-                name="dataAgendada"
-                required
-                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-white outline-none focus:border-cyan-400"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-300">
-                <ShieldAlert size={16} />
-                Avisar admins antes
-              </label>
-
-              <select
-                name="diasAntesAviso"
-                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-white outline-none focus:border-cyan-400"
-              >
-                <option value="1">1 dia antes</option>
-                <option value="2">2 dias antes</option>
-                <option value="3">3 dias antes</option>
-                <option value="7">7 dias antes</option>
-              </select>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="mt-8 inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-8 font-black text-slate-950 transition hover:scale-[1.02] hover:bg-cyan-300"
-          >
-            <Save size={18} />
-            Salvar preventiva
-          </button>
-        </form>
+        <FormularioPreventiva
+          setores={setores}
+          colaboradores={colaboradores}
+        />
       </div>
     </main>
   );

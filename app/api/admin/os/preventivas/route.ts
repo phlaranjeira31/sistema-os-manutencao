@@ -8,6 +8,20 @@ export async function POST(req: Request) {
     const titulo = String(formData.get("titulo") ?? "").trim();
     const descricao = String(formData.get("descricao") ?? "").trim();
     const setorId = String(formData.get("setorId") ?? "").trim();
+
+    const maquinaId = String(
+      formData.get("maquinaId") ?? ""
+    ).trim();
+
+    const responsavelIds = Array.from(
+      new Set(
+        formData
+          .getAll("responsavelIds")
+          .map((valor) => String(valor).trim())
+          .filter(Boolean)
+      )
+    );
+
     const prioridade = String(
       formData.get("prioridade") ?? "MEDIA"
     ).trim();
@@ -48,16 +62,73 @@ export async function POST(req: Request) {
       );
     }
 
-    const preventiva = await prisma.ordemPreventiva.create({
+    if (maquinaId) {
+      const maquina = await prisma.maquina.findFirst({
+        where: {
+          id: maquinaId,
+          setorId,
+          ativo: true,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!maquina) {
+        return NextResponse.json(
+          {
+            error:
+              "A máquina selecionada não pertence ao setor informado ou está inativa.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (responsavelIds.length > 0) {
+      const quantidadeUsuariosValidos = await prisma.user.count({
+        where: {
+          id: {
+            in: responsavelIds,
+          },
+          ativo: true,
+        },
+      });
+
+      if (quantidadeUsuariosValidos !== responsavelIds.length) {
+        return NextResponse.json(
+          {
+            error:
+              "Um ou mais colaboradores selecionados não foram encontrados ou estão inativos.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    await prisma.ordemPreventiva.create({
       data: {
         titulo,
         descricao,
         prioridade: prioridade as any,
         setorId,
+
+        maquinaId: maquinaId || null,
+
         dataAgendada: new Date(
           `${dataAgendadaTexto}T00:00:00`
         ),
+
         diasAntesAviso,
+
+        responsaveis:
+          responsavelIds.length > 0
+            ? {
+                create: responsavelIds.map((userId) => ({
+                  userId,
+                })),
+              }
+            : undefined,
       },
     });
 

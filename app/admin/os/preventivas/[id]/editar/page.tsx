@@ -3,48 +3,158 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   CalendarClock,
-  Save,
-  ShieldAlert,
 } from "lucide-react";
+
 import { prisma } from "@/src/lib/prisma";
+import FormularioEditarPreventiva from "@/components/FormularioEditarPreventiva";
 
 type Props = {
   params: Promise<{ id: string }>;
 };
 
-function formatInputDate(date: Date | string | null | undefined) {
+function formatInputDate(
+  date: Date | string | null | undefined
+) {
   if (!date) return "";
+
   return new Date(date).toISOString().split("T")[0];
 }
 
-export default async function EditarPreventivaPage({ params }: Props) {
+export default async function EditarPreventivaPage({
+  params,
+}: Props) {
   const { id } = await params;
 
   const preventiva = await prisma.ordemPreventiva.findUnique({
-    where: { id },
+    where: {
+      id,
+    },
+
     include: {
       setor: true,
+      maquina: true,
+
+      responsaveis: {
+        include: {
+          user: true,
+        },
+      },
     },
   });
 
-  if (!preventiva) return notFound();
+  if (!preventiva) {
+    return notFound();
+  }
 
-  const setores = await prisma.setor.findMany({
-    where: {
-      ativo: true,
-    },
-    orderBy: {
-      nome: "asc",
-    },
-  });
+  const responsaveisAtuaisIds = preventiva.responsaveis.map(
+    (responsavel) => responsavel.userId
+  );
+
+  const [setoresBanco, colaboradoresBanco] =
+    await Promise.all([
+      prisma.setor.findMany({
+        where: {
+          ativo: true,
+        },
+
+        select: {
+          id: true,
+          nome: true,
+
+          maquinas: {
+            where: {
+              ativo: true,
+            },
+
+            select: {
+              id: true,
+              nome: true,
+            },
+
+            orderBy: {
+              nome: "asc",
+            },
+          },
+        },
+
+        orderBy: {
+          nome: "asc",
+        },
+      }),
+
+      prisma.user.findMany({
+        where: {
+          perfil: "COLABORADOR",
+
+          OR: [
+            {
+              ativo: true,
+            },
+
+            {
+              id: {
+                in: responsaveisAtuaisIds,
+              },
+            },
+          ],
+        },
+
+        select: {
+          id: true,
+          nome: true,
+          email: true,
+          ativo: true,
+        },
+
+        orderBy: {
+          nome: "asc",
+        },
+      }),
+    ]);
+
+  const setores = setoresBanco.map((setor) => ({
+    id: setor.id,
+    nome: setor.nome,
+
+    maquinas: setor.maquinas.map((maquina) => ({
+      id: maquina.id,
+      nome: maquina.nome,
+    })),
+  }));
+
+  const colaboradores = colaboradoresBanco.map(
+    (colaborador) => ({
+      id: colaborador.id,
+      nome: colaborador.nome,
+      email: colaborador.email,
+      ativo: colaborador.ativo,
+    })
+  );
+
+  const dadosPreventiva = {
+    id: preventiva.id,
+    titulo: preventiva.titulo,
+    descricao: preventiva.descricao,
+    setorId: preventiva.setorId,
+    maquinaId: preventiva.maquinaId ?? "",
+    prioridade: preventiva.prioridade,
+    dataAgendada: formatInputDate(
+      preventiva.dataAgendada
+    ),
+    diasAntesAviso: preventiva.diasAntesAviso,
+    responsavelIds: responsaveisAtuaisIds,
+  };
 
   return (
     <main className="min-h-screen bg-[#050816] px-4 py-8 text-white md:px-10">
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-5 border-b border-white/10 pb-8 md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-500/10">
-              <CalendarClock className="text-cyan-300" size={32} />
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-500/10">
+              <CalendarClock
+                className="text-cyan-300"
+                size={32}
+              />
             </div>
 
             <div>
@@ -71,119 +181,11 @@ export default async function EditarPreventivaPage({ params }: Props) {
           </Link>
         </div>
 
-        <form
-          action={`/api/admin/os/preventivas/${preventiva.id}`}
-          method="POST"
-          className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/30"
-        >
-          <input type="hidden" name="_method" value="PATCH" />
-
-          <div className="grid gap-5 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-300">
-                Título
-              </label>
-
-              <input
-                type="text"
-                name="titulo"
-                required
-                defaultValue={preventiva.titulo}
-                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-white outline-none focus:border-cyan-400"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-300">
-                Setor
-              </label>
-
-              <select
-                name="setorId"
-                required
-                defaultValue={preventiva.setorId}
-                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-white outline-none focus:border-cyan-400"
-              >
-                {setores.map((setor: any) => (
-                  <option key={setor.id} value={setor.id}>
-                    {setor.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="mb-2 block text-sm font-bold text-slate-300">
-                Descrição
-              </label>
-
-              <textarea
-                name="descricao"
-                required
-                rows={5}
-                defaultValue={preventiva.descricao}
-                className="w-full rounded-2xl border border-white/10 bg-[#050816] p-4 text-white outline-none focus:border-cyan-400"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-300">
-                Prioridade
-              </label>
-
-              <select
-                name="prioridade"
-                defaultValue={preventiva.prioridade}
-                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-white outline-none focus:border-cyan-400"
-              >
-                <option value="BAIXA">Baixa</option>
-                <option value="MEDIA">Média</option>
-                <option value="ALTA">Alta</option>
-                <option value="URGENTE">Urgente</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-300">
-                Data agendada
-              </label>
-
-              <input
-                type="date"
-                name="dataAgendada"
-                required
-                defaultValue={formatInputDate(preventiva.dataAgendada)}
-                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-white outline-none focus:border-cyan-400"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-300">
-                <ShieldAlert size={16} />
-                Avisar admins antes
-              </label>
-
-              <select
-                name="diasAntesAviso"
-                defaultValue={preventiva.diasAntesAviso}
-                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-white outline-none focus:border-cyan-400"
-              >
-                <option value="1">1 dia antes</option>
-                <option value="2">2 dias antes</option>
-                <option value="3">3 dias antes</option>
-                <option value="7">7 dias antes</option>
-              </select>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="mt-8 inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-8 font-black text-slate-950 transition hover:scale-[1.02] hover:bg-cyan-300"
-          >
-            <Save size={18} />
-            Salvar alterações
-          </button>
-        </form>
+        <FormularioEditarPreventiva
+          preventiva={dadosPreventiva}
+          setores={setores}
+          colaboradores={colaboradores}
+        />
       </div>
     </main>
   );

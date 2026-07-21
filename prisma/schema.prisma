@@ -25,6 +25,21 @@ enum PrioridadeOS {
   URGENTE
 }
 
+enum AcaoAuditoria {
+  CRIAR
+  EDITAR
+  EXCLUIR
+  ATRIBUIR
+  REMOVER_ATRIBUICAO
+  ALTERAR_STATUS
+  ATIVAR
+  DESATIVAR
+  LOGIN
+  LOGOUT
+  FALHA_LOGIN
+  EXPORTAR
+}
+
 model User {
   id      String        @id @default(cuid())
   nome    String
@@ -34,8 +49,10 @@ model User {
   perfil  PerfilUsuario @default(COLABORADOR)
   ativo   Boolean       @default(true)
 
-  ordensCriadas     OrdemServico[]  @relation("CriadorOS")
-  ordensResponsavel ResponsavelOS[]
+  ordensCriadas          OrdemServico[]          @relation("CriadorOS")
+  ordensResponsavel      ResponsavelOS[]
+  preventivasResponsavel ResponsavelPreventiva[]
+  logsAuditoria          LogAuditoria[]          @relation("UsuarioAuditoria")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -62,7 +79,8 @@ model Maquina {
   setorId String
   setor   Setor  @relation(fields: [setorId], references: [id], onDelete: Cascade)
 
-  ordens OrdemServico[]
+  ordens      OrdemServico[]
+  preventivas OrdemPreventiva[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -146,6 +164,11 @@ model OrdemPreventiva {
   setorId String
   setor   Setor  @relation(fields: [setorId], references: [id])
 
+  maquinaId String?
+  maquina   Maquina? @relation(fields: [maquinaId], references: [id], onDelete: SetNull)
+
+  responsaveis ResponsavelPreventiva[]
+
   status String @default("PENDENTE")
 
   dataAgendada   DateTime
@@ -157,5 +180,53 @@ model OrdemPreventiva {
   updatedAt DateTime @updatedAt
 
   @@index([setorId])
+  @@index([maquinaId])
   @@index([dataAgendada])
+}
+
+model ResponsavelPreventiva {
+  id String @id @default(cuid())
+
+  preventivaId String
+  preventiva   OrdemPreventiva @relation(fields: [preventivaId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([preventivaId, userId])
+  @@index([preventivaId])
+  @@index([userId])
+}
+
+model LogAuditoria {
+  id String @id @default(cuid())
+
+  acao       AcaoAuditoria
+  entidade   String
+  entidadeId String?
+
+  descricao String
+
+  dadosAnteriores Json?
+  dadosNovos      Json?
+
+  usuarioId String?
+  usuario   User?   @relation("UsuarioAuditoria", fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  usuarioNome  String?
+  usuarioEmail String?
+
+  ip        String?
+  userAgent String?
+  rota      String?
+  metodo    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([usuarioId])
+  @@index([entidade, entidadeId])
+  @@index([acao])
+  @@index([createdAt])
 }

@@ -14,7 +14,16 @@ export default async function ListaPreventivasPage() {
   const preventivas = await prisma.ordemPreventiva.findMany({
     include: {
       setor: true,
+
+      maquina: true,
+
+      responsaveis: {
+        include: {
+          user: true,
+        },
+      },
     },
+
     orderBy: {
       dataAgendada: "asc",
     },
