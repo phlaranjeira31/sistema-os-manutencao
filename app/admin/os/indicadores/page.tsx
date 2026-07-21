@@ -248,6 +248,7 @@ export default async function IndicadoresOSPage({
     numero: os.numero,
     setor: os.setor?.nome ?? "-",
     titulo: os.titulo,
+    descricao: os.descricao?.trim() || "-",
     status: statusLabel(os.status),
     geradaEm: formatDate(os.createdAt),
     concluidaEm:
@@ -473,7 +474,7 @@ export default async function IndicadoresOSPage({
             </div>
 
             <div className="w-full overflow-x-auto rounded-2xl border border-white/10">
-              <table className="w-full min-w-[980px] border-collapse text-sm">
+              <table className="w-full min-w-[1400px] border-collapse text-sm">
                 <thead className="bg-cyan-400 text-slate-950">
                   <tr>
                     <th className="border border-slate-900 px-3 py-3 text-left">
@@ -486,6 +487,10 @@ export default async function IndicadoresOSPage({
 
                     <th className="border border-slate-900 px-3 py-3 text-left">
                       Título
+                    </th>
+
+                    <th className="border border-slate-900 px-3 py-3 text-left">
+                      Descrição
                     </th>
 
                     <th className="border border-slate-900 px-3 py-3 text-left">
@@ -510,7 +515,7 @@ export default async function IndicadoresOSPage({
                   {ordens.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={8}
                         className="px-4 py-8 text-center text-slate-400"
                       >
                         Nenhuma OS encontrada com os filtros selecionados.
@@ -540,6 +545,10 @@ export default async function IndicadoresOSPage({
 
                         <td className="border border-white/10 px-3 py-3 font-bold">
                           {os.titulo}
+                        </td>
+
+                        <td className="min-w-[360px] whitespace-pre-wrap break-words border border-white/10 px-3 py-3 align-top text-slate-200">
+                          {os.descricao?.trim() || "-"}
                         </td>
 
                         <td className="border border-white/10 px-3 py-3 font-black">

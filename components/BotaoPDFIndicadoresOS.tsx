@@ -6,6 +6,7 @@ type OSIndicadorPDF = {
   numero: number;
   setor: string;
   titulo: string;
+  descricao: string;
   status: string;
   geradaEm: string;
   concluidaEm: string;
@@ -103,6 +104,7 @@ export default function BotaoPDFIndicadoresOS({
             String(os.numero),
             os.setor,
             os.titulo,
+            os.descricao,
             os.status,
             os.geradaEm,
             os.concluidaEm,
@@ -110,6 +112,7 @@ export default function BotaoPDFIndicadoresOS({
           ])
         : [
             [
+              "-",
               "-",
               "-",
               "Nenhuma OS encontrada com os filtros selecionados.",
@@ -122,23 +125,27 @@ export default function BotaoPDFIndicadoresOS({
 
     autoTable(doc, {
       startY: 48,
+
       margin: {
         top: 48,
         right: 12,
         bottom: 18,
         left: 12,
       },
+
       head: [
         [
           "Nº",
           "Setor",
           "Título",
+          "Descrição",
           "Status",
           "Gerada em",
           "Concluída em",
           "Responsável",
         ],
       ],
+
       body: linhasTabela,
       theme: "grid",
       showHead: "everyPage",
@@ -147,10 +154,10 @@ export default function BotaoPDFIndicadoresOS({
 
       styles: {
         font: "helvetica",
-        fontSize: 7.5,
-        cellPadding: 2.2,
+        fontSize: 6.8,
+        cellPadding: 2,
         overflow: "linebreak",
-        valign: "middle",
+        valign: "top",
         lineColor: [203, 213, 225],
         lineWidth: 0.15,
         textColor: [15, 23, 42],
@@ -160,7 +167,7 @@ export default function BotaoPDFIndicadoresOS({
         fillColor: [34, 211, 238],
         textColor: [5, 8, 22],
         fontStyle: "bold",
-        fontSize: 8,
+        fontSize: 7.2,
         halign: "left",
         valign: "middle",
       },
@@ -175,37 +182,40 @@ export default function BotaoPDFIndicadoresOS({
 
       columnStyles: {
         0: {
-          cellWidth: 12,
+          cellWidth: 10,
           halign: "center",
           fontStyle: "bold",
         },
         1: {
-          cellWidth: 28,
+          cellWidth: 24,
         },
         2: {
-          cellWidth: 64,
+          cellWidth: 38,
         },
         3: {
-          cellWidth: 28,
-          fontStyle: "bold",
+          cellWidth: 70,
         },
         4: {
-          cellWidth: 25,
-          halign: "center",
+          cellWidth: 24,
+          fontStyle: "bold",
         },
         5: {
-          cellWidth: 25,
+          cellWidth: 24,
           halign: "center",
         },
         6: {
-          cellWidth: 91,
+          cellWidth: 24,
+          halign: "center",
+        },
+        7: {
+          cellWidth: 59,
         },
       },
 
       didParseCell(data) {
         if (
           data.section === "body" &&
-          data.column.index === 3
+          data.column.index === 4
         ) {
           const status = String(data.cell.raw ?? "");
 

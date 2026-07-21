@@ -6,6 +6,7 @@ type OSIndicadorExcel = {
   numero: number;
   setor: string;
   titulo: string;
+  descricao: string;
   status: string;
   geradaEm: string;
   concluidaEm: string;
@@ -34,6 +35,7 @@ export default function BotaoExcelIndicadoresOS({
       "Nº da OS": os.numero,
       Setor: os.setor,
       Título: os.titulo,
+      Descrição: os.descricao,
       Status: os.status,
       "Gerada em": os.geradaEm,
       "Concluída em": os.concluidaEm,
@@ -82,6 +84,7 @@ export default function BotaoExcelIndicadoresOS({
       { wch: 12 },
       { wch: 24 },
       { wch: 40 },
+      { wch: 70 },
       { wch: 20 },
       { wch: 16 },
       { wch: 16 },
