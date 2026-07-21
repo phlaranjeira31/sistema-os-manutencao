@@ -2,23 +2,63 @@ import Link from "next/link";
 import {
   ArrowLeft,
   BarChart3,
+  Building2,
   CalendarDays,
   ClipboardList,
   Search,
+  Users,
 } from "lucide-react";
+import { Prisma, StatusOS } from "@prisma/client";
 import { prisma } from "@/src/lib/prisma";
 import BotaoPDFIndicadoresOS from "@/components/BotaoPDFIndicadoresOS";
+import BotaoExcelIndicadoresOS from "@/components/BotaoExcelIndicadoresOS";
+
+export const dynamic = "force-dynamic";
 
 type PageProps = {
   searchParams?: Promise<{
     dataInicio?: string;
     dataFim?: string;
+    status?: string;
+    colaborador?: string;
+    setor?: string;
   }>;
 };
 
+const STATUS_OPTIONS: Array<{
+  value: StatusOS;
+  label: string;
+}> = [
+  {
+    value: "NAO_INICIADA",
+    label: "Não iniciada",
+  },
+  {
+    value: "EM_ANDAMENTO",
+    label: "Em andamento",
+  },
+  {
+    value: "CONCLUIDA",
+    label: "Concluída",
+  },
+  {
+    value: "CANCELADA",
+    label: "Cancelada",
+  },
+];
+
 function formatDate(date: Date | string | null | undefined) {
   if (!date) return "-";
+
   return new Intl.DateTimeFormat("pt-BR").format(new Date(date));
+}
+
+function formatDateInput(value: string) {
+  if (!value) return "Todas";
+
+  return new Intl.DateTimeFormat("pt-BR").format(
+    new Date(`${value}T00:00:00`)
+  );
 }
 
 function statusLabel(status: string) {
@@ -32,11 +72,22 @@ function statusLabel(status: string) {
   return map[status] ?? status;
 }
 
-export default async function IndicadoresOSPage({ searchParams }: PageProps) {
+export default async function IndicadoresOSPage({
+  searchParams,
+}: PageProps) {
   const params = await searchParams;
 
   const dataInicioFiltro = String(params?.dataInicio ?? "").trim();
   const dataFimFiltro = String(params?.dataFim ?? "").trim();
+  const statusFiltro = String(params?.status ?? "").trim();
+  const colaboradorFiltro = String(params?.colaborador ?? "").trim();
+  const setorFiltro = String(params?.setor ?? "").trim();
+
+  const statusSelecionado = STATUS_OPTIONS.some(
+    (item) => item.value === statusFiltro
+  )
+    ? (statusFiltro as StatusOS)
+    : undefined;
 
   const dataInicio = dataInicioFiltro
     ? new Date(`${dataInicioFiltro}T00:00:00`)
@@ -46,50 +97,103 @@ export default async function IndicadoresOSPage({ searchParams }: PageProps) {
     ? new Date(`${dataFimFiltro}T23:59:59`)
     : null;
 
-  const ordens = await prisma.ordemServico.findMany({
-    where:
-      dataInicio || dataFim
-        ? {
-            createdAt: {
-              ...(dataInicio ? { gte: dataInicio } : {}),
-              ...(dataFim ? { lte: dataFim } : {}),
+  const where: Prisma.OrdemServicoWhereInput = {
+    ...(dataInicio || dataFim
+      ? {
+          createdAt: {
+            ...(dataInicio ? { gte: dataInicio } : {}),
+            ...(dataFim ? { lte: dataFim } : {}),
+          },
+        }
+      : {}),
+    ...(statusSelecionado
+      ? {
+          status: statusSelecionado,
+        }
+      : {}),
+    ...(setorFiltro
+      ? {
+          setorId: setorFiltro,
+        }
+      : {}),
+    ...(colaboradorFiltro
+      ? {
+          responsaveis: {
+            some: {
+              userId: colaboradorFiltro,
             },
-          }
-        : {},
-    include: {
-      setor: true,
-      responsaveis: {
+          },
+        }
+      : {}),
+  };
+
+  const [ordens, setoresDisponiveis, colaboradoresDisponiveis] =
+    await Promise.all([
+      prisma.ordemServico.findMany({
+        where,
         include: {
-          user: true,
+          setor: true,
+          responsaveis: {
+            include: {
+              user: true,
+            },
+          },
         },
-      },
-    },
-    orderBy: {
-      createdAt: "asc",
-    },
-  });
+        orderBy: {
+          createdAt: "asc",
+        },
+      }),
+
+      prisma.setor.findMany({
+        where: {
+          ativo: true,
+        },
+        select: {
+          id: true,
+          nome: true,
+        },
+        orderBy: {
+          nome: "asc",
+        },
+      }),
+
+      prisma.user.findMany({
+        where: {
+          ativo: true,
+          perfil: "COLABORADOR",
+        },
+        select: {
+          id: true,
+          nome: true,
+        },
+        orderBy: {
+          nome: "asc",
+        },
+      }),
+    ]);
 
   const setores = Array.from(
-    new Set(ordens.map((os: any) => os.setor?.nome ?? "Sem setor"))
+    new Set(ordens.map((os) => os.setor?.nome ?? "Sem setor"))
   );
 
-  const dadosPorSetor = setores.map((setor: any) => {
+  const dadosPorSetor = setores.map((setor) => {
     const ordensSetor = ordens.filter(
-  (os: any) => (os.setor?.nome ?? "Sem setor") === setor
-);
+      (os) => (os.setor?.nome ?? "Sem setor") === setor
+    );
 
     const concluidas = ordensSetor.filter(
-  (os: any) => os.status === "CONCLUIDA"
-).length;
+      (os) => os.status === "CONCLUIDA"
+    ).length;
 
     const pendentes = ordensSetor.filter(
-  (os: any) =>
-        os.status === "NAO_INICIADA" || os.status === "EM_ANDAMENTO"
+      (os) =>
+        os.status === "NAO_INICIADA" ||
+        os.status === "EM_ANDAMENTO"
     ).length;
 
     const canceladas = ordensSetor.filter(
-  (os: any) => os.status === "CANCELADA"
-).length;
+      (os) => os.status === "CANCELADA"
+    ).length;
 
     return {
       setor,
@@ -102,22 +206,68 @@ export default async function IndicadoresOSPage({ searchParams }: PageProps) {
 
   const maiorTotal = Math.max(
     ...dadosPorSetor.map((item) =>
-      Math.max(item.concluidas, item.pendentes, item.canceladas)
+      Math.max(
+        item.concluidas,
+        item.pendentes,
+        item.canceladas
+      )
     ),
     1
   );
 
   const totalOS = ordens.length;
+
   const totalConcluidas = ordens.filter(
-  (os: any) => os.status === "CONCLUIDA"
-).length;
-  const totalPendentes = ordens.filter(
-  (os: any) =>
-      os.status === "NAO_INICIADA" || os.status === "EM_ANDAMENTO"
+    (os) => os.status === "CONCLUIDA"
   ).length;
+
+  const totalPendentes = ordens.filter(
+    (os) =>
+      os.status === "NAO_INICIADA" ||
+      os.status === "EM_ANDAMENTO"
+  ).length;
+
   const totalCanceladas = ordens.filter(
-  (os: any) => os.status === "CANCELADA"
-).length;
+    (os) => os.status === "CANCELADA"
+  ).length;
+
+  const setorSelecionado =
+    setoresDisponiveis.find((setor) => setor.id === setorFiltro)
+      ?.nome ?? "Todos";
+
+  const colaboradorSelecionado =
+    colaboradoresDisponiveis.find(
+      (colaborador) => colaborador.id === colaboradorFiltro
+    )?.nome ?? "Todos";
+
+  const statusSelecionadoLabel = statusSelecionado
+    ? statusLabel(statusSelecionado)
+    : "Todos";
+
+  const ordensExportacao = ordens.map((os) => ({
+    numero: os.numero,
+    setor: os.setor?.nome ?? "-",
+    titulo: os.titulo,
+    status: statusLabel(os.status),
+    geradaEm: formatDate(os.createdAt),
+    concluidaEm:
+      os.status === "CONCLUIDA"
+        ? formatDate(os.updatedAt)
+        : "-",
+    responsavel: os.responsaveis.length
+      ? os.responsaveis
+          .map((responsavel) => responsavel.user.nome)
+          .join(", ")
+      : "-",
+  }));
+
+  const filtrosExportacao = {
+    dataInicio: formatDateInput(dataInicioFiltro),
+    dataFim: formatDateInput(dataFimFiltro),
+    status: statusSelecionadoLabel,
+    colaborador: colaboradorSelecionado,
+    setor: setorSelecionado,
+  };
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#050816] px-3 py-6 text-white sm:px-4 md:px-10">
@@ -129,12 +279,16 @@ export default async function IndicadoresOSPage({ searchParams }: PageProps) {
             </div>
 
             <div className="min-w-0">
-              <p className="text-sm font-bold text-cyan-300">Indicadores</p>
+              <p className="text-sm font-bold text-cyan-300">
+                Indicadores
+              </p>
+
               <h1 className="break-words text-3xl font-black md:text-4xl">
                 Indicadores de OS
               </h1>
+
               <p className="break-words text-slate-400">
-                Filtre por período e visualize a planilha e os gráficos.
+                Filtre os dados e visualize a planilha e os gráficos.
               </p>
             </div>
           </div>
@@ -149,36 +303,110 @@ export default async function IndicadoresOSPage({ searchParams }: PageProps) {
         </header>
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl shadow-black/30 backdrop-blur sm:p-6">
-          <form className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_150px_130px_150px]">
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
-                <CalendarDays size={16} />
-                Data inicial
-              </label>
+          <form className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+                  <CalendarDays size={16} />
+                  Data inicial
+                </label>
 
-              <input
-                name="dataInicio"
-                defaultValue={dataInicioFiltro}
-                type="date"
-                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
-              />
+                <input
+                  name="dataInicio"
+                  defaultValue={dataInicioFiltro}
+                  type="date"
+                  className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+                  <CalendarDays size={16} />
+                  Data final
+                </label>
+
+                <input
+                  name="dataFim"
+                  defaultValue={dataFimFiltro}
+                  type="date"
+                  className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+                  <ClipboardList size={16} />
+                  Status
+                </label>
+
+                <select
+                  name="status"
+                  defaultValue={statusSelecionado ?? ""}
+                  className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
+                >
+                  <option value="">Todos os status</option>
+
+                  {STATUS_OPTIONS.map((status) => (
+                    <option
+                      key={status.value}
+                      value={status.value}
+                    >
+                      {status.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+                  <Building2 size={16} />
+                  Setor
+                </label>
+
+                <select
+                  name="setor"
+                  defaultValue={setorFiltro}
+                  className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
+                >
+                  <option value="">Todos os setores</option>
+
+                  {setoresDisponiveis.map((setor) => (
+                    <option
+                      key={setor.id}
+                      value={setor.id}
+                    >
+                      {setor.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+                  <Users size={16} />
+                  Colaborador
+                </label>
+
+                <select
+                  name="colaborador"
+                  defaultValue={colaboradorFiltro}
+                  className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
+                >
+                  <option value="">Todos os colaboradores</option>
+
+                  {colaboradoresDisponiveis.map((colaborador) => (
+                    <option
+                      key={colaborador.id}
+                      value={colaborador.id}
+                    >
+                      {colaborador.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
-                <CalendarDays size={16} />
-                Data final
-              </label>
-
-              <input
-                name="dataFim"
-                defaultValue={dataFimFiltro}
-                type="date"
-                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
-              />
-            </div>
-
-            <div className="flex items-end">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <button
                 type="submit"
                 className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-4 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300"
@@ -186,42 +414,44 @@ export default async function IndicadoresOSPage({ searchParams }: PageProps) {
                 <Search size={17} />
                 Filtrar
               </button>
-            </div>
 
-            <div className="flex items-end">
               <Link
                 href="/admin/os/indicadores"
                 className="inline-flex h-14 w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-black text-white transition hover:bg-white/10"
               >
-                Limpar
+                Limpar filtros
               </Link>
-            </div>
 
-            <div className="flex items-end sm:col-span-2 xl:col-span-1">
-              <div className="w-full">
-                <BotaoPDFIndicadoresOS
-                  ordens={ordens.map((os: any) => ({
-                    numero: os.numero,
-                    setor: os.setor?.nome ?? "-",
-                    titulo: os.titulo,
-                    status: statusLabel(os.status),
-                    geradaEm: formatDate(os.createdAt),
-concluidaEm: os.status === "CONCLUIDA" ? formatDate(os.updatedAt) : "-",
-                    responsavel: os.responsaveis.length
-                      ? os.responsaveis.map((r: any) => r.user.nome).join(", ")
-                      : "-",
-                  }))}
-                />
-              </div>
+              <BotaoPDFIndicadoresOS
+                ordens={ordensExportacao}
+                filtros={filtrosExportacao}
+              />
+
+              <BotaoExcelIndicadoresOS
+                ordens={ordensExportacao}
+                filtros={filtrosExportacao}
+              />
             </div>
           </form>
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <ResumoCard title="Total OS" value={totalOS} />
-          <ResumoCard title="Concluídas" value={totalConcluidas} />
-          <ResumoCard title="Pendentes" value={totalPendentes} />
-          <ResumoCard title="Canceladas" value={totalCanceladas} />
+
+          <ResumoCard
+            title="Concluídas"
+            value={totalConcluidas}
+          />
+
+          <ResumoCard
+            title="Pendentes"
+            value={totalPendentes}
+          />
+
+          <ResumoCard
+            title="Canceladas"
+            value={totalCanceladas}
+          />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -235,8 +465,9 @@ concluidaEm: os.status === "CONCLUIDA" ? formatDate(os.updatedAt) : "-",
                 <h2 className="break-words text-xl font-black">
                   Planilha de OS
                 </h2>
+
                 <p className="break-words text-sm text-slate-400">
-                  Todas as OS encontradas no período selecionado.
+                  Todas as OS encontradas com os filtros selecionados.
                 </p>
               </div>
             </div>
@@ -248,22 +479,27 @@ concluidaEm: os.status === "CONCLUIDA" ? formatDate(os.updatedAt) : "-",
                     <th className="border border-slate-900 px-3 py-3 text-left">
                       Nº
                     </th>
+
                     <th className="border border-slate-900 px-3 py-3 text-left">
                       Setor
                     </th>
+
                     <th className="border border-slate-900 px-3 py-3 text-left">
                       Título
                     </th>
+
                     <th className="border border-slate-900 px-3 py-3 text-left">
                       Status
                     </th>
-                    <th className="border border-slate-900 px-3 py-3 text-left">
-  Gerada em
-</th>
 
-<th className="border border-slate-900 px-3 py-3 text-left">
-  Concluída em
-</th>
+                    <th className="border border-slate-900 px-3 py-3 text-left">
+                      Gerada em
+                    </th>
+
+                    <th className="border border-slate-900 px-3 py-3 text-left">
+                      Concluída em
+                    </th>
+
                     <th className="border border-slate-900 px-3 py-3 text-left">
                       Responsável
                     </th>
@@ -277,44 +513,56 @@ concluidaEm: os.status === "CONCLUIDA" ? formatDate(os.updatedAt) : "-",
                         colSpan={7}
                         className="px-4 py-8 text-center text-slate-400"
                       >
-                        Nenhuma OS encontrada no período selecionado.
+                        Nenhuma OS encontrada com os filtros selecionados.
                       </td>
                     </tr>
                   ) : (
-                    ordens.map((os: any) => (
+                    ordens.map((os) => (
                       <tr
                         key={os.id}
                         className={
                           os.status === "CONCLUIDA"
                             ? "bg-emerald-500/15"
                             : os.status === "CANCELADA"
-                            ? "bg-red-500/15"
-                            : "bg-red-500/25"
+                              ? "bg-slate-500/15"
+                              : os.status === "EM_ANDAMENTO"
+                                ? "bg-blue-500/15"
+                                : "bg-red-500/25"
                         }
                       >
                         <td className="border border-white/10 px-3 py-3 font-black">
                           {os.numero}
                         </td>
+
                         <td className="border border-white/10 px-3 py-3 font-bold">
                           {os.setor?.nome ?? "-"}
                         </td>
+
                         <td className="border border-white/10 px-3 py-3 font-bold">
                           {os.titulo}
                         </td>
+
                         <td className="border border-white/10 px-3 py-3 font-black">
                           {statusLabel(os.status)}
                         </td>
-                        <td className="border border-white/10 px-3 py-3">
-  {formatDate(os.createdAt)}
-</td>
 
-<td className="border border-white/10 px-3 py-3">
-  {os.status === "CONCLUIDA" ? formatDate(os.updatedAt) : "-"}
-</td>
+                        <td className="border border-white/10 px-3 py-3">
+                          {formatDate(os.createdAt)}
+                        </td>
+
+                        <td className="border border-white/10 px-3 py-3">
+                          {os.status === "CONCLUIDA"
+                            ? formatDate(os.updatedAt)
+                            : "-"}
+                        </td>
+
                         <td className="border border-white/10 px-3 py-3">
                           {os.responsaveis.length
                             ? os.responsaveis
-                                .map((r: any) => r.user.nome)
+                                .map(
+                                  (responsavel) =>
+                                    responsavel.user.nome
+                                )
                                 .join(", ")
                             : "-"}
                         </td>
@@ -336,6 +584,7 @@ concluidaEm: os.status === "CONCLUIDA" ? formatDate(os.updatedAt) : "-",
                 <h2 className="break-words text-xl font-black">
                   OS por setor
                 </h2>
+
                 <p className="break-words text-sm text-slate-400">
                   Comparativo de concluídas, pendentes e canceladas.
                 </p>
@@ -357,6 +606,7 @@ concluidaEm: os.status === "CONCLUIDA" ? formatDate(os.updatedAt) : "-",
                       <h3 className="break-words font-black text-white">
                         {item.setor}
                       </h3>
+
                       <span className="shrink-0 text-xs font-bold text-slate-400">
                         {item.total} OS
                       </span>
@@ -393,11 +643,20 @@ concluidaEm: os.status === "CONCLUIDA" ? formatDate(os.updatedAt) : "-",
   );
 }
 
-function ResumoCard({ title, value }: { title: string; value: number }) {
+function ResumoCard({
+  title,
+  value,
+}: {
+  title: string;
+  value: number;
+}) {
   return (
     <div className="rounded-2xl border border-white/10 bg-[#080d1f] p-5 shadow-lg">
       <p className="text-sm text-slate-400">{title}</p>
-      <p className="mt-2 text-3xl font-black text-white">{value}</p>
+
+      <p className="mt-2 text-3xl font-black text-white">
+        {value}
+      </p>
     </div>
   );
 }
@@ -413,19 +672,23 @@ function GraficoLinha({
   total: number;
   color: string;
 }) {
-  const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+  const percent =
+    total > 0 ? Math.round((value / total) * 100) : 0;
 
   return (
     <div className="mb-3 last:mb-0">
       <div className="mb-1 flex items-center justify-between gap-3 text-xs font-bold text-slate-400">
         <span className="break-words">{label}</span>
+
         <span className="shrink-0">{value}</span>
       </div>
 
       <div className="h-3 overflow-hidden rounded-full bg-white/10">
         <div
           className={`h-full rounded-full ${color}`}
-          style={{ width: `${percent}%` }}
+          style={{
+            width: `${percent}%`,
+          }}
         />
       </div>
     </div>

@@ -12,14 +12,27 @@ type OSIndicadorPDF = {
   responsavel: string;
 };
 
+type FiltrosIndicadores = {
+  dataInicio: string;
+  dataFim: string;
+  status: string;
+  colaborador: string;
+  setor: string;
+};
+
 export default function BotaoPDFIndicadoresOS({
   ordens,
+  filtros,
 }: {
   ordens: OSIndicadorPDF[];
+  filtros: FiltrosIndicadores;
 }) {
-  async function carregarImagem(src: string): Promise<HTMLImageElement> {
+  async function carregarImagem(
+    src: string
+  ): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const img = new Image();
+
       img.src = src;
       img.onload = () => resolve(img);
       img.onerror = reject;
@@ -28,108 +41,240 @@ export default function BotaoPDFIndicadoresOS({
 
   async function gerarPDF() {
     const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
 
-    const doc = new jsPDF("l", "mm", "a4");
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const larguraPagina = doc.internal.pageSize.getWidth();
+    const alturaPagina = doc.internal.pageSize.getHeight();
+
+    let logo: HTMLImageElement | null = null;
 
     try {
-      const logo = await carregarImagem("/logo.sequoia.png");
-      doc.addImage(logo, "PNG", 14, 8, 32, 24);
+      logo = await carregarImagem("/logo.sequoia.png");
     } catch {
       console.warn("Logo não carregada no PDF.");
     }
 
-    doc.setFillColor(5, 8, 22);
-    doc.rect(0, 0, 297, 34, "F");
+    function desenharCabecalho() {
+      doc.setFillColor(5, 8, 22);
+      doc.rect(0, 0, larguraPagina, 42, "F");
 
-    try {
-      const logo = await carregarImagem("/logo.sequoia.png");
-      doc.addImage(logo, "PNG", 14, 5, 35, 25);
-    } catch {}
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("Indicadores de Ordens de Serviço", 55, 15);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Total de OS: ${ordens.length}`, 55, 23);
-
-    doc.setTextColor(0, 0, 0);
-
-    let y = 48;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFillColor(34, 211, 238);
-    doc.rect(14, y - 7, 270, 10, "F");
-
-    doc.text("Nº", 17, y);
-    doc.text("Setor", 30, y);
-    doc.text("Título", 62, y);
-    doc.text("Status", 132, y);
-    doc.text("Gerada em", 170, y);
-    doc.text("Concluída em", 205, y);
-    doc.text("Responsável", 245, y);
-
-    y += 9;
-    doc.setFont("helvetica", "normal");
-
-    ordens.forEach((os, index) => {
-      if (y > 190) {
-        doc.addPage();
-
-        doc.setFillColor(5, 8, 22);
-        doc.rect(0, 0, 297, 24, "F");
-
-        doc.setTextColor(255, 255, 255);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
-        doc.text("Indicadores de Ordens de Serviço", 14, 15);
-
-        doc.setTextColor(0, 0, 0);
-        y = 36;
-
-        doc.setFillColor(34, 211, 238);
-        doc.rect(14, y - 7, 270, 10, "F");
-
-        doc.text("Nº", 17, y);
-        doc.text("Setor", 30, y);
-        doc.text("Título", 62, y);
-        doc.text("Status", 132, y);
-        doc.text("Gerada em", 170, y);
-        doc.text("Concluída em", 205, y);
-        doc.text("Responsável", 245, y);
-
-        y += 9;
-        doc.setFont("helvetica", "normal");
+      if (logo) {
+        doc.addImage(logo, "PNG", 12, 6, 32, 24);
       }
 
-      if (index % 2 === 0) {
-        doc.setFillColor(245, 247, 250);
-      } else {
-        doc.setFillColor(255, 255, 255);
-      }
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("Indicadores de Ordens de Serviço", 50, 15);
 
-      doc.rect(14, y - 6, 270, 9, "F");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(203, 213, 225);
 
-      doc.setTextColor(0, 0, 0);
-      doc.text(String(os.numero), 17, y);
-      doc.text(os.setor.slice(0, 16), 30, y);
-      doc.text(os.titulo.slice(0, 34), 62, y);
-      doc.text(os.status.slice(0, 18), 132, y);
-      doc.text(os.geradaEm, 170, y);
-      doc.text(os.concluidaEm, 205, y);
-      doc.text(os.responsavel.slice(0, 22), 245, y);
+      doc.text(
+        `Gerado em: ${new Date().toLocaleString("pt-BR")}`,
+        50,
+        22
+      );
 
-      y += 9;
+      const resumoFiltros =
+        `Período: ${filtros.dataInicio} até ${filtros.dataFim}  |  ` +
+        `Status: ${filtros.status}  |  ` +
+        `Setor: ${filtros.setor}  |  ` +
+        `Colaborador: ${filtros.colaborador}`;
+
+      const linhasFiltros = doc.splitTextToSize(
+        resumoFiltros,
+        larguraPagina - 24
+      );
+
+      doc.text(linhasFiltros, 12, 34);
+    }
+
+    const linhasTabela =
+      ordens.length > 0
+        ? ordens.map((os) => [
+            String(os.numero),
+            os.setor,
+            os.titulo,
+            os.status,
+            os.geradaEm,
+            os.concluidaEm,
+            os.responsavel,
+          ])
+        : [
+            [
+              "-",
+              "-",
+              "Nenhuma OS encontrada com os filtros selecionados.",
+              "-",
+              "-",
+              "-",
+              "-",
+            ],
+          ];
+
+    autoTable(doc, {
+      startY: 48,
+      margin: {
+        top: 48,
+        right: 12,
+        bottom: 18,
+        left: 12,
+      },
+      head: [
+        [
+          "Nº",
+          "Setor",
+          "Título",
+          "Status",
+          "Gerada em",
+          "Concluída em",
+          "Responsável",
+        ],
+      ],
+      body: linhasTabela,
+      theme: "grid",
+      showHead: "everyPage",
+      pageBreak: "auto",
+      rowPageBreak: "avoid",
+
+      styles: {
+        font: "helvetica",
+        fontSize: 7.5,
+        cellPadding: 2.2,
+        overflow: "linebreak",
+        valign: "middle",
+        lineColor: [203, 213, 225],
+        lineWidth: 0.15,
+        textColor: [15, 23, 42],
+      },
+
+      headStyles: {
+        fillColor: [34, 211, 238],
+        textColor: [5, 8, 22],
+        fontStyle: "bold",
+        fontSize: 8,
+        halign: "left",
+        valign: "middle",
+      },
+
+      alternateRowStyles: {
+        fillColor: [245, 247, 250],
+      },
+
+      bodyStyles: {
+        fillColor: [255, 255, 255],
+      },
+
+      columnStyles: {
+        0: {
+          cellWidth: 12,
+          halign: "center",
+          fontStyle: "bold",
+        },
+        1: {
+          cellWidth: 28,
+        },
+        2: {
+          cellWidth: 64,
+        },
+        3: {
+          cellWidth: 28,
+          fontStyle: "bold",
+        },
+        4: {
+          cellWidth: 25,
+          halign: "center",
+        },
+        5: {
+          cellWidth: 25,
+          halign: "center",
+        },
+        6: {
+          cellWidth: 91,
+        },
+      },
+
+      didParseCell(data) {
+        if (
+          data.section === "body" &&
+          data.column.index === 3
+        ) {
+          const status = String(data.cell.raw ?? "");
+
+          if (status === "Concluída") {
+            data.cell.styles.textColor = [5, 150, 105];
+          } else if (status === "Cancelada") {
+            data.cell.styles.textColor = [100, 116, 139];
+          } else if (status === "Em andamento") {
+            data.cell.styles.textColor = [37, 99, 235];
+          } else {
+            data.cell.styles.textColor = [220, 38, 38];
+          }
+
+          data.cell.styles.fontStyle = "bold";
+        }
+      },
+
+      didDrawPage() {
+        desenharCabecalho();
+      },
     });
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(120, 120, 120);
-    doc.text("Sistema de OS - Sequoia", 14, 202);
+    const totalPaginas = doc.getNumberOfPages();
 
-    doc.save("indicadores-os.pdf");
+    for (let pagina = 1; pagina <= totalPaginas; pagina++) {
+      doc.setPage(pagina);
+
+      doc.setDrawColor(226, 232, 240);
+      doc.line(
+        12,
+        alturaPagina - 13,
+        larguraPagina - 12,
+        alturaPagina - 13
+      );
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+
+      doc.text(
+        "Sistema de OS - Sequoia",
+        12,
+        alturaPagina - 7
+      );
+
+      doc.text(
+        "Desenvolvido por Pedro H. Laranjeira",
+        larguraPagina / 2,
+        alturaPagina - 7,
+        {
+          align: "center",
+        }
+      );
+
+      doc.text(
+        `Página ${pagina} de ${totalPaginas}`,
+        larguraPagina - 12,
+        alturaPagina - 7,
+        {
+          align: "right",
+        }
+      );
+    }
+
+    const dataArquivo = new Date()
+      .toISOString()
+      .slice(0, 10);
+
+    doc.save(`indicadores-os-${dataArquivo}.pdf`);
   }
 
   return (
