@@ -4,6 +4,7 @@ import {
   BarChart3,
   Building2,
   CalendarDays,
+  ChartNoAxesCombined,
   ClipboardList,
   Search,
   Users,
@@ -294,13 +295,23 @@ export default async function IndicadoresOSPage({
             </div>
           </div>
 
-          <Link
-            href="/admin"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-black text-slate-950 sm:w-fit"
-          >
-            <ArrowLeft size={17} />
-            Voltar
-          </Link>
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+  <Link
+    href="/admin/os/indicadores/graficos"
+    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-5 py-3 text-sm font-black text-cyan-300 transition hover:bg-cyan-400/20 sm:w-fit"
+  >
+    <ChartNoAxesCombined size={18} />
+    Dashboard Gráfico
+  </Link>
+
+  <Link
+    href="/admin"
+    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-black text-slate-950 sm:w-fit"
+  >
+    <ArrowLeft size={17} />
+    Voltar
+  </Link>
+</div>
         </header>
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl shadow-black/30 backdrop-blur sm:p-6">
