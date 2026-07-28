@@ -8,6 +8,7 @@ import {
   Building2,
   CalendarDays,
   Eye,
+  BarChart3,
 } from "lucide-react";
 import { prisma } from "@/src/lib/prisma";
 
@@ -133,13 +134,23 @@ export default async function RelatoriosPage({ searchParams }: PageProps) {
             </div>
           </div>
 
-          <Link
-            href="/admin"
-            className="inline-flex w-fit items-center gap-2 rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:scale-[1.02] hover:bg-cyan-50"
-          >
-            <ArrowLeft size={17} />
-            Voltar
-          </Link>
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+  <Link
+    href="/admin/relatorios/dashboard"
+    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-5 py-3 text-sm font-black text-cyan-300 shadow-lg transition hover:bg-cyan-400/20 sm:w-fit"
+  >
+    <BarChart3 size={18} />
+    Dashboard
+  </Link>
+
+  <Link
+    href="/admin"
+    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:scale-[1.02] hover:bg-cyan-50 sm:w-fit"
+  >
+    <ArrowLeft size={17} />
+    Voltar
+  </Link>
+</div>
         </header>
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/30 backdrop-blur">
