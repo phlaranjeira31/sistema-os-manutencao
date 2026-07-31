@@ -1,8 +1,11 @@
+import { AcaoAuditoria } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { prisma } from "@/src/lib/prisma";
+
+import { registrarAuditoria } from "@/src/lib/auditoria";
 import { authOptions } from "@/src/lib/auth";
 import cloudinary from "@/src/lib/cloudinary";
+import { prisma } from "@/src/lib/prisma";
 
 export const runtime = "nodejs";
 
@@ -566,7 +569,9 @@ export async function POST(req: Request) {
 
     if (!maquinaId) {
       return NextResponse.json(
-        { error: "Selecione a máquina ou equipamento." },
+        {
+          error: "Selecione a máquina ou equipamento.",
+        },
         { status: 400 }
       );
     }
@@ -637,6 +642,7 @@ export async function POST(req: Request) {
         select: {
           id: true,
           nome: true,
+          email: true,
           ativo: true,
         },
       }),
@@ -658,14 +664,18 @@ export async function POST(req: Request) {
 
     if (!maquina) {
       return NextResponse.json(
-        { error: "Máquina ou equipamento não encontrado." },
+        {
+          error: "Máquina ou equipamento não encontrado.",
+        },
         { status: 404 }
       );
     }
 
     if (!maquina.ativo) {
       return NextResponse.json(
-        { error: "A máquina selecionada está inativa." },
+        {
+          error: "A máquina selecionada está inativa.",
+        },
         { status: 400 }
       );
     }
@@ -682,14 +692,18 @@ export async function POST(req: Request) {
 
     if (!usuarioCriador) {
       return NextResponse.json(
-        { error: "Usuário da sessão não encontrado." },
+        {
+          error: "Usuário da sessão não encontrado.",
+        },
         { status: 404 }
       );
     }
 
     if (!usuarioCriador.ativo) {
       return NextResponse.json(
-        { error: "O usuário da sessão está inativo." },
+        {
+          error: "O usuário da sessão está inativo.",
+        },
         { status: 403 }
       );
     }
@@ -781,6 +795,44 @@ export async function POST(req: Request) {
         setor: true,
         maquina: true,
       },
+    });
+
+    await registrarAuditoria({
+      acao: AcaoAuditoria.CRIAR,
+      entidade: "OrdemServico",
+      entidadeId: os.id,
+
+      descricao: `${usuarioCriador.nome} criou a OS #${os.numero} para a máquina ${maquina.nome}.`,
+
+      usuarioId: usuarioCriador.id,
+      usuarioNome: usuarioCriador.nome,
+      usuarioEmail: usuarioCriador.email,
+
+      dadosNovos: {
+        numero: os.numero,
+        titulo: os.titulo,
+        descricao: os.descricao,
+        status: os.status,
+        prioridade: os.prioridade,
+
+        setorId: setor.id,
+        setorNome: setor.nome,
+
+        maquinaId: maquina.id,
+        maquinaNome: maquina.nome,
+
+        dataInicio: os.dataInicio,
+        dataPrevista: os.dataPrevista,
+        dataParada: os.dataParada,
+
+        criadoPorId: usuarioCriador.id,
+        criadoPorNome: usuarioCriador.nome,
+
+        quantidadeAnexos: os.fotos.length,
+        createdAt: os.createdAt,
+      },
+
+      request: req,
     });
 
     const supervisorEmail =
