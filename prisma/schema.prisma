@@ -25,6 +25,13 @@ enum PrioridadeOS {
   URGENTE
 }
 
+enum TipoSetor {
+  MANUTENCAO
+  OPERACIONAL
+  ADMINISTRATIVO
+  OUTRO
+}
+
 enum AcaoAuditoria {
   CRIAR
   EDITAR
@@ -40,6 +47,27 @@ enum AcaoAuditoria {
   EXPORTAR
 }
 
+model Empresa {
+  id    String  @id @default(cuid())
+  nome  String  @unique
+  sigla String  @unique
+  ativo Boolean @default(true)
+
+  logoUrl          String?
+  cor              String?
+  emailNotificacao String?
+
+  usuariosOrigem      User[]                   @relation("EmpresaOrigemUser")
+  usuariosAtendimento UserEmpresaAtendimento[]
+
+  setores     Setor[]
+  ordens      OrdemServico[]
+  preventivas OrdemPreventiva[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model User {
   id      String        @id @default(cuid())
   nome    String
@@ -49,6 +77,17 @@ model User {
   perfil  PerfilUsuario @default(COLABORADOR)
   ativo   Boolean       @default(true)
 
+  empresaOrigemId String?
+  empresaOrigem   Empresa? @relation("EmpresaOrigemUser", fields: [empresaOrigemId], references: [id], onDelete: SetNull)
+
+  setorId String?
+  setor   Setor?  @relation("SetorUser", fields: [setorId], references: [id], onDelete: SetNull)
+
+  funcaoId String?
+  funcao   Funcao? @relation("FuncaoUser", fields: [funcaoId], references: [id], onDelete: SetNull)
+
+  empresasAtendimento UserEmpresaAtendimento[]
+
   ordensCriadas          OrdemServico[]          @relation("CriadorOS")
   ordensResponsavel      ResponsavelOS[]
   preventivasResponsavel ResponsavelPreventiva[]
@@ -56,6 +95,32 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([empresaOrigemId])
+  @@index([setorId])
+  @@index([funcaoId])
+  @@index([perfil])
+  @@index([ativo])
+}
+
+model UserEmpresaAtendimento {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  ativo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, empresaId])
+  @@index([userId])
+  @@index([empresaId])
+  @@index([ativo])
 }
 
 model Setor {
@@ -63,12 +128,43 @@ model Setor {
   nome  String  @unique
   ativo Boolean @default(true)
 
+  tipo TipoSetor @default(OUTRO)
+
+  empresaId String?
+  empresa   Empresa? @relation(fields: [empresaId], references: [id], onDelete: SetNull)
+
+  usuarios User[]   @relation("SetorUser")
+  funcoes  Funcao[]
+
   ordens      OrdemServico[]
   preventivas OrdemPreventiva[]
   maquinas    Maquina[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([empresaId])
+  @@index([tipo])
+  @@index([ativo])
+}
+
+model Funcao {
+  id        String  @id @default(cuid())
+  nome      String
+  descricao String?
+  ativo     Boolean @default(true)
+
+  setorId String
+  setor   Setor  @relation(fields: [setorId], references: [id], onDelete: Cascade)
+
+  usuarios User[] @relation("FuncaoUser")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([nome, setorId])
+  @@index([setorId])
+  @@index([ativo])
 }
 
 model Maquina {
@@ -105,6 +201,9 @@ model OrdemServico {
   anotacoes     String?
   registroFinal String?
 
+  empresaId String?
+  empresa   Empresa? @relation(fields: [empresaId], references: [id], onDelete: SetNull)
+
   setorId String
   setor   Setor  @relation(fields: [setorId], references: [id])
 
@@ -120,6 +219,7 @@ model OrdemServico {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([empresaId])
   @@index([setorId])
   @@index([maquinaId])
   @@index([status])
@@ -161,6 +261,9 @@ model OrdemPreventiva {
   descricao  String
   prioridade PrioridadeOS @default(MEDIA)
 
+  empresaId String?
+  empresa   Empresa? @relation(fields: [empresaId], references: [id], onDelete: SetNull)
+
   setorId String
   setor   Setor  @relation(fields: [setorId], references: [id])
 
@@ -179,6 +282,7 @@ model OrdemPreventiva {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([empresaId])
   @@index([setorId])
   @@index([maquinaId])
   @@index([dataAgendada])
