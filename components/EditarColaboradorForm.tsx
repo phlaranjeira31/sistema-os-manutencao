@@ -91,12 +91,13 @@ function extrairLista<T>(
 
 export default function EditarColaboradorForm({
   colaborador,
+  isAdmin,
 }: {
   colaborador: Colaborador;
+  isAdmin: boolean;
 }) {
   const router = useRouter();
 
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [carregandoEmpresas, setCarregandoEmpresas] =
@@ -146,27 +147,6 @@ export default function EditarColaboradorForm({
       colaborador.funcao?.id ??
       "",
   });
-
-  useEffect(() => {
-    try {
-      const user = localStorage.getItem("user");
-
-      if (user) {
-        const usuario = JSON.parse(user);
-
-        setIsAdmin(
-          usuario?.perfil === "ADMIN"
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Erro ao verificar usuário local:",
-        error
-      );
-
-      setIsAdmin(false);
-    }
-  }, []);
 
   useEffect(() => {
     let ativo = true;

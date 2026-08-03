@@ -1,6 +1,9 @@
-import { prisma } from "@/src/lib/prisma";
-import { notFound } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { notFound, redirect } from "next/navigation";
+
 import EditarColaboradorForm from "@/components/EditarColaboradorForm";
+import { authOptions } from "@/src/lib/auth";
+import { prisma } from "@/src/lib/prisma";
 
 type Props = {
   params: Promise<{
@@ -11,6 +14,35 @@ type Props = {
 export default async function EditarColaboradorPage({
   params,
 }: Props) {
+  const session = await getServerSession(authOptions);
+
+  if (!session) {
+    redirect("/login");
+  }
+
+  const usuarioId = String(
+    (session.user as { id?: string } | undefined)?.id ?? ""
+  ).trim();
+
+  if (!usuarioId) {
+    redirect("/login");
+  }
+
+  const usuarioAutenticado = await prisma.user.findUnique({
+    where: {
+      id: usuarioId,
+    },
+
+    select: {
+      perfil: true,
+      ativo: true,
+    },
+  });
+
+  if (!usuarioAutenticado?.ativo) {
+    redirect("/login");
+  }
+
   const { id } = await params;
 
   const colaborador = await prisma.user.findUnique({
@@ -63,6 +95,7 @@ export default async function EditarColaboradorPage({
       <div className="mx-auto w-full max-w-5xl">
         <EditarColaboradorForm
           colaborador={colaborador}
+          isAdmin={usuarioAutenticado.perfil === "ADMIN"}
         />
       </div>
     </main>
