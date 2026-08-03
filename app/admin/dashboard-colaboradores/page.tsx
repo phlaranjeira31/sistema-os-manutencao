@@ -37,6 +37,11 @@ export default async function DashboardColaboradoresPage({
   const colaboradores = await prisma.user.findMany({
     where: {
       ativo: true,
+      setor: {
+        is: {
+          tipo: "MANUTENCAO",
+        },
+      },
       nome: filtroColaborador
         ? {
             contains: filtroColaborador,
@@ -48,6 +53,19 @@ export default async function DashboardColaboradoresPage({
       nome: "asc",
     },
     include: {
+      setor: {
+        select: {
+          id: true,
+          nome: true,
+          tipo: true,
+        },
+      },
+      funcao: {
+        select: {
+          id: true,
+          nome: true,
+        },
+      },
       ordensResponsavel: {
         include: {
           os: true,
@@ -166,6 +184,10 @@ export default async function DashboardColaboradoresPage({
 
                           <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-black text-cyan-300">
                             {colaborador.perfil}
+                          </span>
+
+                          <span className="rounded-full bg-violet-500/10 px-3 py-1 text-xs font-black text-violet-300">
+                            {colaborador.funcao?.nome ?? "Função não definida"}
                           </span>
                         </div>
 

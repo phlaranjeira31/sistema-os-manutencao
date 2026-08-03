@@ -122,6 +122,13 @@ export default function AdminMenu() {
           />
 
           <MenuItem
+  icon={<Building2 size={19} />}
+  label="Empresas"
+  href="/admin/empresas"
+  active={pathname.startsWith("/admin/empresas")}
+/>
+
+          <MenuItem
             icon={<Building2 size={19} />}
             label="Setores"
             href="/admin/setores"

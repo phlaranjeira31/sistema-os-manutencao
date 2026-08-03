@@ -1,0 +1,13 @@
+BEGIN;
+
+UPDATE "Setor"
+SET
+  "tipo" = 'MANUTENCAO',
+  "updatedAt" = CURRENT_TIMESTAMP
+WHERE UPPER(TRIM("nome")) IN (
+  'MANUTENÇÃO',
+  'MANUTENCAO'
+)
+AND "tipo" <> 'MANUTENCAO';
+
+COMMIT;

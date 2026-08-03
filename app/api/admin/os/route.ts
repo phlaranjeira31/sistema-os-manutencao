@@ -1,8 +1,11 @@
+import { AcaoAuditoria } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { prisma } from "@/src/lib/prisma";
+
+import { registrarAuditoria } from "@/src/lib/auditoria";
 import { authOptions } from "@/src/lib/auth";
 import cloudinary from "@/src/lib/cloudinary";
+import { prisma } from "@/src/lib/prisma";
 
 export const runtime = "nodejs";
 
@@ -84,6 +87,7 @@ async function enviarEmailNovaOS({
   to,
   osId,
   numero,
+  empresa,
   maquina,
   setor,
   descricao,
@@ -96,6 +100,7 @@ async function enviarEmailNovaOS({
   to: string;
   osId: string;
   numero: number;
+  empresa: string;
   maquina: string;
   setor: string;
   descricao: string;
@@ -150,7 +155,7 @@ async function enviarEmailNovaOS({
           email: to,
         },
       ],
-      subject: `Nova OS #${numero} criada - ${maquina}`,
+      subject: `Nova OS #${numero} criada - ${empresa} - ${maquina}`,
       html: `
         <div
           style="
@@ -252,6 +257,30 @@ async function enviarEmailNovaOS({
                   font-size: 14px;
                 "
               >
+                <tr>
+                  <td
+                    style="
+                      width: 160px;
+                      padding: 10px;
+                      border-bottom: 1px solid #e2e8f0;
+                      color: #64748b;
+                      font-weight: bold;
+                    "
+                  >
+                    Empresa
+                  </td>
+
+                  <td
+                    style="
+                      padding: 10px;
+                      border-bottom: 1px solid #e2e8f0;
+                      font-weight: bold;
+                    "
+                  >
+                    ${escaparHtml(empresa)}
+                  </td>
+                </tr>
+
                 <tr>
                   <td
                     style="
@@ -454,7 +483,7 @@ async function enviarEmailNovaOS({
                 text-align: center;
               "
             >
-              Notificação automática do Sistema de OS da Sequoia.
+              Notificação automática do Sistema de OS do grupo.
             </div>
           </div>
         </div>
@@ -534,6 +563,7 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
 
+    const empresaId = String(formData.get("empresaId") ?? "").trim();
     const setorId = String(formData.get("setorId") ?? "").trim();
     const maquinaId = String(formData.get("maquinaId") ?? "").trim();
     const descricao = String(formData.get("descricao") ?? "").trim();
@@ -557,6 +587,13 @@ export async function POST(req: Request) {
           item instanceof File && item.size > 0
       );
 
+    if (!empresaId) {
+      return NextResponse.json(
+        { error: "Selecione a empresa." },
+        { status: 400 }
+      );
+    }
+
     if (!setorId) {
       return NextResponse.json(
         { error: "Selecione o setor." },
@@ -566,7 +603,9 @@ export async function POST(req: Request) {
 
     if (!maquinaId) {
       return NextResponse.json(
-        { error: "Selecione a máquina ou equipamento." },
+        {
+          error: "Selecione a máquina ou equipamento.",
+        },
         { status: 400 }
       );
     }
@@ -615,6 +654,17 @@ export async function POST(req: Request) {
           id: true,
           nome: true,
           ativo: true,
+          empresaId: true,
+
+          empresa: {
+            select: {
+              id: true,
+              nome: true,
+              sigla: true,
+              ativo: true,
+              emailNotificacao: true,
+            },
+          },
         },
       }),
 
@@ -637,6 +687,7 @@ export async function POST(req: Request) {
         select: {
           id: true,
           nome: true,
+          email: true,
           ativo: true,
         },
       }),
@@ -656,16 +707,47 @@ export async function POST(req: Request) {
       );
     }
 
+    if (!setor.empresa || !setor.empresaId) {
+      return NextResponse.json(
+        { error: "O setor selecionado não está vinculado a uma empresa." },
+        { status: 400 }
+      );
+    }
+
+    if (setor.empresaId !== empresaId) {
+      return NextResponse.json(
+        {
+          error:
+            "O setor selecionado não pertence à empresa informada.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!setor.empresa.ativo) {
+      return NextResponse.json(
+        {
+          error:
+            "A empresa selecionada está inativa e não pode receber novas OS.",
+        },
+        { status: 400 }
+      );
+    }
+
     if (!maquina) {
       return NextResponse.json(
-        { error: "Máquina ou equipamento não encontrado." },
+        {
+          error: "Máquina ou equipamento não encontrado.",
+        },
         { status: 404 }
       );
     }
 
     if (!maquina.ativo) {
       return NextResponse.json(
-        { error: "A máquina selecionada está inativa." },
+        {
+          error: "A máquina selecionada está inativa.",
+        },
         { status: 400 }
       );
     }
@@ -682,14 +764,18 @@ export async function POST(req: Request) {
 
     if (!usuarioCriador) {
       return NextResponse.json(
-        { error: "Usuário da sessão não encontrado." },
+        {
+          error: "Usuário da sessão não encontrado.",
+        },
         { status: 404 }
       );
     }
 
     if (!usuarioCriador.ativo) {
       return NextResponse.json(
-        { error: "O usuário da sessão está inativo." },
+        {
+          error: "O usuário da sessão está inativo.",
+        },
         { status: 403 }
       );
     }
@@ -729,6 +815,12 @@ export async function POST(req: Request) {
         dataPrevista,
         dataParada,
 
+        empresa: {
+          connect: {
+            id: setor.empresa.id,
+          },
+        },
+
         setor: {
           connect: {
             id: setor.id,
@@ -748,6 +840,7 @@ export async function POST(req: Request) {
         },
 
         anotacoes: [
+          `Empresa: ${setor.empresa.nome}`,
           `Equipamento: ${maquina.nome}`,
           `Setor: ${setor.nome}`,
           `Descrição: ${descricao}`,
@@ -778,12 +871,56 @@ export async function POST(req: Request) {
       include: {
         fotos: true,
         criadoPor: true,
+        empresa: true,
         setor: true,
         maquina: true,
       },
     });
 
+    await registrarAuditoria({
+      acao: AcaoAuditoria.CRIAR,
+      entidade: "OrdemServico",
+      entidadeId: os.id,
+
+      descricao: `${usuarioCriador.nome} criou a OS #${os.numero} para a empresa ${setor.empresa.nome}, máquina ${maquina.nome}.`,
+
+      usuarioId: usuarioCriador.id,
+      usuarioNome: usuarioCriador.nome,
+      usuarioEmail: usuarioCriador.email,
+
+      dadosNovos: {
+        numero: os.numero,
+        titulo: os.titulo,
+        descricao: os.descricao,
+        status: os.status,
+        prioridade: os.prioridade,
+
+        empresaId: setor.empresa.id,
+        empresaNome: setor.empresa.nome,
+        empresaSigla: setor.empresa.sigla,
+
+        setorId: setor.id,
+        setorNome: setor.nome,
+
+        maquinaId: maquina.id,
+        maquinaNome: maquina.nome,
+
+        dataInicio: os.dataInicio,
+        dataPrevista: os.dataPrevista,
+        dataParada: os.dataParada,
+
+        criadoPorId: usuarioCriador.id,
+        criadoPorNome: usuarioCriador.nome,
+
+        quantidadeAnexos: os.fotos.length,
+        createdAt: os.createdAt,
+      },
+
+      request: req,
+    });
+
     const supervisorEmail =
+      setor.empresa.emailNotificacao?.trim() ||
       process.env.SUPERVISOR_EMAIL?.trim() ||
       "npinto@tortillas.com.br";
 
@@ -797,6 +934,7 @@ export async function POST(req: Request) {
         to: supervisorEmail,
         osId: os.id,
         numero: os.numero,
+        empresa: setor.empresa.nome,
         maquina: maquina.nome,
         setor: setor.nome,
         descricao: os.descricao,
