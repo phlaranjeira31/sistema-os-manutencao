@@ -29,9 +29,19 @@ function statusLabel(status: string) {
 export async function GET(_req: Request, { params }: RouteProps) {
   const { id } = await params;
 
-  const colaborador = await prisma.user.findUnique({
-    where: { id },
+  const colaborador = await prisma.user.findFirst({
+    where: {
+      id,
+      ativo: true,
+      setor: {
+        is: {
+          tipo: "MANUTENCAO",
+        },
+      },
+    },
     include: {
+      setor: true,
+      funcao: true,
       ordensResponsavel: {
         include: {
           os: {
@@ -46,7 +56,7 @@ export async function GET(_req: Request, { params }: RouteProps) {
 
   if (!colaborador) {
     return NextResponse.json(
-      { error: "Colaborador não encontrado." },
+      { error: "Colaborador da manutenção não encontrado." },
       { status: 404 }
     );
   }
@@ -113,8 +123,10 @@ export async function GET(_req: Request, { params }: RouteProps) {
   doc.setFontSize(10);
   doc.setTextColor(148, 163, 184);
   doc.text(`Perfil: ${colaborador.perfil}`, 15, 66);
-  doc.text(`E-mail: ${colaborador.email}`, 15, 73);
-  doc.text(`Gerado em: ${formatDate(new Date())}`, 15, 80);
+  doc.text(`Função: ${colaborador.funcao?.nome ?? "Não definida"}`, 15, 73);
+  doc.text(`Setor: ${colaborador.setor?.nome ?? "-"}`, 15, 80);
+  doc.text(`E-mail: ${colaborador.email}`, 15, 87);
+  doc.text(`Gerado em: ${formatDate(new Date())}`, 15, 94);
 
   function card(x: number, y: number, title: string, value: string) {
     doc.setFillColor(15, 23, 42);
@@ -130,27 +142,27 @@ export async function GET(_req: Request, { params }: RouteProps) {
     doc.text(value, x + 4, y + 19);
   }
 
-  card(15, 92, "TOTAL", String(total));
-  card(60, 92, "ABERTAS", String(abertas));
-  card(105, 92, "CONCLUÍDAS", String(concluidas));
-  card(150, 92, "CANCELADAS", String(canceladas));
+  card(15, 106, "TOTAL", String(total));
+  card(60, 106, "ABERTAS", String(abertas));
+  card(105, 106, "CONCLUÍDAS", String(concluidas));
+  card(150, 106, "CANCELADAS", String(canceladas));
 
   doc.setFillColor(15, 23, 42);
-  doc.roundedRect(15, 126, 180, 28, 4, 4, "F");
+  doc.roundedRect(15, 140, 180, 28, 4, 4, "F");
 
   doc.setTextColor(148, 163, 184);
   doc.setFontSize(10);
-  doc.text("RESOLUÇÃO", 22, 137);
+  doc.text("RESOLUÇÃO", 22, 151);
 
   doc.setTextColor(34, 211, 238);
   doc.setFontSize(22);
-  doc.text(`${resolucao}%`, 22, 148);
+  doc.text(`${resolucao}%`, 22, 162);
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(13);
-  doc.text("Ordens de Serviço vinculadas", 15, 170);
+  doc.text("Ordens de Serviço vinculadas", 15, 184);
 
-  let y = 182;
+  let y = 196;
 
   if (ordens.length === 0) {
     doc.setTextColor(148, 163, 184);

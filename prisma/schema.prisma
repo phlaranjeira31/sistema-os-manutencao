@@ -125,7 +125,7 @@ model UserEmpresaAtendimento {
 
 model Setor {
   id    String  @id @default(cuid())
-  nome  String  @unique
+  nome  String
   ativo Boolean @default(true)
 
   tipo TipoSetor @default(OUTRO)
@@ -143,6 +143,7 @@ model Setor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([nome, empresaId])
   @@index([empresaId])
   @@index([tipo])
   @@index([ativo])

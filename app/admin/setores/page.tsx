@@ -1,13 +1,13 @@
 import Link from "next/link";
 import {
+  Activity,
+  AlertTriangle,
   ArrowLeft,
+  BarChart3,
   Building2,
   CheckCircle2,
   ClipboardList,
   Plus,
-  AlertTriangle,
-  Activity,
-  BarChart3,
   Search,
 } from "lucide-react";
 import { prisma } from "@/src/lib/prisma";
@@ -17,65 +17,146 @@ import GerenciarMaquinasSetor from "@/components/GerenciarMaquinasSetor";
 
 type PageProps = {
   searchParams?: Promise<{
+    empresaId?: string;
     q?: string;
     status?: string;
   }>;
 };
 
-export default async function SetoresPage({ searchParams }: PageProps) {
+const ORDEM_EMPRESAS: Record<string, number> = {
+  SEQ: 1,
+  SHA: 2,
+  OCO: 3,
+};
+
+export const dynamic = "force-dynamic";
+
+export default async function SetoresPage({
+  searchParams,
+}: PageProps) {
   const params = await searchParams;
+
+  const empresaIdInformada = String(
+    params?.empresaId ?? ""
+  ).trim();
 
   const q = String(params?.q ?? "").trim();
   const status = String(params?.status ?? "").trim();
 
-  const setores = await prisma.setor.findMany({
+  const empresasEncontradas = await prisma.empresa.findMany({
     where: {
-      ...(q
-        ? {
-            nome: {
-              contains: q,
-              mode: "insensitive",
-            },
-          }
-        : {}),
-
-      ...(status === "ativo"
-        ? { ativo: true }
-        : status === "inativo"
-        ? { ativo: false }
-        : {}),
-    },
-    include: {
-      ordens: true,
-      maquinas: {
-        orderBy: {
-          nome: "asc",
-        },
+      sigla: {
+        in: ["SEQ", "SHA", "OCO"],
       },
     },
-    orderBy: {
-      nome: "asc",
+
+    select: {
+      id: true,
+      nome: true,
+      sigla: true,
+      ativo: true,
+      cor: true,
     },
   });
 
+  const empresas = empresasEncontradas.sort(
+    (a, b) =>
+      (ORDEM_EMPRESAS[a.sigla] ?? 99) -
+      (ORDEM_EMPRESAS[b.sigla] ?? 99)
+  );
+
+  const empresaSelecionada =
+    empresas.find(
+      (empresa) => empresa.id === empresaIdInformada
+    ) ??
+    empresas.find((empresa) => empresa.sigla === "SEQ") ??
+    empresas[0] ??
+    null;
+
+  const empresaId = empresaSelecionada?.id ?? "";
+
+  const setores = empresaId
+    ? await prisma.setor.findMany({
+        where: {
+          empresaId,
+
+          ...(q
+            ? {
+                nome: {
+                  contains: q,
+                  mode: "insensitive",
+                },
+              }
+            : {}),
+
+          ...(status === "ativo"
+            ? {
+                ativo: true,
+              }
+            : status === "inativo"
+              ? {
+                  ativo: false,
+                }
+              : {}),
+        },
+
+        include: {
+          empresa: {
+            select: {
+              id: true,
+              nome: true,
+              sigla: true,
+              cor: true,
+            },
+          },
+
+          ordens: true,
+
+          maquinas: {
+            orderBy: {
+              nome: "asc",
+            },
+          },
+        },
+
+        orderBy: {
+          nome: "asc",
+        },
+      })
+    : [];
+
   const totalSetores = setores.length;
-  const setoresAtivos = setores.filter((setor: any) => setor.ativo).length;
+
+  const setoresAtivos = setores.filter(
+    (setor) => setor.ativo
+  ).length;
+
   const totalOS = setores.reduce(
-    (acc: number, setor: any) => acc + setor.ordens.length,
+    (total, setor) => total + setor.ordens.length,
     0
   );
 
   const totalConcluidas = setores.reduce(
-    (acc: number, setor: any) =>
-      acc +
-      setor.ordens.filter((os: any) => os.status === "CONCLUIDA").length,
+    (total, setor) =>
+      total +
+      setor.ordens.filter(
+        (os) => os.status === "CONCLUIDA"
+      ).length,
     0
   );
+
+  const corEmpresa =
+    empresaSelecionada?.cor || "#22D3EE";
+
+  const limparHref = empresaId
+    ? `/admin/setores?empresaId=${encodeURIComponent(
+        empresaId
+      )}`
+    : "/admin/setores";
 
   return (
     <main className="min-h-screen bg-[#050816] px-4 py-8 text-white md:px-10">
       <div className="mx-auto max-w-7xl space-y-6">
-        {/* HEADER */}
         <header className="flex flex-col gap-5 border-b border-white/10 pb-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 shadow-lg shadow-cyan-950/30">
@@ -83,32 +164,151 @@ export default async function SetoresPage({ searchParams }: PageProps) {
             </div>
 
             <div>
-              <p className="text-sm font-bold text-cyan-300">Gestão</p>
-              <h1 className="text-3xl font-black md:text-4xl">Setores</h1>
+              <p className="text-sm font-bold text-cyan-300">
+                Gestão
+              </p>
+
+              <h1 className="text-3xl font-black md:text-4xl">
+                Setores
+              </h1>
+
               <p className="text-slate-400">
-                Gerencie setores e acompanhe as ordens de serviço.
+                Gerencie os setores separadamente por empresa.
               </p>
             </div>
           </div>
 
-          <Link
-            href="/admin"
-            className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-bold text-slate-950 shadow-lg hover:bg-cyan-50"
-          >
-            <ArrowLeft size={17} />
-            Voltar
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            {empresaSelecionada && (
+              <Link
+                href={`/admin/empresas/${empresaSelecionada.sigla.toLowerCase()}`}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-black text-white transition hover:bg-white/10"
+              >
+                <Building2 size={17} />
+                Dashboard da empresa
+              </Link>
+            )}
+
+            <Link
+              href="/admin"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:bg-cyan-50"
+            >
+              <ArrowLeft size={17} />
+              Voltar
+            </Link>
+          </div>
         </header>
 
+        {empresaSelecionada && (
+          <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#080d1f] shadow-xl">
+            <div
+              className="h-1.5 w-full"
+              style={{
+                backgroundColor: corEmpresa,
+              }}
+            />
+
+            <div className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-4">
+                <div
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl border"
+                  style={{
+                    borderColor: `${corEmpresa}55`,
+                    backgroundColor: `${corEmpresa}15`,
+                    color: corEmpresa,
+                  }}
+                >
+                  <Building2 size={23} />
+                </div>
+
+                <div>
+                  <p
+                    className="text-xs font-black uppercase tracking-wider"
+                    style={{
+                      color: corEmpresa,
+                    }}
+                  >
+                    Empresa selecionada
+                  </p>
+
+                  <h2 className="text-2xl font-black">
+                    {empresaSelecionada.nome}
+                  </h2>
+                </div>
+              </div>
+
+              <span
+                className={`w-fit rounded-full px-3 py-1.5 text-xs font-black ${
+                  empresaSelecionada.ativo
+                    ? "bg-emerald-500/15 text-emerald-300"
+                    : "bg-red-500/15 text-red-300"
+                }`}
+              >
+                {empresaSelecionada.ativo
+                  ? "Empresa ativa"
+                  : "Empresa inativa"}
+              </span>
+            </div>
+          </section>
+        )}
+
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/30 backdrop-blur">
-          {/* CARDS */}
-          <div className="mb-6 grid gap-4 md:grid-cols-2">
-            <Card title="Setores" value={totalSetores} icon={<Building2 />} />
-            <Card title="Ativos" value={setoresAtivos} icon={<CheckCircle2 />} />
+          <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Card
+              title="Setores encontrados"
+              value={totalSetores}
+              icon={<Building2 />}
+            />
+
+            <Card
+              title="Setores ativos"
+              value={setoresAtivos}
+              icon={<CheckCircle2 />}
+            />
+
+            <Card
+              title="Ordens de serviço"
+              value={totalOS}
+              icon={<ClipboardList />}
+            />
+
+            <Card
+              title="OS concluídas"
+              value={totalConcluidas}
+              icon={<CheckCircle2 />}
+            />
           </div>
 
-          {/* FILTRO */}
-          <form className="grid gap-4 md:grid-cols-[1fr_220px_160px_130px]">
+          <form className="grid gap-4 lg:grid-cols-[260px_1fr_220px_160px_130px]">
+            <div>
+              <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+                <Building2 size={16} />
+                Empresa
+              </label>
+
+              <select
+                name="empresaId"
+                defaultValue={empresaId}
+                disabled={empresas.length === 0}
+                className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none transition focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {empresas.length === 0 ? (
+                  <option value="">
+                    Nenhuma empresa encontrada
+                  </option>
+                ) : (
+                  empresas.map((empresa) => (
+                    <option
+                      key={empresa.id}
+                      value={empresa.id}
+                    >
+                      {empresa.nome} — {empresa.sigla}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
             <div>
               <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
                 <Search size={16} />
@@ -118,7 +318,7 @@ export default async function SetoresPage({ searchParams }: PageProps) {
               <input
                 name="q"
                 defaultValue={q}
-                placeholder="Ex: Manutenção, TI, Administrativo..."
+                placeholder="Ex: Manutenção, Produção, Administrativo..."
                 className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400"
               />
             </div>
@@ -143,7 +343,8 @@ export default async function SetoresPage({ searchParams }: PageProps) {
             <div className="flex items-end">
               <button
                 type="submit"
-                className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.02] hover:bg-cyan-300"
+                disabled={empresas.length === 0}
+                className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.02] hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Search size={17} />
                 Filtrar
@@ -152,7 +353,7 @@ export default async function SetoresPage({ searchParams }: PageProps) {
 
             <div className="flex items-end">
               <Link
-                href="/admin/setores"
+                href={limparHref}
                 className="inline-flex h-14 w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-black text-white transition hover:bg-white/10"
               >
                 Limpar
@@ -161,7 +362,6 @@ export default async function SetoresPage({ searchParams }: PageProps) {
           </form>
         </section>
 
-        {/* NOVO SETOR */}
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl backdrop-blur">
           <div className="mb-5 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400 text-slate-950">
@@ -169,23 +369,34 @@ export default async function SetoresPage({ searchParams }: PageProps) {
             </div>
 
             <div>
-              <h2 className="text-xl font-black">Adicionar setor</h2>
+              <h2 className="text-xl font-black">
+                Adicionar setor
+              </h2>
+
               <p className="text-sm text-slate-400">
-                Setores ativos aparecem na criação de OS.
+                Escolha a empresa e informe o nome do novo
+                setor.
               </p>
             </div>
           </div>
 
-          <NovoSetorForm />
+          <NovoSetorForm
+  key={empresaId}
+  empresaIdInicial={empresaId}
+/>
         </section>
 
-        {/* LISTA */}
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl backdrop-blur">
           <div className="mb-6 flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-black">Dashboard dos setores</h2>
+              <h2 className="text-xl font-black">
+                Dashboard dos setores
+              </h2>
+
               <p className="text-sm text-slate-400">
-                Visualize desempenho, gargalos e volume de OS por setor.
+                {empresaSelecionada
+                  ? `Visualizando os setores da empresa ${empresaSelecionada.nome}.`
+                  : "Selecione uma empresa para visualizar seus setores."}
               </p>
             </div>
 
@@ -194,41 +405,62 @@ export default async function SetoresPage({ searchParams }: PageProps) {
             </div>
           </div>
 
-          {setores.length === 0 ? (
+          {!empresaSelecionada ? (
             <div className="rounded-2xl border border-dashed border-white/20 p-10 text-center text-slate-400">
-              Nenhum setor encontrado com os filtros selecionados.
+              Nenhuma empresa disponível.
+            </div>
+          ) : setores.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/20 p-10 text-center text-slate-400">
+              Nenhum setor encontrado para a empresa{" "}
+              {empresaSelecionada.nome} com os filtros
+              selecionados.
             </div>
           ) : (
             <div className="grid gap-5">
-              {setores.map((setor: any) => {
+              {setores.map((setor) => {
                 const total = setor.ordens.length;
 
                 const naoIniciadas = setor.ordens.filter(
-                  (os: any) => os.status === "NAO_INICIADA"
+                  (os) => os.status === "NAO_INICIADA"
                 ).length;
 
                 const emAndamento = setor.ordens.filter(
-                  (os: any) => os.status === "EM_ANDAMENTO"
+                  (os) => os.status === "EM_ANDAMENTO"
                 ).length;
 
-                const abertas = naoIniciadas + emAndamento;
+                const abertas =
+                  naoIniciadas + emAndamento;
 
                 const concluidas = setor.ordens.filter(
-                  (os: any) => os.status === "CONCLUIDA"
+                  (os) => os.status === "CONCLUIDA"
                 ).length;
 
                 const canceladas = setor.ordens.filter(
-                  (os: any) => os.status === "CANCELADA"
+                  (os) => os.status === "CANCELADA"
                 ).length;
 
                 const percentual =
-                  total > 0 ? Math.round((concluidas / total) * 100) : 0;
+                  total > 0
+                    ? Math.round(
+                        (concluidas / total) * 100
+                      )
+                    : 0;
+
+                const corSetor =
+                  setor.empresa?.cor || corEmpresa;
 
                 return (
-                  <div
+                  <article
                     key={setor.id}
                     className="overflow-hidden rounded-3xl border border-white/10 bg-[#080d1f] shadow-xl transition hover:border-cyan-400/40"
                   >
+                    <div
+                      className="h-1 w-full"
+                      style={{
+                        backgroundColor: corSetor,
+                      }}
+                    />
+
                     <div className="grid gap-5 p-5 xl:grid-cols-[1fr_360px]">
                       <div className="min-w-0 space-y-5">
                         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -239,27 +471,48 @@ export default async function SetoresPage({ searchParams }: PageProps) {
                               </h3>
 
                               <span
+                                className="rounded-full border px-3 py-1 text-xs font-black"
+                                style={{
+                                  borderColor: `${corSetor}55`,
+                                  backgroundColor: `${corSetor}15`,
+                                  color: corSetor,
+                                }}
+                              >
+                                {setor.empresa?.sigla ??
+                                  empresaSelecionada.sigla}
+                              </span>
+
+                              <span
                                 className={`rounded-full px-3 py-1 text-xs font-black ${
                                   setor.ativo
                                     ? "bg-emerald-500/20 text-emerald-300"
                                     : "bg-red-500/20 text-red-300"
                                 }`}
                               >
-                                {setor.ativo ? "Ativo" : "Inativo"}
+                                {setor.ativo
+                                  ? "Ativo"
+                                  : "Inativo"}
                               </span>
                             </div>
 
                             <p className="mt-1 text-sm text-slate-400">
-                              {total} ordem(ns) de serviço vinculada(s).
+                              {total} ordem(ns) de serviço e{" "}
+                              {setor.maquinas.length} máquina(s)
+                              vinculada(s).
                             </p>
                           </div>
 
                           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#050816] px-4 py-3">
-                            <Activity size={18} className="text-cyan-300" />
+                            <Activity
+                              size={18}
+                              className="text-cyan-300"
+                            />
+
                             <div>
                               <p className="text-xs font-bold uppercase text-slate-400">
                                 Resolução
                               </p>
+
                               <p className="text-xl font-black text-white">
                                 {percentual}%
                               </p>
@@ -268,13 +521,24 @@ export default async function SetoresPage({ searchParams }: PageProps) {
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                          <Mini label="Total" value={total} color="cyan" />
-                          <Mini label="Abertas" value={abertas} color="orange" />
+                          <Mini
+                            label="Total"
+                            value={total}
+                            color="cyan"
+                          />
+
+                          <Mini
+                            label="Abertas"
+                            value={abertas}
+                            color="orange"
+                          />
+
                           <Mini
                             label="Concluídas"
                             value={concluidas}
                             color="green"
                           />
+
                           <Mini
                             label="Canceladas"
                             value={canceladas}
@@ -296,17 +560,23 @@ export default async function SetoresPage({ searchParams }: PageProps) {
                                   total > 0
                                     ? `conic-gradient(
                                         #facc15 0 ${Math.round(
-                                          (naoIniciadas / total) * 100
+                                          (naoIniciadas /
+                                            total) *
+                                            100
                                         )}%,
                                         #22d3ee ${Math.round(
-                                          (naoIniciadas / total) * 100
+                                          (naoIniciadas /
+                                            total) *
+                                            100
                                         )}% ${Math.round(
-                                          ((naoIniciadas + emAndamento) /
+                                          ((naoIniciadas +
+                                            emAndamento) /
                                             total) *
                                             100
                                         )}%,
                                         #34d399 ${Math.round(
-                                          ((naoIniciadas + emAndamento) /
+                                          ((naoIniciadas +
+                                            emAndamento) /
                                             total) *
                                             100
                                         )}% ${Math.round(
@@ -331,6 +601,7 @@ export default async function SetoresPage({ searchParams }: PageProps) {
                                 <span className="text-2xl font-black text-white">
                                   {total}
                                 </span>
+
                                 <span className="text-xs font-bold text-slate-400">
                                   OS
                                 </span>
@@ -343,16 +614,19 @@ export default async function SetoresPage({ searchParams }: PageProps) {
                                 value={naoIniciadas}
                                 color="bg-yellow-400"
                               />
+
                               <Legenda
                                 label="Em andamento"
                                 value={emAndamento}
                                 color="bg-cyan-400"
                               />
+
                               <Legenda
                                 label="Concluídas"
                                 value={concluidas}
                                 color="bg-emerald-400"
                               />
+
                               <Legenda
                                 label="Canceladas"
                                 value={canceladas}
@@ -371,14 +645,15 @@ export default async function SetoresPage({ searchParams }: PageProps) {
                         {abertas > 0 && (
                           <div className="flex items-center gap-2 rounded-2xl border border-orange-400/20 bg-orange-500/10 px-4 py-3 text-sm font-bold text-orange-300">
                             <AlertTriangle size={16} />
-                            Atenção: este setor possui OS em aberto.
+                            Atenção: este setor possui OS em
+                            aberto.
                           </div>
                         )}
                       </div>
 
                       <EditarSetorInline setor={setor} />
                     </div>
-                  </div>
+                  </article>
                 );
               })}
             </div>
@@ -402,7 +677,10 @@ function Card({
     <div className="rounded-2xl border border-white/10 bg-[#080d1f] p-5 shadow-lg">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-slate-400">{title}</p>
+          <p className="text-sm text-slate-400">
+            {title}
+          </p>
+
           <p className="text-3xl font-black">{value}</p>
         </div>
 
@@ -425,15 +703,24 @@ function Mini({
 }) {
   const colors = {
     cyan: "text-cyan-300 bg-cyan-500/10 border-cyan-400/20",
-    orange: "text-orange-300 bg-orange-500/10 border-orange-400/20",
-    green: "text-emerald-300 bg-emerald-500/10 border-emerald-400/20",
+    orange:
+      "text-orange-300 bg-orange-500/10 border-orange-400/20",
+    green:
+      "text-emerald-300 bg-emerald-500/10 border-emerald-400/20",
     red: "text-red-300 bg-red-500/10 border-red-400/20",
   };
 
   return (
-    <div className={`rounded-2xl border p-4 ${colors[color]}`}>
-      <p className="text-xs font-bold uppercase opacity-80">{label}</p>
-      <p className="mt-2 text-3xl font-black">{value}</p>
+    <div
+      className={`rounded-2xl border p-4 ${colors[color]}`}
+    >
+      <p className="text-xs font-bold uppercase opacity-80">
+        {label}
+      </p>
+
+      <p className="mt-2 text-3xl font-black">
+        {value}
+      </p>
     </div>
   );
 }
@@ -450,11 +737,18 @@ function Legenda({
   return (
     <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
       <div className="flex items-center gap-2">
-        <span className={`h-3 w-3 rounded-full ${color}`} />
-        <span className="text-sm font-bold text-slate-300">{label}</span>
+        <span
+          className={`h-3 w-3 rounded-full ${color}`}
+        />
+
+        <span className="text-sm font-bold text-slate-300">
+          {label}
+        </span>
       </div>
 
-      <span className="text-sm font-black text-white">{value}</span>
+      <span className="text-sm font-black text-white">
+        {value}
+      </span>
     </div>
   );
 }

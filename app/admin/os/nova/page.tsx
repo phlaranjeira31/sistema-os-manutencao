@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ClipboardList,
   Building2,
+  Factory,
   AlertTriangle,
   ArrowLeft,
   Save,
@@ -16,9 +17,17 @@ import {
   CalendarClock,
 } from "lucide-react";
 
+type Empresa = {
+  id: string;
+  nome: string;
+  sigla: string;
+  ativo: boolean;
+};
+
 type Setor = {
   id: string;
   nome: string;
+  empresaId?: string | null;
 };
 
 type Maquina = {
@@ -42,10 +51,13 @@ export default function NovaOSPage() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
+  const [loadingEmpresas, setLoadingEmpresas] = useState(true);
+  const [loadingSetores, setLoadingSetores] = useState(false);
   const [loadingMaquinas, setLoadingMaquinas] = useState(false);
   const [loadingSessao, setLoadingSessao] = useState(true);
   const [erro, setErro] = useState("");
 
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [setores, setSetores] = useState<Setor[]>([]);
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
   const [usuarioLogado, setUsuarioLogado] =
@@ -53,6 +65,7 @@ export default function NovaOSPage() {
   const [arquivos, setArquivos] = useState<PreviewArquivo[]>([]);
 
   const [form, setForm] = useState({
+    empresaId: "",
     setorId: "",
     maquinaId: "",
     descricao: "",
@@ -64,8 +77,8 @@ export default function NovaOSPage() {
   useEffect(() => {
     async function carregarDados() {
       try {
-        const [setoresRes, sessaoRes] = await Promise.all([
-          fetch("/api/admin/setores", {
+        const [empresasRes, sessaoRes] = await Promise.all([
+          fetch("/api/admin/empresas?ativas=true", {
             cache: "no-store",
           }),
 
@@ -74,12 +87,29 @@ export default function NovaOSPage() {
           }),
         ]);
 
-        const setoresData = await setoresRes.json();
+        const empresasData = await empresasRes.json();
         const sessaoData = await sessaoRes.json();
 
-        if (setoresRes.ok) {
-          setSetores(Array.isArray(setoresData) ? setoresData : []);
+        if (!empresasRes.ok) {
+          throw new Error(
+            empresasData?.error || "Erro ao carregar empresas."
+          );
         }
+
+        const listaEmpresas: Empresa[] = Array.isArray(empresasData)
+          ? empresasData
+          : [];
+
+        setEmpresas(listaEmpresas);
+
+        const sequoia = listaEmpresas.find(
+          (empresa) => empresa.sigla === "SEQ"
+        );
+
+        setForm((prev) => ({
+          ...prev,
+          empresaId: sequoia?.id || listaEmpresas[0]?.id || "",
+        }));
 
         if (sessaoRes.ok && sessaoData?.user) {
           setUsuarioLogado({
@@ -95,14 +125,66 @@ export default function NovaOSPage() {
       } catch (error) {
         console.error("Erro ao buscar dados:", error);
 
-        setErro("Não foi possível carregar os dados do formulário.");
+        setErro(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível carregar os dados do formulário."
+        );
       } finally {
+        setLoadingEmpresas(false);
         setLoadingSessao(false);
       }
     }
 
     carregarDados();
   }, []);
+
+  useEffect(() => {
+    async function carregarSetores() {
+      if (!form.empresaId) {
+        setSetores([]);
+        setMaquinas([]);
+        return;
+      }
+
+      try {
+        setLoadingSetores(true);
+        setErro("");
+
+        const res = await fetch(
+          `/api/admin/setores?empresaId=${encodeURIComponent(
+            form.empresaId
+          )}`,
+          {
+            cache: "no-store",
+          }
+        );
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data?.error || "Erro ao buscar setores.");
+        }
+
+        setSetores(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Erro ao buscar setores:", error);
+
+        setSetores([]);
+        setMaquinas([]);
+
+        setErro(
+          error instanceof Error
+            ? error.message
+            : "Erro ao carregar setores."
+        );
+      } finally {
+        setLoadingSetores(false);
+      }
+    }
+
+    carregarSetores();
+  }, [form.empresaId]);
 
   useEffect(() => {
     async function carregarMaquinas() {
@@ -159,6 +241,12 @@ export default function NovaOSPage() {
     setForm((prev) => ({
       ...prev,
       [name]: value,
+      ...(name === "empresaId"
+        ? {
+            setorId: "",
+            maquinaId: "",
+          }
+        : {}),
       ...(name === "setorId" ? { maquinaId: "" } : {}),
     }));
   }
@@ -201,6 +289,11 @@ export default function NovaOSPage() {
       return;
     }
 
+    if (!form.empresaId) {
+      setErro("Selecione a empresa.");
+      return;
+    }
+
     if (!form.setorId) {
       setErro("Selecione o setor.");
       return;
@@ -221,6 +314,7 @@ export default function NovaOSPage() {
 
       const data = new FormData();
 
+      data.append("empresaId", form.empresaId);
       data.append("setorId", form.setorId);
       data.append("maquinaId", form.maquinaId);
       data.append("descricao", form.descricao);
@@ -246,8 +340,8 @@ export default function NovaOSPage() {
         throw new Error(response?.error || "Erro ao criar OS.");
       }
 
-      router.push("/admin/os");
-      router.refresh();
+      window.location.assign("/admin/os");
+return;
     } catch (error) {
       setErro(
         error instanceof Error ? error.message : "Erro ao criar OS."
@@ -276,7 +370,7 @@ export default function NovaOSPage() {
               </h1>
 
               <p className="text-sm text-slate-400">
-                Selecione o setor e o equipamento
+                Selecione a empresa, o setor e o equipamento
               </p>
             </div>
           </div>
@@ -304,6 +398,35 @@ export default function NovaOSPage() {
           <div>
             <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
               <Building2 size={17} />
+              Empresa
+            </label>
+
+            <select
+              name="empresaId"
+              value={form.empresaId}
+              onChange={handleChange}
+              disabled={loadingEmpresas || empresas.length === 0}
+              className="w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="">
+                {loadingEmpresas
+                  ? "Carregando empresas..."
+                  : empresas.length === 0
+                    ? "Nenhuma empresa ativa disponível"
+                    : "Selecione a empresa"}
+              </option>
+
+              {empresas.map((empresa) => (
+                <option key={empresa.id} value={empresa.id}>
+                  {empresa.nome} — {empresa.sigla}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+              <Factory size={17} />
               Setor
             </label>
 
@@ -311,9 +434,18 @@ export default function NovaOSPage() {
               name="setorId"
               value={form.setorId}
               onChange={handleChange}
-              className="w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+              disabled={!form.empresaId || loadingSetores}
+              className="w-full rounded-xl border border-white/10 bg-[#050816] px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <option value="">Selecione o setor</option>
+              <option value="">
+                {!form.empresaId
+                  ? "Selecione primeiro a empresa"
+                  : loadingSetores
+                    ? "Carregando setores..."
+                    : setores.length === 0
+                      ? "Nenhum setor ativo cadastrado"
+                      : "Selecione o setor"}
+              </option>
 
               {setores.map((setor) => (
                 <option key={setor.id} value={setor.id}>
@@ -321,6 +453,14 @@ export default function NovaOSPage() {
                 </option>
               ))}
             </select>
+
+            {form.empresaId &&
+              !loadingSetores &&
+              setores.length === 0 && (
+                <p className="mt-2 text-xs font-semibold text-orange-300">
+                  Cadastre um setor nesta empresa antes de criar a OS.
+                </p>
+              )}
           </div>
 
           <div>
@@ -535,9 +675,12 @@ export default function NovaOSPage() {
             type="submit"
             disabled={
               loading ||
+              loadingEmpresas ||
+              loadingSetores ||
               loadingSessao ||
               loadingMaquinas ||
               !usuarioLogado ||
+              !form.empresaId ||
               !form.setorId ||
               !form.maquinaId
             }
