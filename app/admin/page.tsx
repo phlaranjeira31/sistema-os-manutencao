@@ -157,13 +157,31 @@ export default async function AdminPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#020617] text-white">
       <div className="flex min-w-0">
-        <aside className="hidden min-h-screen w-72 shrink-0 border-r border-white/10 bg-[#020617] text-white lg:block">
-          <div className="p-6">
+        <aside className="hidden h-screen w-72 shrink-0 flex-col border-r border-white/10 bg-[#020617] text-white lg:sticky lg:top-0 lg:flex">
+          <div className="shrink-0 p-6">
             <h1 className="text-2xl font-extrabold">Sistema de OS</h1>
-            <p className="mt-1 text-sm text-slate-400">Painel de manutenção</p>
+            <p className="mt-1 text-sm text-slate-400">
+              Painel de manutenção
+            </p>
           </div>
 
-          <AdminMenu />
+          <div className="min-h-0 flex-1 overflow-y-auto pb-4">
+            <AdminMenu />
+          </div>
+
+          <footer className="shrink-0 border-t border-white/10 bg-[#020617] px-6 py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Desenvolvido por
+            </p>
+
+            <p className="mt-1 text-sm font-bold text-slate-200">
+              Pedro H. Laranjeira
+            </p>
+
+            <p className="mt-2 text-xs font-semibold text-cyan-300">
+              Versão 1.0.0
+            </p>
+          </footer>
         </aside>
 
         <section className="min-w-0 flex-1 overflow-x-hidden">
