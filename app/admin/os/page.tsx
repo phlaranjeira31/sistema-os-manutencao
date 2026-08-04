@@ -16,6 +16,8 @@ import {
   Factory,
   Wrench,
   Flag,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { prisma } from "../../../src/lib/prisma";
 import AtribuirOSForm from "@/components/AtribuirOSForm";
@@ -28,6 +30,7 @@ type PageProps = {
     prioridade?: string;
     q?: string;
     colaborador?: string;
+    pagina?: string;
   }>;
 };
 
@@ -42,6 +45,46 @@ const COR_EMPRESAS: Record<string, string> = {
   SHA: "#003E71",
   OCO: "#517F3B",
 };
+
+const ITENS_POR_PAGINA = 12;
+
+function criarPaginasVisiveis(
+  paginaAtual: number,
+  totalPaginas: number
+): Array<number | "..."> {
+  if (totalPaginas <= 7) {
+    return Array.from(
+      { length: totalPaginas },
+      (_, indice) => indice + 1
+    );
+  }
+
+  if (paginaAtual <= 4) {
+    return [1, 2, 3, 4, 5, "...", totalPaginas];
+  }
+
+  if (paginaAtual >= totalPaginas - 3) {
+    return [
+      1,
+      "...",
+      totalPaginas - 4,
+      totalPaginas - 3,
+      totalPaginas - 2,
+      totalPaginas - 1,
+      totalPaginas,
+    ];
+  }
+
+  return [
+    1,
+    "...",
+    paginaAtual - 1,
+    paginaAtual,
+    paginaAtual + 1,
+    "...",
+    totalPaginas,
+  ];
+}
 
 function corDaEmpresa(
   sigla: string | null | undefined,
@@ -152,6 +195,17 @@ export default async function OrdensServicoPage({
   const colaboradorId = String(
     params?.colaborador ?? ""
   ).trim();
+
+  const paginaInformada = Number.parseInt(
+    String(params?.pagina ?? "1"),
+    10
+  );
+
+  const paginaSolicitada =
+    Number.isFinite(paginaInformada) &&
+    paginaInformada > 0
+      ? paginaInformada
+      : 1;
 
   const status = Object.values(StatusOS).includes(
     statusInformado as StatusOS
@@ -330,24 +384,150 @@ export default async function OrdensServicoPage({
       : {}),
   };
 
+  const totalOrdens = empresaId
+    ? await prisma.ordemServico.count({
+        where: whereOrdens,
+      })
+    : 0;
+
+  const totalPaginas = Math.max(
+    1,
+    Math.ceil(totalOrdens / ITENS_POR_PAGINA)
+  );
+
+  const paginaAtual = Math.min(
+    paginaSolicitada,
+    totalPaginas
+  );
+
   const ordens = empresaId
     ? await prisma.ordemServico.findMany({
         where: whereOrdens,
-        include: {
-          empresa: true,
-          setor: true,
-          maquina: true,
+
+        select: {
+          id: true,
+          numero: true,
+          titulo: true,
+          descricao: true,
+          status: true,
+          prioridade: true,
+          createdAt: true,
+
+          empresa: {
+            select: {
+              id: true,
+              nome: true,
+              sigla: true,
+              cor: true,
+            },
+          },
+
+          setor: {
+            select: {
+              id: true,
+              nome: true,
+            },
+          },
+
+          maquina: {
+            select: {
+              id: true,
+              nome: true,
+            },
+          },
+
           responsaveis: {
-            include: {
-              user: true,
+            select: {
+              user: {
+                select: {
+                  id: true,
+                  nome: true,
+                },
+              },
             },
           },
         },
+
         orderBy: {
           createdAt: "desc",
         },
+
+        skip:
+          (paginaAtual - 1) *
+          ITENS_POR_PAGINA,
+
+        take: ITENS_POR_PAGINA,
       })
     : [];
+
+  const inicioExibicao =
+    totalOrdens > 0
+      ? (paginaAtual - 1) *
+          ITENS_POR_PAGINA +
+        1
+      : 0;
+
+  const fimExibicao = Math.min(
+    paginaAtual * ITENS_POR_PAGINA,
+    totalOrdens
+  );
+
+  function criarHrefPagina(
+    numeroPagina: number
+  ) {
+    const parametros = new URLSearchParams();
+
+    if (empresaId) {
+      parametros.set("empresaId", empresaId);
+    }
+
+    if (setorIdFiltro) {
+      parametros.set("setorId", setorIdFiltro);
+    }
+
+    if (status) {
+      parametros.set("status", status);
+    }
+
+    if (prioridade) {
+      parametros.set(
+        "prioridade",
+        prioridade
+      );
+    }
+
+    if (q) {
+      parametros.set("q", q);
+    }
+
+    if (colaboradorId) {
+      parametros.set(
+        "colaborador",
+        colaboradorId
+      );
+    }
+
+    if (numeroPagina > 1) {
+      parametros.set(
+        "pagina",
+        String(numeroPagina)
+      );
+    }
+
+    const consulta = parametros.toString();
+
+    const caminho = consulta
+      ? `/admin/os?${consulta}`
+      : "/admin/os";
+
+    return `${caminho}#planner-os`;
+  }
+
+  const paginasVisiveis =
+    criarPaginasVisiveis(
+      paginaAtual,
+      totalPaginas
+    );
 
   const limparHref = empresaId
     ? `/admin/os?empresaId=${encodeURIComponent(empresaId)}`
@@ -428,7 +608,7 @@ export default async function OrdensServicoPage({
               </div>
 
               <div className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-black text-emerald-300">
-                {ordens.length} OS encontrada(s)
+                {totalOrdens} OS encontrada(s)
               </div>
             </div>
           </section>
@@ -587,7 +767,10 @@ export default async function OrdensServicoPage({
           </form>
         </section>
 
-        <section className="space-y-5">
+        <section
+          id="planner-os"
+          className="scroll-mt-6 space-y-5"
+        >
           <div>
             <h2 className="text-xl font-black md:text-2xl">
               Planner de OS
@@ -596,6 +779,13 @@ export default async function OrdensServicoPage({
             <p className="mt-1 text-sm text-slate-400">
               Clique em uma OS para visualizar detalhes completos.
             </p>
+
+            {totalOrdens > 0 && (
+              <p className="mt-2 text-xs font-bold text-slate-500">
+                Exibindo {inicioExibicao}–{fimExibicao} de{" "}
+                {totalOrdens} ordem(ns).
+              </p>
+            )}
           </div>
 
           {ordens.length === 0 ? (
@@ -764,6 +954,93 @@ export default async function OrdensServicoPage({
                 );
               })}
             </div>
+          )}
+
+          {totalOrdens > ITENS_POR_PAGINA && (
+            <nav
+              aria-label="Paginação das ordens de serviço"
+              className="flex flex-col items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-xl sm:flex-row"
+            >
+              <p className="text-sm font-semibold text-slate-400">
+                Página{" "}
+                <span className="font-black text-white">
+                  {paginaAtual}
+                </span>{" "}
+                de{" "}
+                <span className="font-black text-white">
+                  {totalPaginas}
+                </span>
+              </p>
+
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {paginaAtual > 1 ? (
+                  <Link
+                    href={criarHrefPagina(
+                      paginaAtual - 1
+                    )}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-bold text-white transition hover:border-cyan-400/30 hover:bg-cyan-500/10"
+                  >
+                    <ChevronLeft size={17} />
+                    Anterior
+                  </Link>
+                ) : (
+                  <span className="inline-flex h-10 cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-4 text-sm font-bold text-slate-600">
+                    <ChevronLeft size={17} />
+                    Anterior
+                  </span>
+                )}
+
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {paginasVisiveis.map(
+                    (pagina, indice) =>
+                      pagina === "..." ? (
+                        <span
+                          key={`reticencias-${indice}`}
+                          className="flex h-10 w-10 items-center justify-center text-sm font-black text-slate-500"
+                        >
+                          ...
+                        </span>
+                      ) : (
+                        <Link
+                          key={pagina}
+                          href={criarHrefPagina(
+                            pagina
+                          )}
+                          aria-current={
+                            pagina === paginaAtual
+                              ? "page"
+                              : undefined
+                          }
+                          className={`flex h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-sm font-black transition ${
+                            pagina === paginaAtual
+                              ? "border-cyan-400 bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20"
+                              : "border-white/10 bg-white/5 text-white hover:border-cyan-400/30 hover:bg-cyan-500/10"
+                          }`}
+                        >
+                          {pagina}
+                        </Link>
+                      )
+                  )}
+                </div>
+
+                {paginaAtual < totalPaginas ? (
+                  <Link
+                    href={criarHrefPagina(
+                      paginaAtual + 1
+                    )}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-bold text-white transition hover:border-cyan-400/30 hover:bg-cyan-500/10"
+                  >
+                    Próxima
+                    <ChevronRight size={17} />
+                  </Link>
+                ) : (
+                  <span className="inline-flex h-10 cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-4 text-sm font-bold text-slate-600">
+                    Próxima
+                    <ChevronRight size={17} />
+                  </span>
+                )}
+              </div>
+            </nav>
           )}
         </section>
       </div>
