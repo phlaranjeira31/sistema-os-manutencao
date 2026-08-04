@@ -12,6 +12,7 @@ import {
   Cpu,
   Gauge,
   Search,
+  Timer,
   XCircle,
 } from "lucide-react";
 import { prisma } from "@/src/lib/prisma";
@@ -94,6 +95,69 @@ function formatarHoras(valor: number) {
   if (minutos === 0) return `${horas}h`;
 
   return `${horas}h ${minutos}min`;
+}
+
+function obterDuracaoExecucaoMinutos(os: {
+  duracaoExecucaoMinutos: number | null;
+  registroFinal: string | null;
+}) {
+  if (
+    typeof os.duracaoExecucaoMinutos === "number" &&
+    os.duracaoExecucaoMinutos > 0
+  ) {
+    return os.duracaoExecucaoMinutos;
+  }
+
+  const relatorio = os.registroFinal ?? "";
+
+  const dataInicio =
+    relatorio.match(
+      /Data de início:\s*\n?\s*(\d{4}-\d{2}-\d{2})/i
+    )?.[1] ?? "";
+
+  const horaInicio =
+    relatorio.match(
+      /Hora de início:\s*\n?\s*([0-2]\d:[0-5]\d)/i
+    )?.[1] ?? "";
+
+  const dataTermino =
+    relatorio.match(
+      /Data de término:\s*\n?\s*(\d{4}-\d{2}-\d{2})/i
+    )?.[1] ?? "";
+
+  const horaTermino =
+    relatorio.match(
+      /Hora de término:\s*\n?\s*([0-2]\d:[0-5]\d)/i
+    )?.[1] ?? "";
+
+  if (
+    !dataInicio ||
+    !horaInicio ||
+    !dataTermino ||
+    !horaTermino
+  ) {
+    return null;
+  }
+
+  const inicio = new Date(
+    `${dataInicio}T${horaInicio}:00-03:00`
+  );
+
+  const fim = new Date(
+    `${dataTermino}T${horaTermino}:00-03:00`
+  );
+
+  if (
+    Number.isNaN(inicio.getTime()) ||
+    Number.isNaN(fim.getTime()) ||
+    fim.getTime() <= inicio.getTime()
+  ) {
+    return null;
+  }
+
+  return Math.round(
+    (fim.getTime() - inicio.getTime()) / 60000
+  );
 }
 
 function dateToInput(date: Date) {
@@ -212,6 +276,27 @@ export default async function DashboardMaquinaPage({
   const tempoMedioHoras =
     ordensConcluidas.length > 0
       ? totalHorasConclusao / ordensConcluidas.length
+      : 0;
+
+  const duracoesExecucaoReal = ordens
+    .map((os) => obterDuracaoExecucaoMinutos(os))
+    .filter(
+      (duracao): duracao is number =>
+        typeof duracao === "number" && duracao > 0
+    );
+
+  const totalMinutosExecucaoReal =
+    duracoesExecucaoReal.reduce(
+      (acumulado, duracao) =>
+        acumulado + duracao,
+      0
+    );
+
+  const tempoMedioExecucaoRealHoras =
+    duracoesExecucaoReal.length > 0
+      ? totalMinutosExecucaoReal /
+        duracoesExecucaoReal.length /
+        60
       : 0;
 
   const agora = new Date();
@@ -606,7 +691,7 @@ export default async function DashboardMaquinaPage({
           />
 
           <ResumoCard
-            titulo="Tempo médio"
+            titulo="Tempo médio total"
             valor={formatarHoras(tempoMedioHoras)}
             descricao="Da abertura à conclusão"
             detalhe={
@@ -618,6 +703,21 @@ export default async function DashboardMaquinaPage({
             }
             icon={<Clock3 size={21} />}
             estilo="cyan"
+          />
+
+          <ResumoCard
+            titulo="Tempo médio em manutenção"
+            valor={formatarHoras(
+              tempoMedioExecucaoRealHoras
+            )}
+            descricao="Tempo real informado no relatório"
+            detalhe={
+              duracoesExecucaoReal.length > 0
+                ? `Baseado em ${duracoesExecucaoReal.length} relatório(s) válido(s)`
+                : "Nenhum relatório com duração válida"
+            }
+            icon={<Timer size={21} />}
+            estilo="green"
           />
         </section>
 

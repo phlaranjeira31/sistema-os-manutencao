@@ -210,10 +210,14 @@ ${checklistTexto}
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          relatorio,
-          observacoes: "",
-        }),
+       body: JSON.stringify({
+  relatorio,
+  observacoes: "",
+  dataInicio,
+  horaInicio,
+  dataTermino,
+  horaTermino,
+}),
       });
 
       const data = await res.json();

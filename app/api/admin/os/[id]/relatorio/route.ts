@@ -12,12 +12,54 @@ type Props = {
   }>;
 };
 
+type RelatorioBody = {
+  relatorio?: unknown;
+  observacoes?: unknown;
+
+  dataInicio?: unknown;
+  horaInicio?: unknown;
+  dataTermino?: unknown;
+  horaTermino?: unknown;
+};
+
+function criarDataHoraExecucao(
+  data: string,
+  hora: string
+) {
+  const dataValida =
+    /^\d{4}-\d{2}-\d{2}$/.test(data);
+
+  const horaValida =
+    /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(hora);
+
+  if (!dataValida || !horaValida) {
+    return null;
+  }
+
+  /*
+   * Os campos date e time não possuem informação
+   * de fuso horário.
+   *
+   * O sistema utiliza o horário de Brasília.
+   */
+  const dataHora = new Date(
+    `${data}T${hora}:00-03:00`
+  );
+
+  if (Number.isNaN(dataHora.getTime())) {
+    return null;
+  }
+
+  return dataHora;
+}
+
 export async function PATCH(
   req: Request,
   { params }: Props
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session =
+      await getServerSession(authOptions);
 
     const usuarioLogadoId = String(
       (
@@ -53,10 +95,7 @@ export async function PATCH(
       );
     }
 
-    let body: {
-      relatorio?: unknown;
-      observacoes?: unknown;
-    };
+    let body: RelatorioBody;
 
     try {
       body = await req.json();
@@ -79,10 +118,104 @@ export async function PATCH(
       body?.observacoes ?? ""
     ).trim();
 
+    const dataInicio = String(
+      body?.dataInicio ?? ""
+    ).trim();
+
+    const horaInicio = String(
+      body?.horaInicio ?? ""
+    ).trim();
+
+    const dataTermino = String(
+      body?.dataTermino ?? ""
+    ).trim();
+
+    const horaTermino = String(
+      body?.horaTermino ?? ""
+    ).trim();
+
     if (!relatorio) {
       return NextResponse.json(
         {
           error: "Escreva o relatório do serviço.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      !dataInicio ||
+      !horaInicio ||
+      !dataTermino ||
+      !horaTermino
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Informe a data e a hora de início e término do serviço.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const inicioExecucaoReal =
+      criarDataHoraExecucao(
+        dataInicio,
+        horaInicio
+      );
+
+    const fimExecucaoReal =
+      criarDataHoraExecucao(
+        dataTermino,
+        horaTermino
+      );
+
+    if (
+      !inicioExecucaoReal ||
+      !fimExecucaoReal
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "A data ou o horário da execução é inválido.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      fimExecucaoReal.getTime() <=
+      inicioExecucaoReal.getTime()
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "O término do serviço precisa ser posterior ao início.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const duracaoExecucaoMinutos =
+      Math.round(
+        (fimExecucaoReal.getTime() -
+          inicioExecucaoReal.getTime()) /
+          60000
+      );
+
+    if (duracaoExecucaoMinutos <= 0) {
+      return NextResponse.json(
+        {
+          error:
+            "A duração calculada do serviço é inválida.",
         },
         {
           status: 400,
@@ -102,6 +235,10 @@ export async function PATCH(
             numero: true,
             titulo: true,
             registroFinal: true,
+
+            inicioExecucaoReal: true,
+            fimExecucaoReal: true,
+            duracaoExecucaoMinutos: true,
           },
         }),
 
@@ -122,7 +259,8 @@ export async function PATCH(
     if (!usuarioLogado) {
       return NextResponse.json(
         {
-          error: "Usuário da sessão não encontrado.",
+          error:
+            "Usuário da sessão não encontrado.",
         },
         {
           status: 404,
@@ -133,7 +271,8 @@ export async function PATCH(
     if (!usuarioLogado.ativo) {
       return NextResponse.json(
         {
-          error: "O usuário da sessão está inativo.",
+          error:
+            "O usuário da sessão está inativo.",
         },
         {
           status: 403,
@@ -144,7 +283,8 @@ export async function PATCH(
     if (!osAnterior) {
       return NextResponse.json(
         {
-          error: "Ordem de serviço não encontrada.",
+          error:
+            "Ordem de serviço não encontrada.",
         },
         {
           status: 404,
@@ -154,6 +294,7 @@ export async function PATCH(
 
     const registroFinal = [
       `Relatório: ${relatorio}`,
+
       observacoes &&
         `Observações finais: ${observacoes}`,
     ]
@@ -165,7 +306,14 @@ export async function PATCH(
     );
 
     const houveAlteracao =
-      osAnterior.registroFinal !== registroFinal;
+      osAnterior.registroFinal !==
+        registroFinal ||
+      osAnterior.inicioExecucaoReal?.getTime() !==
+        inicioExecucaoReal.getTime() ||
+      osAnterior.fimExecucaoReal?.getTime() !==
+        fimExecucaoReal.getTime() ||
+      osAnterior.duracaoExecucaoMinutos !==
+        duracaoExecucaoMinutos;
 
     const osAtualizada =
       await prisma.ordemServico.update({
@@ -175,6 +323,10 @@ export async function PATCH(
 
         data: {
           registroFinal,
+
+          inicioExecucaoReal,
+          fimExecucaoReal,
+          duracaoExecucaoMinutos,
         },
       });
 
@@ -199,24 +351,51 @@ export async function PATCH(
           tipoRegistro: "RELATORIO_FINAL",
           numeroOS: osAnterior.numero,
           tituloOS: osAnterior.titulo,
+
           registroFinal:
             osAnterior.registroFinal ?? null,
+
+          inicioExecucaoReal:
+            osAnterior.inicioExecucaoReal ??
+            null,
+
+          fimExecucaoReal:
+            osAnterior.fimExecucaoReal ?? null,
+
+          duracaoExecucaoMinutos:
+            osAnterior.duracaoExecucaoMinutos ??
+            null,
         },
 
         dadosNovos: {
           tipoRegistro: "RELATORIO_FINAL",
           numeroOS: osAtualizada.numero,
           tituloOS: osAtualizada.titulo,
+
           relatorio,
-          observacoes: observacoes || null,
-          registroFinal: osAtualizada.registroFinal,
+          observacoes:
+            observacoes || null,
+
+          registroFinal:
+            osAtualizada.registroFinal,
+
+          inicioExecucaoReal:
+            osAtualizada.inicioExecucaoReal,
+
+          fimExecucaoReal:
+            osAtualizada.fimExecucaoReal,
+
+          duracaoExecucaoMinutos:
+            osAtualizada.duracaoExecucaoMinutos,
         },
 
         request: req,
       });
     }
 
-    return NextResponse.json(osAtualizada);
+    return NextResponse.json(
+      osAtualizada
+    );
   } catch (error) {
     console.error(
       "Erro ao salvar relatório:",

@@ -199,6 +199,10 @@ model OrdemServico {
   dataConclusao DateTime?
   dataParada    DateTime?
 
+  inicioExecucaoReal     DateTime?
+fimExecucaoReal        DateTime?
+duracaoExecucaoMinutos Int?
+
   anotacoes     String?
   registroFinal String?
 
