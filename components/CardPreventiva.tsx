@@ -39,12 +39,14 @@ type Preventiva = {
   }>;
 };
 
-function formatDate(date: Date | string | null | undefined) {
+function formatDate(
+  date: Date | string | null | undefined
+) {
   if (!date) return "-";
 
-  return new Intl.DateTimeFormat("pt-BR").format(
-    new Date(date)
-  );
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "UTC",
+  }).format(new Date(date));
 }
 
 function prioridadeLabel(
