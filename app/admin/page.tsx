@@ -24,6 +24,42 @@ export default async function AdminPage() {
 
   if (!session) redirect("/login");
 
+  const empresaSequoia = await prisma.empresa.findFirst({
+    where: {
+      sigla: {
+        equals: "SEQ",
+        mode: "insensitive",
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  const empresaSequoiaId = empresaSequoia?.id ?? "";
+
+  const hrefOrdensSequoia = (
+    filtros?: Record<string, string>
+  ) => {
+    const parametros = new URLSearchParams();
+
+    if (empresaSequoiaId) {
+      parametros.set("empresaId", empresaSequoiaId);
+    }
+
+    Object.entries(filtros ?? {}).forEach(
+      ([chave, valor]) => {
+        parametros.set(chave, valor);
+      }
+    );
+
+    const consulta = parametros.toString();
+
+    return consulta
+      ? `/admin/os?${consulta}`
+      : "/admin/os";
+  };
+
   const [
     totalOS,
     naoIniciadas,
@@ -37,17 +73,82 @@ export default async function AdminPage() {
     colaboradores,
     setores,
   ] = await Promise.all([
-    prisma.ordemServico.count(),
-    prisma.ordemServico.count({ where: { status: "NAO_INICIADA" } }),
-    prisma.ordemServico.count({ where: { status: "EM_ANDAMENTO" } }),
-    prisma.ordemServico.count({ where: { status: "CONCLUIDA" } }),
-    prisma.ordemServico.count({ where: { status: "CANCELADA" } }),
-    prisma.ordemServico.count({ where: { prioridade: "BAIXA" } }),
-    prisma.ordemServico.count({ where: { prioridade: "MEDIA" } }),
-    prisma.ordemServico.count({ where: { prioridade: "ALTA" } }),
-    prisma.ordemServico.count({ where: { prioridade: "URGENTE" } }),
-    prisma.user.count({ where: { ativo: true, perfil: "COLABORADOR" } }),
-    prisma.setor.count({ where: { ativo: true } }),
+    prisma.ordemServico.count({
+      where: {
+        empresaId: empresaSequoiaId,
+      },
+    }),
+
+    prisma.ordemServico.count({
+      where: {
+        empresaId: empresaSequoiaId,
+        status: "NAO_INICIADA",
+      },
+    }),
+
+    prisma.ordemServico.count({
+      where: {
+        empresaId: empresaSequoiaId,
+        status: "EM_ANDAMENTO",
+      },
+    }),
+
+    prisma.ordemServico.count({
+      where: {
+        empresaId: empresaSequoiaId,
+        status: "CONCLUIDA",
+      },
+    }),
+
+    prisma.ordemServico.count({
+      where: {
+        empresaId: empresaSequoiaId,
+        status: "CANCELADA",
+      },
+    }),
+
+    prisma.ordemServico.count({
+      where: {
+        empresaId: empresaSequoiaId,
+        prioridade: "BAIXA",
+      },
+    }),
+
+    prisma.ordemServico.count({
+      where: {
+        empresaId: empresaSequoiaId,
+        prioridade: "MEDIA",
+      },
+    }),
+
+    prisma.ordemServico.count({
+      where: {
+        empresaId: empresaSequoiaId,
+        prioridade: "ALTA",
+      },
+    }),
+
+    prisma.ordemServico.count({
+      where: {
+        empresaId: empresaSequoiaId,
+        prioridade: "URGENTE",
+      },
+    }),
+
+    prisma.user.count({
+      where: {
+        ativo: true,
+        perfil: "COLABORADOR",
+        empresaOrigemId: empresaSequoiaId,
+      },
+    }),
+
+    prisma.setor.count({
+      where: {
+        ativo: true,
+        empresaId: empresaSequoiaId,
+      },
+    }),
   ]);
 
   const eficienciaPercentual =
@@ -87,7 +188,7 @@ export default async function AdminPage() {
                 </div>
 
                 <Link
-                  href="/admin/os"
+                  href={hrefOrdensSequoia()}
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/30 bg-white px-5 py-3 text-sm font-bold text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.16)] transition hover:bg-cyan-50 sm:w-fit"
                 >
                   Ver ordens
@@ -114,10 +215,10 @@ export default async function AdminPage() {
                 </div>
 
                 <div className="mt-6 grid min-w-0 gap-4 md:grid-cols-2">
-                  <BIStatusCard label="Não iniciadas" value={naoIniciadas} total={totalOS} href="/admin/os?status=NAO_INICIADA" color="red" />
-                  <BIStatusCard label="Em andamento" value={emAndamento} total={totalOS} href="/admin/os?status=EM_ANDAMENTO" color="blue" />
-                  <BIStatusCard label="Concluídas" value={concluidas} total={totalOS} href="/admin/os?status=CONCLUIDA" color="green" />
-                  <BIStatusCard label="Canceladas" value={canceladas} total={totalOS} href="/admin/os?status=CANCELADA" color="slate" />
+                  <BIStatusCard label="Não iniciadas" value={naoIniciadas} total={totalOS} href={hrefOrdensSequoia({ status: "NAO_INICIADA" })} color="red" />
+                  <BIStatusCard label="Em andamento" value={emAndamento} total={totalOS} href={hrefOrdensSequoia({ status: "EM_ANDAMENTO" })} color="blue" />
+                  <BIStatusCard label="Concluídas" value={concluidas} total={totalOS} href={hrefOrdensSequoia({ status: "CONCLUIDA" })} color="green" />
+                  <BIStatusCard label="Canceladas" value={canceladas} total={totalOS} href={hrefOrdensSequoia({ status: "CANCELADA" })} color="slate" />
                 </div>
               </div>
 
@@ -179,10 +280,10 @@ export default async function AdminPage() {
                 </div>
 
                 <div className="mt-6 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <PriorityBox label="Baixa" value={baixa} color="green" href="/admin/os?prioridade=BAIXA" />
-                  <PriorityBox label="Média" value={media} color="yellow" href="/admin/os?prioridade=MEDIA" />
-                  <PriorityBox label="Alta" value={alta} color="orange" href="/admin/os?prioridade=ALTA" />
-                  <PriorityBox label="Urgente" value={urgente} color="red" href="/admin/os?prioridade=URGENTE" />
+                  <PriorityBox label="Baixa" value={baixa} color="green" href={hrefOrdensSequoia({ prioridade: "BAIXA" })} />
+                  <PriorityBox label="Média" value={media} color="yellow" href={hrefOrdensSequoia({ prioridade: "MEDIA" })} />
+                  <PriorityBox label="Alta" value={alta} color="orange" href={hrefOrdensSequoia({ prioridade: "ALTA" })} />
+                  <PriorityBox label="Urgente" value={urgente} color="red" href={hrefOrdensSequoia({ prioridade: "URGENTE" })} />
                 </div>
               </div>
 
