@@ -29,6 +29,19 @@ const ORDEM_EMPRESAS: Record<string, number> = {
   OCO: 3,
 };
 
+const COR_EMPRESAS: Record<string, string> = {
+  SEQ: "#E31E24",
+  SHA: "#003E71",
+  OCO: "#517F3B",
+};
+
+function corDaFaixaEmpresa(
+  sigla: string | null | undefined,
+  corCadastrada: string | null | undefined
+) {
+  return COR_EMPRESAS[sigla ?? ""] ?? corCadastrada ?? "#22D3EE";
+}
+
 export const dynamic = "force-dynamic";
 
 export default async function SetoresPage({
@@ -148,6 +161,11 @@ export default async function SetoresPage({
   const corEmpresa =
     empresaSelecionada?.cor || "#22D3EE";
 
+  const corFaixaEmpresa = corDaFaixaEmpresa(
+    empresaSelecionada?.sigla,
+    empresaSelecionada?.cor
+  );
+
   const limparHref = empresaId
     ? `/admin/setores?empresaId=${encodeURIComponent(
         empresaId
@@ -204,7 +222,7 @@ export default async function SetoresPage({
             <div
               className="h-1.5 w-full"
               style={{
-                backgroundColor: corEmpresa,
+                backgroundColor: corFaixaEmpresa,
               }}
             />
 
@@ -449,6 +467,13 @@ export default async function SetoresPage({
                 const corSetor =
                   setor.empresa?.cor || corEmpresa;
 
+                const corFaixaSetor = corDaFaixaEmpresa(
+                  setor.empresa?.sigla ??
+                    empresaSelecionada.sigla,
+                  setor.empresa?.cor ??
+                    empresaSelecionada.cor
+                );
+
                 return (
                   <article
                     key={setor.id}
@@ -457,7 +482,7 @@ export default async function SetoresPage({
                     <div
                       className="h-1 w-full"
                       style={{
-                        backgroundColor: corSetor,
+                        backgroundColor: corFaixaSetor,
                       }}
                     />
 

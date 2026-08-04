@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -5,7 +6,6 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardList,
-  Factory,
 } from "lucide-react";
 import { prisma } from "@/src/lib/prisma";
 
@@ -17,27 +17,49 @@ const ORDEM_EMPRESAS: Record<string, number> = {
   OCO: 3,
 };
 
+const IDENTIDADE_EMPRESAS: Record<
+  string,
+  {
+    cor: string;
+    logo: string;
+  }
+> = {
+  SEQ: {
+    cor: "#E31E24",
+    logo: "/logo.sequoia.png",
+  },
+  SHA: {
+    cor: "#003E71",
+    logo: "/empresas/shasta.jpg",
+  },
+  OCO: {
+    cor: "#517F3B",
+    logo: "/empresas/ocotillo.png",
+  },
+};
+
 export default async function EmpresasPage() {
-  const empresasEncontradas = await prisma.empresa.findMany({
-    where: {
-      sigla: {
-        in: ["SEQ", "SHA", "OCO"],
-      },
-    },
-    select: {
-      id: true,
-      nome: true,
-      sigla: true,
-      ativo: true,
-      cor: true,
-      _count: {
-        select: {
-          setores: true,
-          ordens: true,
+  const empresasEncontradas =
+    await prisma.empresa.findMany({
+      where: {
+        sigla: {
+          in: ["SEQ", "SHA", "OCO"],
         },
       },
-    },
-  });
+      select: {
+        id: true,
+        nome: true,
+        sigla: true,
+        ativo: true,
+        cor: true,
+        _count: {
+          select: {
+            setores: true,
+            ordens: true,
+          },
+        },
+      },
+    });
 
   const empresas = empresasEncontradas.sort(
     (a, b) =>
@@ -64,7 +86,8 @@ export default async function EmpresasPage() {
               </h1>
 
               <p className="text-slate-400">
-                Selecione uma empresa para acessar seu dashboard.
+                Selecione uma empresa para acessar seu
+                dashboard.
               </p>
             </div>
           </div>
@@ -90,37 +113,60 @@ export default async function EmpresasPage() {
             </h2>
 
             <p className="mt-2 text-slate-400">
-              As empresas do grupo ainda não estão disponíveis neste banco.
+              As empresas do grupo ainda não estão
+              disponíveis neste banco.
             </p>
           </section>
         ) : (
           <section className="grid gap-6 lg:grid-cols-3">
             {empresas.map((empresa) => {
-              const cor = empresa.cor || "#22D3EE";
+              const identidade =
+                IDENTIDADE_EMPRESAS[empresa.sigla];
+
+              const cor =
+                identidade?.cor ||
+                empresa.cor ||
+                "#22D3EE";
+
+              const logo =
+                identidade?.logo ||
+                "/logo.sequoia.png";
 
               return (
                 <article
                   key={empresa.id}
-                  className="group overflow-hidden rounded-3xl border border-white/10 bg-[#080d1f] shadow-2xl transition hover:-translate-y-1 hover:border-cyan-400/40"
+                  className="group overflow-hidden rounded-3xl border bg-[#080d1f] shadow-2xl transition duration-300 hover:-translate-y-1 hover:brightness-110"
+                  style={{
+                    borderColor: `${cor}55`,
+                    background: `radial-gradient(circle at 100% 0%, ${cor}25, transparent 38%), #080d1f`,
+                    boxShadow: `0 22px 60px ${cor}18`,
+                  }}
                 >
                   <div
                     className="h-2"
                     style={{
                       backgroundColor: cor,
+                      boxShadow: `0 0 24px ${cor}90`,
                     }}
                   />
 
                   <div className="p-6">
                     <div className="flex items-start justify-between gap-4">
                       <div
-                        className="flex h-14 w-14 items-center justify-center rounded-2xl border"
+                        className="relative h-24 w-44 overflow-hidden rounded-2xl border bg-white"
                         style={{
-                          borderColor: `${cor}55`,
-                          backgroundColor: `${cor}15`,
-                          color: cor,
+                          borderColor: `${cor}70`,
+                          boxShadow: `0 12px 30px ${cor}25`,
                         }}
                       >
-                        <Factory size={27} />
+                        <Image
+                          src={logo}
+                          alt={`Logo ${empresa.nome}`}
+                          fill
+                          sizes="176px"
+                          className="object-contain p-3"
+                          priority
+                        />
                       </div>
 
                       <span
@@ -132,7 +178,9 @@ export default async function EmpresasPage() {
                       >
                         <CheckCircle2 size={13} />
 
-                        {empresa.ativo ? "Ativa" : "Inativa"}
+                        {empresa.ativo
+                          ? "Ativa"
+                          : "Inativa"}
                       </span>
                     </div>
 
@@ -152,8 +200,19 @@ export default async function EmpresasPage() {
                     </div>
 
                     <div className="mt-6 grid grid-cols-2 gap-3">
-                      <div className="rounded-2xl border border-white/10 bg-[#050816] p-4">
-                        <div className="flex items-center gap-2 text-slate-400">
+                      <div
+                        className="rounded-2xl border p-4"
+                        style={{
+                          borderColor: `${cor}35`,
+                          backgroundColor: `${cor}0F`,
+                        }}
+                      >
+                        <div
+                          className="flex items-center gap-2"
+                          style={{
+                            color: cor,
+                          }}
+                        >
                           <Building2 size={16} />
 
                           <p className="text-xs font-bold uppercase">
@@ -166,8 +225,19 @@ export default async function EmpresasPage() {
                         </p>
                       </div>
 
-                      <div className="rounded-2xl border border-white/10 bg-[#050816] p-4">
-                        <div className="flex items-center gap-2 text-slate-400">
+                      <div
+                        className="rounded-2xl border p-4"
+                        style={{
+                          borderColor: `${cor}35`,
+                          backgroundColor: `${cor}0F`,
+                        }}
+                      >
+                        <div
+                          className="flex items-center gap-2"
+                          style={{
+                            color: cor,
+                          }}
+                        >
                           <ClipboardList size={16} />
 
                           <p className="text-xs font-bold uppercase">
@@ -183,9 +253,14 @@ export default async function EmpresasPage() {
 
                     <Link
                       href={`/admin/empresas/${empresa.sigla.toLowerCase()}`}
-                      className="mt-6 inline-flex w-full items-center justify-between rounded-2xl bg-cyan-400 px-5 py-4 text-sm font-black text-slate-950 transition hover:bg-cyan-300"
+                      className="mt-6 inline-flex w-full items-center justify-between rounded-2xl px-5 py-4 text-sm font-black text-white transition hover:brightness-110"
+                      style={{
+                        backgroundColor: cor,
+                        boxShadow: `0 14px 32px ${cor}38`,
+                      }}
                     >
                       Acessar empresa
+
                       <ChevronRight
                         size={19}
                         className="transition group-hover:translate-x-1"

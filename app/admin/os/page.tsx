@@ -37,6 +37,19 @@ const ORDEM_EMPRESAS: Record<string, number> = {
   OCO: 3,
 };
 
+const COR_EMPRESAS: Record<string, string> = {
+  SEQ: "#E31E24",
+  SHA: "#003E71",
+  OCO: "#517F3B",
+};
+
+function corDaEmpresa(
+  sigla: string | null | undefined,
+  corCadastrada: string | null | undefined
+) {
+  return COR_EMPRESAS[sigla ?? ""] ?? corCadastrada ?? "#22D3EE";
+}
+
 function formatDateTime(date: Date | string | null | undefined) {
   if (!date) return "-";
 
@@ -395,8 +408,10 @@ export default async function OrdensServicoPage({
             <div
               className="h-1.5 w-full"
               style={{
-                backgroundColor:
-                  empresaSelecionada.cor || "#22D3EE",
+                backgroundColor: corDaEmpresa(
+                  empresaSelecionada.sigla,
+                  empresaSelecionada.cor
+                ),
               }}
             />
 
@@ -612,10 +627,12 @@ export default async function OrdensServicoPage({
                     <div
                       className="h-1 w-full"
                       style={{
-                        backgroundColor:
-                          os.empresa?.cor ||
-                          empresaSelecionada?.cor ||
-                          "#22D3EE",
+                        backgroundColor: corDaEmpresa(
+                          os.empresa?.sigla ??
+                            empresaSelecionada?.sigla,
+                          os.empresa?.cor ??
+                            empresaSelecionada?.cor
+                        ),
                       }}
                     />
 
