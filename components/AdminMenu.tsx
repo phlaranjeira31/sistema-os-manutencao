@@ -1,14 +1,18 @@
 "use client";
 
 import {
+  Activity,
   BarChart3,
   Building2,
   CalendarClock,
   CalendarDays,
   ClipboardList,
+  FileDown,
   LayoutDashboard,
+  Pencil,
   Plus,
   Users,
+  Wrench,
 } from "lucide-react";
 import MenuItem from "@/components/MenuItem";
 import { useEffect, useState } from "react";
@@ -73,7 +77,7 @@ export default function AdminMenu() {
       {isAdmin && (
         <>
           <MenuItem
-            icon={<ClipboardList size={19} />}
+            icon={<Pencil size={19} />}
             label="Editar OS"
             href="/admin/os/editar"
             active={pathname === "/admin/os/editar"}
@@ -101,10 +105,13 @@ export default function AdminMenu() {
           />
 
           <MenuItem
-            icon={<Users size={19} />}
+            icon={<Activity size={19} />}
             label="Dashboard Colaboradores"
             href="/admin/dashboard-colaboradores"
-            active={pathname === "/admin/dashboard-colaboradores"}
+            active={
+              pathname ===
+              "/admin/dashboard-colaboradores"
+            }
           />
 
           <MenuItem
@@ -118,25 +125,27 @@ export default function AdminMenu() {
             icon={<Plus size={19} />}
             label="Adicionar colaborador"
             href="/admin/colaboradores/novo"
-            active={pathname === "/admin/colaboradores/novo"}
+            active={
+              pathname === "/admin/colaboradores/novo"
+            }
           />
 
           <MenuItem
-  icon={<Building2 size={19} />}
-  label="Empresas"
-  href="/admin/empresas"
-  active={pathname.startsWith("/admin/empresas")}
-/>
+            icon={<Building2 size={19} />}
+            label="Empresas"
+            href="/admin/empresas"
+            active={pathname.startsWith("/admin/empresas")}
+          />
 
           <MenuItem
-            icon={<Building2 size={19} />}
+            icon={<Wrench size={19} />}
             label="Setores"
             href="/admin/setores"
             active={pathname === "/admin/setores"}
           />
 
           <MenuItem
-            icon={<BarChart3 size={19} />}
+            icon={<FileDown size={19} />}
             label="Relatórios"
             href="/admin/relatorios"
             active={pathname === "/admin/relatorios"}
