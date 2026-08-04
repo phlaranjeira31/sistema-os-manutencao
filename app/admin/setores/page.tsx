@@ -123,11 +123,15 @@ export default async function SetoresPage({
             },
           },
 
-          ordens: true,
-
           maquinas: {
             orderBy: {
               nome: "asc",
+            },
+          },
+
+          _count: {
+            select: {
+              ordens: true,
             },
           },
         },
@@ -138,6 +142,69 @@ export default async function SetoresPage({
       })
     : [];
 
+  const idsSetores = setores.map((setor) => setor.id);
+
+  const agrupamentoStatus = idsSetores.length
+    ? await prisma.ordemServico.groupBy({
+        by: ["setorId", "status"],
+
+        where: {
+          setorId: {
+            in: idsSetores,
+          },
+        },
+
+        _count: {
+          _all: true,
+        },
+      })
+    : [];
+
+  type ResumoStatusSetor = {
+    naoIniciadas: number;
+    emAndamento: number;
+    concluidas: number;
+    canceladas: number;
+  };
+
+  const resumoStatusPorSetor =
+    new Map<string, ResumoStatusSetor>();
+
+  for (const item of agrupamentoStatus) {
+    const resumoAtual =
+      resumoStatusPorSetor.get(item.setorId) ?? {
+        naoIniciadas: 0,
+        emAndamento: 0,
+        concluidas: 0,
+        canceladas: 0,
+      };
+
+    if (item.status === "NAO_INICIADA") {
+      resumoAtual.naoIniciadas =
+        item._count._all;
+    }
+
+    if (item.status === "EM_ANDAMENTO") {
+      resumoAtual.emAndamento =
+        item._count._all;
+    }
+
+    if (item.status === "CONCLUIDA") {
+      resumoAtual.concluidas =
+        item._count._all;
+    }
+
+    if (item.status === "CANCELADA") {
+      resumoAtual.canceladas =
+        item._count._all;
+    }
+
+    resumoStatusPorSetor.set(
+      item.setorId,
+      resumoAtual
+    );
+  }
+
   const totalSetores = setores.length;
 
   const setoresAtivos = setores.filter(
@@ -145,16 +212,16 @@ export default async function SetoresPage({
   ).length;
 
   const totalOS = setores.reduce(
-    (total, setor) => total + setor.ordens.length,
+    (total, setor) =>
+      total + setor._count.ordens,
     0
   );
 
   const totalConcluidas = setores.reduce(
     (total, setor) =>
       total +
-      setor.ordens.filter(
-        (os) => os.status === "CONCLUIDA"
-      ).length,
+      (resumoStatusPorSetor.get(setor.id)
+        ?.concluidas ?? 0),
     0
   );
 
@@ -436,26 +503,26 @@ export default async function SetoresPage({
           ) : (
             <div className="grid gap-5">
               {setores.map((setor) => {
-                const total = setor.ordens.length;
+                const total =
+                  setor._count.ordens;
 
-                const naoIniciadas = setor.ordens.filter(
-                  (os) => os.status === "NAO_INICIADA"
-                ).length;
+                const resumoStatus =
+                  resumoStatusPorSetor.get(setor.id);
 
-                const emAndamento = setor.ordens.filter(
-                  (os) => os.status === "EM_ANDAMENTO"
-                ).length;
+                const naoIniciadas =
+                  resumoStatus?.naoIniciadas ?? 0;
+
+                const emAndamento =
+                  resumoStatus?.emAndamento ?? 0;
 
                 const abertas =
                   naoIniciadas + emAndamento;
 
-                const concluidas = setor.ordens.filter(
-                  (os) => os.status === "CONCLUIDA"
-                ).length;
+                const concluidas =
+                  resumoStatus?.concluidas ?? 0;
 
-                const canceladas = setor.ordens.filter(
-                  (os) => os.status === "CANCELADA"
-                ).length;
+                const canceladas =
+                  resumoStatus?.canceladas ?? 0;
 
                 const percentual =
                   total > 0
