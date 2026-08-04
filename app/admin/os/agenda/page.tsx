@@ -93,6 +93,23 @@ function estaDentroDoMes(
   );
 }
 
+function normalizarDataDiaTodo(
+  data: Date | string
+) {
+  const dataConvertida = new Date(data);
+
+  const ano = dataConvertida.getUTCFullYear();
+  const mes = String(
+    dataConvertida.getUTCMonth() + 1
+  ).padStart(2, "0");
+
+  const dia = String(
+    dataConvertida.getUTCDate()
+  ).padStart(2, "0");
+
+  return `${ano}-${mes}-${dia}T12:00:00-03:00`;
+}
+
 function nomesResponsaveis(
   responsaveis: Array<{
     user: {
@@ -428,7 +445,9 @@ export default async function AgendaManutencaoPage({
         ...dadosComuns,
         id: `os-${os.id}-prevista`,
         tipo: "DATA_PREVISTA",
-        data: os.dataPrevista!.toISOString(),
+        data: normalizarDataDiaTodo(
+          os.dataPrevista!
+        ),
         diaTodo: true,
         titulo: `Previsão da OS #${os.numero}`,
         subtitulo: os.titulo,
@@ -466,7 +485,9 @@ export default async function AgendaManutencaoPage({
       id: `preventiva-${preventiva.id}`,
       origem: "PREVENTIVA",
       tipo: "PREVENTIVA",
-      data: preventiva.dataAgendada.toISOString(),
+      data: normalizarDataDiaTodo(
+        preventiva.dataAgendada
+      ),
       diaTodo: true,
       titulo: `Preventiva: ${preventiva.titulo}`,
       subtitulo:
