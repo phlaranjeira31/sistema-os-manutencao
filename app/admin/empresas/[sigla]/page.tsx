@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -7,7 +8,6 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardList,
-  Factory,
   Gauge,
   PlayCircle,
   Wrench,
@@ -35,6 +35,27 @@ const PRIORIDADE_LABEL: Record<string, string> = {
   MEDIA: "Média",
   ALTA: "Alta",
   URGENTE: "Urgente",
+};
+
+const IDENTIDADE_EMPRESAS: Record<
+  string,
+  {
+    cor: string;
+    logo: string;
+  }
+> = {
+  SEQ: {
+    cor: "#E31E24",
+    logo: "/logo.sequoia.png",
+  },
+  SHA: {
+    cor: "#003E71",
+    logo: "/empresas/shasta.jpg",
+  },
+  OCO: {
+    cor: "#517F3B",
+    logo: "/empresas/ocotillo.png",
+  },
 };
 
 export default async function DashboardEmpresaPage({
@@ -169,7 +190,17 @@ export default async function DashboardEmpresaPage({
       ? Math.round((concluidas / totalOS) * 100)
       : 0;
 
-  const corEmpresa = empresa.cor || "#22D3EE";
+  const identidadeEmpresa =
+    IDENTIDADE_EMPRESAS[empresa.sigla];
+
+  const corEmpresa =
+    identidadeEmpresa?.cor ||
+    empresa.cor ||
+    "#22D3EE";
+
+  const logoEmpresa =
+    identidadeEmpresa?.logo ||
+    "/logo.sequoia.png";
 
   return (
     <main className="min-h-screen bg-[#050816] px-4 py-8 text-white md:px-10">
@@ -185,14 +216,20 @@ export default async function DashboardEmpresaPage({
           <div className="flex flex-col gap-6 p-6 md:flex-row md:items-center md:justify-between md:p-8">
             <div className="flex items-center gap-4">
               <div
-                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border"
+                className="relative h-20 w-36 shrink-0 overflow-hidden rounded-2xl border bg-white"
                 style={{
                   borderColor: `${corEmpresa}55`,
-                  backgroundColor: `${corEmpresa}18`,
-                  color: corEmpresa,
+                  boxShadow: `0 12px 30px ${corEmpresa}25`,
                 }}
               >
-                <Factory size={30} />
+                <Image
+                  src={logoEmpresa}
+                  alt={`Logo ${empresa.nome}`}
+                  fill
+                  sizes="144px"
+                  className="object-contain p-3"
+                  priority
+                />
               </div>
 
               <div>
