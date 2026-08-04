@@ -270,7 +270,6 @@ export default async function OrdensServicoPage({
     prisma.user.findMany({
       where: {
         ativo: true,
-        perfil: "COLABORADOR",
         setor: {
           is: {
             nome: {
