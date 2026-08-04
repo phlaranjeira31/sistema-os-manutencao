@@ -59,7 +59,7 @@ export default function AdminMenu() {
   const isAdmin = usuario.perfil === "ADMIN";
 
   return (
-    <nav className="space-y-1 px-4 lg:space-y-0 lg:px-3 lg:[&_a>div]:!gap-2.5 lg:[&_a>div]:!px-3 lg:[&_a>div]:!py-2 lg:[&_a>div]:!text-[13px] lg:[&_svg]:!h-[17px] lg:[&_svg]:!w-[17px]">
+    <nav className="space-y-1 px-4 lg:space-y-0.5 lg:px-3 lg:[&_a>div]:!gap-3 lg:[&_a>div]:!px-3.5 lg:[&_a>div]:!py-2.5 lg:[&_a>div]:!text-sm lg:[&_svg]:!h-[18px] lg:[&_svg]:!w-[18px]">
       <MenuItem
         icon={<LayoutDashboard size={19} />}
         label="Dashboard"

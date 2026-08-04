@@ -155,9 +155,9 @@ export default async function AdminPage() {
     totalOS > 0 ? Math.round((concluidas / totalOS) * 100) : 0;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#020617] text-white">
-      <div className="flex min-w-0">
-        <aside className="hidden h-screen w-72 shrink-0 flex-col border-r border-white/10 bg-[#020617] text-white lg:sticky lg:top-0 lg:flex">
+    <main className="h-screen overflow-hidden bg-[#020617] text-white">
+      <div className="flex h-full min-w-0">
+        <aside className="hidden h-full w-72 shrink-0 flex-col border-r border-white/10 bg-[#020617] text-white lg:flex">
           <div className="shrink-0 p-6">
             <h1 className="text-2xl font-extrabold">Sistema de OS</h1>
             <p className="mt-1 text-sm text-slate-400">
@@ -184,7 +184,7 @@ export default async function AdminPage() {
           </footer>
         </aside>
 
-        <section className="min-w-0 flex-1 overflow-x-hidden">
+        <section className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
           <HeaderUsuario />
 
           <div className="px-4 py-6 sm:px-6 lg:px-8">
