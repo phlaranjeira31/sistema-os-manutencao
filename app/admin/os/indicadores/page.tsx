@@ -2,17 +2,14 @@ import Link from "next/link";
 import {
   ArrowLeft,
   BarChart3,
-  Building2,
-  CalendarDays,
   ChartNoAxesCombined,
   ClipboardList,
-  Search,
-  Users,
 } from "lucide-react";
 import { Prisma, StatusOS } from "@prisma/client";
 import { prisma } from "@/src/lib/prisma";
 import BotaoPDFIndicadoresOS from "@/components/BotaoPDFIndicadoresOS";
 import BotaoExcelIndicadoresOS from "@/components/BotaoExcelIndicadoresOS";
+import FiltrosIndicadoresOS from "@/components/FiltrosIndicadoresOS";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +20,8 @@ type PageProps = {
     status?: string;
     colaborador?: string;
     setor?: string;
+    empresa?: string;
+    maquina?: string;
   }>;
 };
 
@@ -47,6 +46,12 @@ const STATUS_OPTIONS: Array<{
     label: "Cancelada",
   },
 ];
+
+const ORDEM_EMPRESAS: Record<string, number> = {
+  SEQ: 1,
+  SHA: 2,
+  OCO: 3,
+};
 
 function formatDate(date: Date | string | null | undefined) {
   if (!date) return "-";
@@ -83,6 +88,8 @@ export default async function IndicadoresOSPage({
   const statusFiltro = String(params?.status ?? "").trim();
   const colaboradorFiltro = String(params?.colaborador ?? "").trim();
   const setorFiltro = String(params?.setor ?? "").trim();
+  const empresaFiltro = String(params?.empresa ?? "").trim();
+  const maquinaFiltro = String(params?.maquina ?? "").trim();
 
   const statusSelecionado = STATUS_OPTIONS.some(
     (item) => item.value === statusFiltro
@@ -98,7 +105,122 @@ export default async function IndicadoresOSPage({
     ? new Date(`${dataFimFiltro}T23:59:59`)
     : null;
 
+  const [
+    empresasEncontradas,
+    setoresEncontrados,
+    maquinasEncontradas,
+    colaboradoresDisponiveis,
+  ] = await Promise.all([
+    prisma.empresa.findMany({
+      where: {
+        ativo: true,
+        sigla: {
+          in: ["SEQ", "SHA", "OCO"],
+        },
+      },
+      select: {
+        id: true,
+        nome: true,
+        sigla: true,
+      },
+    }),
+
+    prisma.setor.findMany({
+      where: {
+        ativo: true,
+      },
+      select: {
+        id: true,
+        nome: true,
+        empresaId: true,
+      },
+      orderBy: {
+        nome: "asc",
+      },
+    }),
+
+    prisma.maquina.findMany({
+      where: {
+        ativo: true,
+      },
+      select: {
+        id: true,
+        nome: true,
+        setorId: true,
+      },
+      orderBy: {
+        nome: "asc",
+      },
+    }),
+
+    prisma.user.findMany({
+      where: {
+        ativo: true,
+        perfil: "COLABORADOR",
+      },
+      select: {
+        id: true,
+        nome: true,
+      },
+      orderBy: {
+        nome: "asc",
+      },
+    }),
+  ]);
+
+  const empresasDisponiveis = empresasEncontradas.sort(
+    (empresaA, empresaB) =>
+      (ORDEM_EMPRESAS[empresaA.sigla] ?? 99) -
+      (ORDEM_EMPRESAS[empresaB.sigla] ?? 99)
+  );
+
+  const empresaSelecionada =
+    empresasDisponiveis.find(
+      (empresa) => empresa.id === empresaFiltro
+    ) ?? null;
+
+  const empresaIdFiltro = empresaSelecionada?.id ?? "";
+
+  const setoresDisponiveis = setoresEncontrados.map((setor) => ({
+    id: setor.id,
+    nome: setor.nome,
+    empresaId: setor.empresaId ?? "",
+  }));
+
+  const setorIdFiltro = setoresDisponiveis.some(
+    (setor) =>
+      setor.id === setorFiltro &&
+      setor.empresaId === empresaIdFiltro
+  )
+    ? setorFiltro
+    : "";
+
+  const maquinasDisponiveis = maquinasEncontradas.filter((maquina) =>
+    setoresDisponiveis.some(
+      (setor) => setor.id === maquina.setorId
+    )
+  );
+
+  const maquinaIdFiltro = maquinasDisponiveis.some(
+    (maquina) =>
+      maquina.id === maquinaFiltro &&
+      maquina.setorId === setorIdFiltro
+  )
+    ? maquinaFiltro
+    : "";
+
+  const colaboradorIdFiltro = colaboradoresDisponiveis.some(
+    (colaborador) => colaborador.id === colaboradorFiltro
+  )
+    ? colaboradorFiltro
+    : "";
+
   const where: Prisma.OrdemServicoWhereInput = {
+    ...(empresaIdFiltro
+      ? {
+          empresaId: empresaIdFiltro,
+        }
+      : {}),
     ...(dataInicio || dataFim
       ? {
           createdAt: {
@@ -112,66 +234,43 @@ export default async function IndicadoresOSPage({
           status: statusSelecionado,
         }
       : {}),
-    ...(setorFiltro
+    ...(setorIdFiltro
       ? {
-          setorId: setorFiltro,
+          setorId: setorIdFiltro,
         }
       : {}),
-    ...(colaboradorFiltro
+    ...(maquinaIdFiltro
+      ? {
+          maquinaId: maquinaIdFiltro,
+        }
+      : {}),
+    ...(colaboradorIdFiltro
       ? {
           responsaveis: {
             some: {
-              userId: colaboradorFiltro,
+              userId: colaboradorIdFiltro,
             },
           },
         }
       : {}),
   };
 
-  const [ordens, setoresDisponiveis, colaboradoresDisponiveis] =
-    await Promise.all([
-      prisma.ordemServico.findMany({
-        where,
+  const ordens = await prisma.ordemServico.findMany({
+    where,
+    include: {
+      empresa: true,
+      setor: true,
+      maquina: true,
+      responsaveis: {
         include: {
-          setor: true,
-          responsaveis: {
-            include: {
-              user: true,
-            },
-          },
+          user: true,
         },
-        orderBy: {
-          createdAt: "asc",
-        },
-      }),
-
-      prisma.setor.findMany({
-        where: {
-          ativo: true,
-        },
-        select: {
-          id: true,
-          nome: true,
-        },
-        orderBy: {
-          nome: "asc",
-        },
-      }),
-
-      prisma.user.findMany({
-        where: {
-          ativo: true,
-          perfil: "COLABORADOR",
-        },
-        select: {
-          id: true,
-          nome: true,
-        },
-        orderBy: {
-          nome: "asc",
-        },
-      }),
-    ]);
+      },
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
 
   const setores = Array.from(
     new Set(ordens.map((os) => os.setor?.nome ?? "Sem setor"))
@@ -233,21 +332,30 @@ export default async function IndicadoresOSPage({
   ).length;
 
   const setorSelecionado =
-    setoresDisponiveis.find((setor) => setor.id === setorFiltro)
+    setoresDisponiveis.find((setor) => setor.id === setorIdFiltro)
       ?.nome ?? "Todos";
+
+  const maquinaSelecionada =
+    maquinasDisponiveis.find(
+      (maquina) => maquina.id === maquinaIdFiltro
+    )?.nome ?? "Todas";
 
   const colaboradorSelecionado =
     colaboradoresDisponiveis.find(
-      (colaborador) => colaborador.id === colaboradorFiltro
+      (colaborador) => colaborador.id === colaboradorIdFiltro
     )?.nome ?? "Todos";
 
   const statusSelecionadoLabel = statusSelecionado
     ? statusLabel(statusSelecionado)
     : "Todos";
 
+  const empresaSelecionadaLabel =
+    empresaSelecionada?.nome ?? "Todas";
+
   const ordensExportacao = ordens.map((os) => ({
     numero: os.numero,
     setor: os.setor?.nome ?? "-",
+    maquina: os.maquina?.nome ?? "-",
     titulo: os.titulo,
     descricao: os.descricao?.trim() || "-",
     status: statusLabel(os.status),
@@ -269,6 +377,8 @@ export default async function IndicadoresOSPage({
     status: statusSelecionadoLabel,
     colaborador: colaboradorSelecionado,
     setor: setorSelecionado,
+    maquina: maquinaSelecionada,
+    empresa: empresaSelecionadaLabel,
   };
 
   return (
@@ -315,136 +425,34 @@ export default async function IndicadoresOSPage({
         </header>
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl shadow-black/30 backdrop-blur sm:p-6">
-          <form className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
-                  <CalendarDays size={16} />
-                  Data inicial
-                </label>
-
-                <input
-                  name="dataInicio"
-                  defaultValue={dataInicioFiltro}
-                  type="date"
-                  className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
+          <FiltrosIndicadoresOS
+            empresas={empresasDisponiveis}
+            setores={setoresDisponiveis}
+            maquinas={maquinasDisponiveis}
+            colaboradores={colaboradoresDisponiveis}
+            filtrosIniciais={{
+              dataInicio: dataInicioFiltro,
+              dataFim: dataFimFiltro,
+              empresa: empresaIdFiltro,
+              status: statusSelecionado ?? "",
+              setor: setorIdFiltro,
+              maquina: maquinaIdFiltro,
+              colaborador: colaboradorIdFiltro,
+            }}
+            acoesExportacao={
+              <>
+                <BotaoPDFIndicadoresOS
+                  ordens={ordensExportacao}
+                  filtros={filtrosExportacao}
                 />
-              </div>
 
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
-                  <CalendarDays size={16} />
-                  Data final
-                </label>
-
-                <input
-                  name="dataFim"
-                  defaultValue={dataFimFiltro}
-                  type="date"
-                  className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
+                <BotaoExcelIndicadoresOS
+                  ordens={ordensExportacao}
+                  filtros={filtrosExportacao}
                 />
-              </div>
-
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
-                  <ClipboardList size={16} />
-                  Status
-                </label>
-
-                <select
-                  name="status"
-                  defaultValue={statusSelecionado ?? ""}
-                  className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
-                >
-                  <option value="">Todos os status</option>
-
-                  {STATUS_OPTIONS.map((status) => (
-                    <option
-                      key={status.value}
-                      value={status.value}
-                    >
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
-                  <Building2 size={16} />
-                  Setor
-                </label>
-
-                <select
-                  name="setor"
-                  defaultValue={setorFiltro}
-                  className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
-                >
-                  <option value="">Todos os setores</option>
-
-                  {setoresDisponiveis.map((setor) => (
-                    <option
-                      key={setor.id}
-                      value={setor.id}
-                    >
-                      {setor.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
-                  <Users size={16} />
-                  Colaborador
-                </label>
-
-                <select
-                  name="colaborador"
-                  defaultValue={colaboradorFiltro}
-                  className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none focus:border-cyan-400"
-                >
-                  <option value="">Todos os colaboradores</option>
-
-                  {colaboradoresDisponiveis.map((colaborador) => (
-                    <option
-                      key={colaborador.id}
-                      value={colaborador.id}
-                    >
-                      {colaborador.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <button
-                type="submit"
-                className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-4 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300"
-              >
-                <Search size={17} />
-                Filtrar
-              </button>
-
-              <Link
-                href="/admin/os/indicadores"
-                className="inline-flex h-14 w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-black text-white transition hover:bg-white/10"
-              >
-                Limpar filtros
-              </Link>
-
-              <BotaoPDFIndicadoresOS
-                ordens={ordensExportacao}
-                filtros={filtrosExportacao}
-              />
-
-              <BotaoExcelIndicadoresOS
-                ordens={ordensExportacao}
-                filtros={filtrosExportacao}
-              />
-            </div>
-          </form>
+              </>
+            }
+          />
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -485,7 +493,7 @@ export default async function IndicadoresOSPage({
             </div>
 
             <div className="w-full overflow-x-auto rounded-2xl border border-white/10">
-              <table className="w-full min-w-[1400px] border-collapse text-sm">
+              <table className="w-full min-w-[1550px] border-collapse text-sm">
                 <thead className="bg-cyan-400 text-slate-950">
                   <tr>
                     <th className="border border-slate-900 px-3 py-3 text-left">
@@ -494,6 +502,10 @@ export default async function IndicadoresOSPage({
 
                     <th className="border border-slate-900 px-3 py-3 text-left">
                       Setor
+                    </th>
+
+                    <th className="border border-slate-900 px-3 py-3 text-left">
+                      Máquina/equipamento
                     </th>
 
                     <th className="border border-slate-900 px-3 py-3 text-left">
@@ -526,7 +538,7 @@ export default async function IndicadoresOSPage({
                   {ordens.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={9}
                         className="px-4 py-8 text-center text-slate-400"
                       >
                         Nenhuma OS encontrada com os filtros selecionados.
@@ -552,6 +564,10 @@ export default async function IndicadoresOSPage({
 
                         <td className="border border-white/10 px-3 py-3 font-bold">
                           {os.setor?.nome ?? "-"}
+                        </td>
+
+                        <td className="border border-white/10 px-3 py-3 font-bold">
+                          {os.maquina?.nome ?? "-"}
                         </td>
 
                         <td className="border border-white/10 px-3 py-3 font-bold">
