@@ -198,6 +198,7 @@ export async function POST(
 
     let body: {
       userId?: unknown;
+      substituirResponsaveis?: unknown;
     };
 
     try {
@@ -216,6 +217,9 @@ export async function POST(
     const userId = String(
       body?.userId ?? ""
     ).trim();
+
+    const substituirResponsaveis =
+      body?.substituirResponsaveis === true;
 
     if (!userId) {
       return NextResponse.json(
@@ -278,6 +282,7 @@ export async function POST(
           nome: true,
           email: true,
           ativo: true,
+          perfil: true,
         },
       }),
     ]);
@@ -299,6 +304,21 @@ export async function POST(
         {
           error:
             "O usuário da sessão está inativo.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    if (
+      substituirResponsaveis &&
+      usuarioLogado.perfil !== "ADMIN"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Somente administradores podem alterar uma atribuição existente.",
         },
         {
           status: 403,
@@ -367,48 +387,66 @@ export async function POST(
 
     const statusAnterior = os.status;
 
-    await prisma.responsavelOS.upsert({
-      where: {
-        osId_userId: {
-          osId: os.id,
-          userId: colaborador.id,
-        },
-      },
+    const osAtualizada = await prisma.$transaction(
+      async (transaction) => {
+        if (substituirResponsaveis) {
+          await transaction.responsavelOS.deleteMany({
+            where: {
+              osId: os.id,
+            },
+          });
 
-      update: {},
+          await transaction.responsavelOS.create({
+            data: {
+              osId: os.id,
+              userId: colaborador.id,
+            },
+          });
+        } else {
+          await transaction.responsavelOS.upsert({
+            where: {
+              osId_userId: {
+                osId: os.id,
+                userId: colaborador.id,
+              },
+            },
 
-      create: {
-        osId: os.id,
-        userId: colaborador.id,
-      },
-    });
+            update: {},
 
-    const osAtualizada =
-      await prisma.ordemServico.update({
-        where: {
-          id: os.id,
-        },
+            create: {
+              osId: os.id,
+              userId: colaborador.id,
+            },
+          });
+        }
 
-        data: {
-          status: "EM_ANDAMENTO",
-        },
+        return transaction.ordemServico.update({
+          where: {
+            id: os.id,
+          },
 
-        include: {
-          setor: true,
+          data: {
+            status: "EM_ANDAMENTO",
+          },
 
-          responsaveis: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  nome: true,
-                  email: true,
+          include: {
+            setor: true,
+
+            responsaveis: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    nome: true,
+                    email: true,
+                  },
                 },
               },
             },
           },
-        },
-      });
+        });
+      }
+    );
 
     const responsaveisNovos =
       osAtualizada.responsaveis.map(
@@ -424,9 +462,17 @@ export async function POST(
       entidade: "OrdemServico",
       entidadeId: osAtualizada.id,
 
-      descricao: jaEraResponsavel
-        ? `${usuarioLogado.nome} confirmou ${colaborador.nome} como responsável pela OS #${osAtualizada.numero}.`
-        : `${usuarioLogado.nome} atribuiu a OS #${osAtualizada.numero} para ${colaborador.nome}.`,
+      descricao: substituirResponsaveis
+        ? `${usuarioLogado.nome} alterou a atribuição da OS #${osAtualizada.numero} de ${
+            responsaveisAnteriores.length > 0
+              ? responsaveisAnteriores
+                  .map((responsavel) => responsavel.nome)
+                  .join(", ")
+              : "sem responsável"
+          } para ${colaborador.nome}.`
+        : jaEraResponsavel
+          ? `${usuarioLogado.nome} confirmou ${colaborador.nome} como responsável pela OS #${osAtualizada.numero}.`
+          : `${usuarioLogado.nome} atribuiu a OS #${osAtualizada.numero} para ${colaborador.nome}.`,
 
       usuarioId: usuarioLogado.id,
       usuarioNome: usuarioLogado.nome,
@@ -459,6 +505,10 @@ export async function POST(
 
         responsaveis: responsaveisNovos,
         jaEraResponsavel,
+        substituirResponsaveis,
+        tipoAtribuicao: substituirResponsaveis
+          ? "SUBSTITUICAO"
+          : "ADICAO",
       },
 
       request: req,

@@ -811,7 +811,7 @@ export default async function OrdensServicoPage({
                 return (
                   <div
                     key={os.id}
-                    className="flex h-full min-h-[560px] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#060b1a] shadow-xl transition hover:-translate-y-1 hover:border-cyan-400/20"
+                    className="flex h-full min-h-[520px] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#060b1a] shadow-xl transition hover:-translate-y-1 hover:border-cyan-400/20"
                   >
                     <div
                       className="h-1 w-full"
@@ -914,16 +914,19 @@ export default async function OrdensServicoPage({
                       </div>
                     </div>
 
-                    <div className="mt-auto border-t border-white/10 bg-[#050816]/80 p-4">
+                    <div className="mt-auto border-t border-white/10 bg-[#050816]/80 p-3">
                       {jaAtribuida ? (
-                        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
-                          <p className="text-sm font-black text-emerald-300">
-                            OS já atribuída
-                          </p>
-
-                          <p className="mt-1 line-clamp-2 text-sm font-semibold text-slate-300">
-                            Responsável: {responsaveisTexto}
-                          </p>
+                        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2.5">
+                          <AtribuirOSForm
+                            osId={os.id}
+                            colaboradores={colaboradores}
+                            responsaveisAtuais={os.responsaveis.map(
+                              (responsavel: any) => ({
+                                id: responsavel.user.id,
+                                nome: responsavel.user.nome,
+                              })
+                            )}
+                          />
                         </div>
                       ) : colaboradores.length === 0 ? (
                         <div className="rounded-2xl border border-orange-400/20 bg-orange-500/10 p-4">
