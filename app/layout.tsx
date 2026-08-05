@@ -12,14 +12,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Sistema OS - Sequoia",
   description: "Sistema de ordens de serviço e manutenção",
-  icons: {
-    icon: "/logo.sequoia.png",
-    shortcut: "/logo.sequoia.png",
-    apple: "/logo.sequoia.png",
-  },
 };
 
 export default function RootLayout({
