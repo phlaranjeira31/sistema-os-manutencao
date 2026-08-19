@@ -25,6 +25,26 @@ enum PrioridadeOS {
   URGENTE
 }
 
+enum FrequenciaPreventiva {
+  SEMANAL
+  QUINZENAL
+  MENSAL
+  BIMESTRAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+  PERSONALIZADA
+}
+
+enum StatusExecucaoPreventiva {
+  PROGRAMADA
+  PENDENTE
+  EM_EXECUCAO
+  CONCLUIDA
+  NAO_REALIZADA
+  CANCELADA
+}
+
 enum TipoSetor {
   MANUTENCAO
   OPERACIONAL
@@ -60,9 +80,10 @@ model Empresa {
   usuariosOrigem      User[]                   @relation("EmpresaOrigemUser")
   usuariosAtendimento UserEmpresaAtendimento[]
 
-  setores     Setor[]
-  ordens      OrdemServico[]
-  preventivas OrdemPreventiva[]
+  setores           Setor[]
+  ordens            OrdemServico[]
+  preventivas       OrdemPreventiva[]
+  planosPreventivos PlanoPreventivo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -91,7 +112,14 @@ model User {
   ordensCriadas          OrdemServico[]          @relation("CriadorOS")
   ordensResponsavel      ResponsavelOS[]
   preventivasResponsavel ResponsavelPreventiva[]
-  logsAuditoria          LogAuditoria[]          @relation("UsuarioAuditoria")
+
+  planosPreventivosCriados     PlanoPreventivo[]            @relation("CriadorPlanoPreventivo")
+  planosPreventivosResponsavel ResponsavelPlanoPreventivo[]
+
+  execucoesPreventivasResponsavel ResponsavelExecucaoPreventiva[]
+  execucoesPreventivasConcluidas  ExecucaoPreventiva[]            @relation("ExecucaoPreventivaConcluidaPor")
+
+  logsAuditoria LogAuditoria[] @relation("UsuarioAuditoria")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -136,9 +164,10 @@ model Setor {
   usuarios User[]   @relation("SetorUser")
   funcoes  Funcao[]
 
-  ordens      OrdemServico[]
-  preventivas OrdemPreventiva[]
-  maquinas    Maquina[]
+  ordens            OrdemServico[]
+  preventivas       OrdemPreventiva[]
+  planosPreventivos PlanoPreventivo[]
+  maquinas          Maquina[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -176,8 +205,9 @@ model Maquina {
   setorId String
   setor   Setor  @relation(fields: [setorId], references: [id], onDelete: Cascade)
 
-  ordens      OrdemServico[]
-  preventivas OrdemPreventiva[]
+  ordens            OrdemServico[]
+  preventivas       OrdemPreventiva[]
+  planosPreventivos PlanoPreventivo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -200,8 +230,8 @@ model OrdemServico {
   dataParada    DateTime?
 
   inicioExecucaoReal     DateTime?
-fimExecucaoReal        DateTime?
-duracaoExecucaoMinutos Int?
+  fimExecucaoReal        DateTime?
+  duracaoExecucaoMinutos Int?
 
   anotacoes     String?
   registroFinal String?
@@ -306,6 +336,132 @@ model ResponsavelPreventiva {
 
   @@unique([preventivaId, userId])
   @@index([preventivaId])
+  @@index([userId])
+}
+
+model PlanoPreventivo {
+  id String @id @default(cuid())
+
+  titulo     String
+  descricao  String
+  prioridade PrioridadeOS @default(MEDIA)
+
+  empresaId String?
+  empresa   Empresa? @relation(fields: [empresaId], references: [id], onDelete: SetNull)
+
+  setorId String
+  setor   Setor  @relation(fields: [setorId], references: [id])
+
+  maquinaId String?
+  maquina   Maquina? @relation(fields: [maquinaId], references: [id], onDelete: SetNull)
+
+  frequencia FrequenciaPreventiva @default(MENSAL)
+
+  intervaloPersonalizadoDias Int?
+
+  dataInicio      DateTime
+  proximaExecucao DateTime
+  dataFim         DateTime?
+
+  diasAntesAviso Int @default(1)
+
+  duracaoEstimadaMinutos Int?
+
+  ativo Boolean @default(true)
+
+  gerarAutomaticamente Boolean @default(true)
+
+  ultimaGeracaoEm DateTime?
+
+  criadoPorId String?
+  criadoPor   User?   @relation("CriadorPlanoPreventivo", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  responsaveis ResponsavelPlanoPreventivo[]
+  execucoes    ExecucaoPreventiva[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([empresaId])
+  @@index([setorId])
+  @@index([maquinaId])
+  @@index([frequencia])
+  @@index([proximaExecucao])
+  @@index([ativo])
+}
+
+model ResponsavelPlanoPreventivo {
+  id String @id @default(cuid())
+
+  planoId String
+  plano   PlanoPreventivo @relation(fields: [planoId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([planoId, userId])
+  @@index([planoId])
+  @@index([userId])
+}
+
+model ExecucaoPreventiva {
+  id String @id @default(cuid())
+
+  planoId String
+  plano   PlanoPreventivo @relation(fields: [planoId], references: [id], onDelete: Cascade)
+
+  dataProgramada DateTime
+
+  status StatusExecucaoPreventiva @default(PROGRAMADA)
+
+  dataInicio    DateTime?
+  dataConclusao DateTime?
+
+  duracaoEstimadaMinutos Int?
+  duracaoRealMinutos     Int?
+
+  checkQuantidadePecas          String?
+  checkFerramentasRecolhidas    String?
+  checkMaterialRepostoRecolhido String?
+  checkLimpezaRealizada         String?
+  checkLimpezaEfetiva           String?
+
+  descricaoExecucao String?
+  pecasUtilizadas   String?
+  observacoes       String?
+
+  notificado     Boolean   @default(false)
+  avisoEnviadoEm DateTime?
+
+  concluidoPorId String?
+  concluidoPor   User?   @relation("ExecucaoPreventivaConcluidaPor", fields: [concluidoPorId], references: [id], onDelete: SetNull)
+
+  responsaveis ResponsavelExecucaoPreventiva[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([planoId, dataProgramada])
+  @@index([planoId])
+  @@index([dataProgramada])
+  @@index([status])
+}
+
+model ResponsavelExecucaoPreventiva {
+  id String @id @default(cuid())
+
+  execucaoId String
+  execucao   ExecucaoPreventiva @relation(fields: [execucaoId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([execucaoId, userId])
+  @@index([execucaoId])
   @@index([userId])
 }
 
