@@ -13,6 +13,7 @@
     "@prisma/client": "^7.8.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.10.0",
+    "exceljs": "^4.4.0",
     "html2canvas-pro": "^2.3.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
