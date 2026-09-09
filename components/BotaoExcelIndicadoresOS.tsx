@@ -12,6 +12,7 @@ type OSIndicadorExcel = {
   descricao: string;
   prioridade?: string;
   status: string;
+  criadoPor: string;
   geradaEm: string;
   concluidaEm: string;
   responsavel: string;
@@ -22,6 +23,7 @@ type FiltrosIndicadores = {
   dataFim: string;
   status: string;
   colaborador: string;
+  criadoPor?: string;
   setor: string;
   empresa?: string;
   maquina?: string;
@@ -1099,6 +1101,62 @@ export default function BotaoExcelIndicadoresOS({
         }
       );
 
+      dashboard.mergeCells("A9:B9");
+      dashboard.mergeCells("C9:L9");
+
+      const criadoPorLabelCell =
+        dashboard.getCell("A9");
+
+      const criadoPorValueCell =
+        dashboard.getCell("C9");
+
+      criadoPorLabelCell.value = "Criada por";
+      criadoPorLabelCell.font = {
+        bold: true,
+        color: {
+          argb: corArgb(CORES.slate700),
+        },
+      };
+
+      criadoPorLabelCell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: {
+          argb: corArgb(CORES.slate100),
+        },
+      };
+
+      criadoPorValueCell.value =
+        filtros.criadoPor || "Todos";
+
+      criadoPorValueCell.font = {
+        bold: true,
+        color: {
+          argb: corArgb(CORES.navy),
+        },
+      };
+
+      criadoPorValueCell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: {
+          argb: corArgb(CORES.white),
+        },
+      };
+
+      [
+        criadoPorLabelCell,
+        criadoPorValueCell,
+      ].forEach((cell) => {
+        cell.border = BORDA_PADRAO;
+        cell.alignment = {
+          vertical: "middle",
+          horizontal: "left",
+        };
+      });
+
+      dashboard.getRow(9).height = 24;
+
       criarKpi(
         dashboard,
         "A11:C11",
@@ -1771,7 +1829,7 @@ export default function BotaoExcelIndicadoresOS({
         base,
         "BASE DE ORDENS DE SERVIÇO",
         "Base completa das OS consideradas neste relatório",
-        "L",
+        "M",
         imagemId
       );
 
@@ -1780,7 +1838,7 @@ export default function BotaoExcelIndicadoresOS({
         "landscape"
       );
 
-      base.mergeCells("A5:L5");
+      base.mergeCells("A5:M5");
 
       const avisoBase =
         base.getCell("A5");
@@ -1833,6 +1891,7 @@ export default function BotaoExcelIndicadoresOS({
               os.geradaEm,
             parseDataPtBR(os.concluidaEm) ??
               os.concluidaEm,
+            textoSeguro(os.criadoPor),
             textoSeguro(os.responsavel),
             tipoServico(os.responsavel),
           ];
@@ -1862,6 +1921,7 @@ export default function BotaoExcelIndicadoresOS({
           { name: "Status" },
           { name: "Gerada em" },
           { name: "Concluída em" },
+          { name: "Criada por" },
           { name: "Responsável" },
           { name: "Tipo de serviço" },
         ],
@@ -1887,8 +1947,9 @@ export default function BotaoExcelIndicadoresOS({
       base.getColumn(8).width = 18;
       base.getColumn(9).width = 16;
       base.getColumn(10).width = 16;
-      base.getColumn(11).width = 34;
-      base.getColumn(12).width = 20;
+      base.getColumn(11).width = 28;
+      base.getColumn(12).width = 34;
+      base.getColumn(13).width = 20;
 
       base.getColumn(9).numFmt =
         "dd/mm/yyyy";
@@ -1900,7 +1961,7 @@ export default function BotaoExcelIndicadoresOS({
         base,
         7,
         1,
-        12
+        13
       );
 
       for (
@@ -1912,7 +1973,7 @@ export default function BotaoExcelIndicadoresOS({
 
         for (
           let col = 1;
-          col <= 12;
+          col <= 13;
           col += 1
         ) {
           const cell =
@@ -1928,7 +1989,7 @@ export default function BotaoExcelIndicadoresOS({
               col === 8 ||
               col === 9 ||
               col === 10 ||
-              col === 12
+              col === 13
                 ? "center"
                 : "left",
             wrapText: true,
@@ -1992,7 +2053,7 @@ export default function BotaoExcelIndicadoresOS({
         };
 
         const tipoCell =
-          base.getCell(row, 12);
+          base.getCell(row, 13);
 
         const externo =
           String(tipoCell.value) ===
@@ -2627,6 +2688,10 @@ export default function BotaoExcelIndicadoresOS({
         [
           "Colaborador",
           filtros.colaborador || "Todos",
+        ],
+        [
+          "Criada por",
+          filtros.criadoPor || "Todos",
         ],
         [
           "Prioridade",

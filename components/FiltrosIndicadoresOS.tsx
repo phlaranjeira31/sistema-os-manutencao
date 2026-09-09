@@ -44,6 +44,7 @@ type FiltrosIniciais = {
   setor: string;
   maquina: string;
   colaborador: string;
+  criadoPor: string;
 };
 
 type Props = {
@@ -51,6 +52,7 @@ type Props = {
   setores: Setor[];
   maquinas: Maquina[];
   colaboradores: Colaborador[];
+  criadores: Colaborador[];
   filtrosIniciais: FiltrosIniciais;
   acoesExportacao?: ReactNode;
 };
@@ -79,6 +81,7 @@ export default function FiltrosIndicadoresOS({
   setores,
   maquinas,
   colaboradores,
+  criadores,
   filtrosIniciais,
   acoesExportacao,
 }: Props) {
@@ -138,7 +141,7 @@ export default function FiltrosIndicadoresOS({
       method="GET"
       className="space-y-5"
     >
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
         {/* DATA INICIAL */}
         <div>
           <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
@@ -315,6 +318,37 @@ export default function FiltrosIndicadoresOS({
                   value={colaborador.id}
                 >
                   {colaborador.nome}
+                </option>
+              )
+            )}
+          </select>
+        </div>
+
+        {/* CRIADA POR */}
+        <div>
+          <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+            <Users size={16} />
+            Criada por
+          </label>
+
+          <select
+            name="criadoPor"
+            defaultValue={
+              filtrosIniciais.criadoPor
+            }
+            className="h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none transition focus:border-cyan-400"
+          >
+            <option value="">
+              Todos os criadores
+            </option>
+
+            {criadores.map(
+              (criador) => (
+                <option
+                  key={criador.id}
+                  value={criador.id}
+                >
+                  {criador.nome}
                 </option>
               )
             )}

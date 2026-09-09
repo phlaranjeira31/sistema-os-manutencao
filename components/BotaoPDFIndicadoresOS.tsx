@@ -8,6 +8,7 @@ type OSIndicadorPDF = {
   titulo: string;
   descricao: string;
   status: string;
+  criadoPor: string;
   geradaEm: string;
   concluidaEm: string;
   responsavel: string;
@@ -18,6 +19,7 @@ type FiltrosIndicadores = {
   dataFim: string;
   status: string;
   colaborador: string;
+  criadoPor: string;
   setor: string;
 };
 
@@ -88,7 +90,8 @@ export default function BotaoPDFIndicadoresOS({
         `Período: ${filtros.dataInicio} até ${filtros.dataFim}  |  ` +
         `Status: ${filtros.status}  |  ` +
         `Setor: ${filtros.setor}  |  ` +
-        `Colaborador: ${filtros.colaborador}`;
+        `Colaborador: ${filtros.colaborador}  |  ` +
+        `Criada por: ${filtros.criadoPor}`;
 
       const linhasFiltros = doc.splitTextToSize(
         resumoFiltros,
@@ -108,6 +111,7 @@ export default function BotaoPDFIndicadoresOS({
             os.status,
             os.geradaEm,
             os.concluidaEm,
+            os.criadoPor,
             os.responsavel,
           ])
         : [
@@ -116,6 +120,7 @@ export default function BotaoPDFIndicadoresOS({
               "-",
               "-",
               "Nenhuma OS encontrada com os filtros selecionados.",
+              "-",
               "-",
               "-",
               "-",
@@ -142,6 +147,7 @@ export default function BotaoPDFIndicadoresOS({
           "Status",
           "Gerada em",
           "Concluída em",
+          "Criada por",
           "Responsável",
         ],
       ],
@@ -187,28 +193,31 @@ export default function BotaoPDFIndicadoresOS({
           fontStyle: "bold",
         },
         1: {
-          cellWidth: 24,
+          cellWidth: 22,
         },
         2: {
-          cellWidth: 38,
+          cellWidth: 32,
         },
         3: {
-          cellWidth: 70,
+          cellWidth: 54,
         },
         4: {
-          cellWidth: 24,
+          cellWidth: 22,
           fontStyle: "bold",
         },
         5: {
-          cellWidth: 24,
+          cellWidth: 22,
           halign: "center",
         },
         6: {
-          cellWidth: 24,
+          cellWidth: 22,
           halign: "center",
         },
         7: {
-          cellWidth: 59,
+          cellWidth: 32,
+        },
+        8: {
+          cellWidth: 57,
         },
       },
 

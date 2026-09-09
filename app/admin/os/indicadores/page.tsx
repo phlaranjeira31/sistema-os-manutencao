@@ -22,6 +22,7 @@ type PageProps = {
     setor?: string;
     empresa?: string;
     maquina?: string;
+    criadoPor?: string;
   }>;
 };
 
@@ -90,6 +91,7 @@ export default async function IndicadoresOSPage({
   const setorFiltro = String(params?.setor ?? "").trim();
   const empresaFiltro = String(params?.empresa ?? "").trim();
   const maquinaFiltro = String(params?.maquina ?? "").trim();
+  const criadoPorFiltro = String(params?.criadoPor ?? "").trim();
 
   const statusSelecionado = STATUS_OPTIONS.some(
     (item) => item.value === statusFiltro
@@ -110,6 +112,7 @@ export default async function IndicadoresOSPage({
     setoresEncontrados,
     maquinasEncontradas,
     colaboradoresDisponiveis,
+    criadoresDisponiveis,
   ] = await Promise.all([
     prisma.empresa.findMany({
       where: {
@@ -157,6 +160,21 @@ export default async function IndicadoresOSPage({
       where: {
         ativo: true,
         perfil: "COLABORADOR",
+      },
+      select: {
+        id: true,
+        nome: true,
+      },
+      orderBy: {
+        nome: "asc",
+      },
+    }),
+
+    prisma.user.findMany({
+      where: {
+        ordensCriadas: {
+          some: {},
+        },
       },
       select: {
         id: true,
@@ -215,6 +233,12 @@ export default async function IndicadoresOSPage({
     ? colaboradorFiltro
     : "";
 
+  const criadoPorIdFiltro = criadoresDisponiveis.some(
+    (criador) => criador.id === criadoPorFiltro
+  )
+    ? criadoPorFiltro
+    : "";
+
   const where: Prisma.OrdemServicoWhereInput = {
     ...(empresaIdFiltro
       ? {
@@ -253,6 +277,11 @@ export default async function IndicadoresOSPage({
           },
         }
       : {}),
+    ...(criadoPorIdFiltro
+      ? {
+          criadoPorId: criadoPorIdFiltro,
+        }
+      : {}),
   };
 
   const ordens = await prisma.ordemServico.findMany({
@@ -261,6 +290,7 @@ export default async function IndicadoresOSPage({
       empresa: true,
       setor: true,
       maquina: true,
+      criadoPor: true,
       responsaveis: {
         include: {
           user: true,
@@ -345,6 +375,11 @@ export default async function IndicadoresOSPage({
       (colaborador) => colaborador.id === colaboradorIdFiltro
     )?.nome ?? "Todos";
 
+  const criadoPorSelecionado =
+    criadoresDisponiveis.find(
+      (criador) => criador.id === criadoPorIdFiltro
+    )?.nome ?? "Todos";
+
   const statusSelecionadoLabel = statusSelecionado
     ? statusLabel(statusSelecionado)
     : "Todos";
@@ -359,6 +394,7 @@ export default async function IndicadoresOSPage({
     titulo: os.titulo,
     descricao: os.descricao?.trim() || "-",
     status: statusLabel(os.status),
+    criadoPor: os.criadoPor?.nome ?? "-",
     geradaEm: formatDate(os.createdAt),
     concluidaEm:
       os.status === "CONCLUIDA"
@@ -376,6 +412,7 @@ export default async function IndicadoresOSPage({
     dataFim: formatDateInput(dataFimFiltro),
     status: statusSelecionadoLabel,
     colaborador: colaboradorSelecionado,
+    criadoPor: criadoPorSelecionado,
     setor: setorSelecionado,
     maquina: maquinaSelecionada,
     empresa: empresaSelecionadaLabel,
@@ -430,6 +467,7 @@ export default async function IndicadoresOSPage({
             setores={setoresDisponiveis}
             maquinas={maquinasDisponiveis}
             colaboradores={colaboradoresDisponiveis}
+            criadores={criadoresDisponiveis}
             filtrosIniciais={{
               dataInicio: dataInicioFiltro,
               dataFim: dataFimFiltro,
@@ -438,6 +476,7 @@ export default async function IndicadoresOSPage({
               setor: setorIdFiltro,
               maquina: maquinaIdFiltro,
               colaborador: colaboradorIdFiltro,
+              criadoPor: criadoPorIdFiltro,
             }}
             acoesExportacao={
               <>
