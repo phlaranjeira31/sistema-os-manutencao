@@ -668,149 +668,946 @@ export default function DashboardGraficosOS({
   }
 
   async function gerarPDF() {
-  if (!relatorioRef.current || gerandoPDF) return;
+    if (gerandoPDF) return;
 
-  try {
-    setGerandoPDF(true);
+    try {
+      setGerandoPDF(true);
 
-    await document.fonts.ready;
-
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => resolve());
-      });
-    });
-
-    const [{ default: html2canvas }, { jsPDF }] =
-      await Promise.all([
-        import("html2canvas-pro"),
+      const [{ jsPDF }, { default: autoTable }] = await Promise.all([
         import("jspdf"),
+        import("jspdf-autotable"),
       ]);
 
-    const elemento = relatorioRef.current;
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
 
-    const canvas = await html2canvas(elemento, {
-      scale: 1.5,
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: "#050816",
-      logging: false,
-      scrollX: 0,
-      scrollY: -window.scrollY,
-      windowWidth: Math.max(
-        document.documentElement.clientWidth,
-        elemento.scrollWidth
-      ),
-      windowHeight: Math.max(
-        document.documentElement.clientHeight,
-        elemento.scrollHeight
-      ),
-    });
+      const larguraPagina = pdf.internal.pageSize.getWidth();
+      const alturaPagina = pdf.internal.pageSize.getHeight();
+      const margem = 12;
+      const larguraUtil = larguraPagina - margem * 2;
 
-    const pdf = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: "a4",
-    });
+      const CORES_PDF = {
+        fundo: [5, 8, 22] as [number, number, number],
+        painel: [8, 13, 31] as [number, number, number],
+        painel2: [11, 18, 38] as [number, number, number],
+        borda: [30, 41, 59] as [number, number, number],
+        branco: [255, 255, 255] as [number, number, number],
+        texto: [226, 232, 240] as [number, number, number],
+        textoFraco: [148, 163, 184] as [number, number, number],
+        textoMuitoFraco: [100, 116, 139] as [number, number, number],
+        ciano: [34, 211, 238] as [number, number, number],
+        verde: [16, 185, 129] as [number, number, number],
+        azul: [59, 130, 246] as [number, number, number],
+        laranja: [249, 115, 22] as [number, number, number],
+        vermelho: [239, 68, 68] as [number, number, number],
+        violeta: [139, 92, 246] as [number, number, number],
+        cinza: [100, 116, 139] as [number, number, number],
+      };
 
-    const larguraPagina = pdf.internal.pageSize.getWidth();
-    const alturaPagina = pdf.internal.pageSize.getHeight();
+      function hexParaRgb(hex: string): [number, number, number] {
+        const limpo = hex.replace("#", "");
+        const numero = Number.parseInt(limpo, 16);
 
-    const margem = 7;
-    const larguraUtil = larguraPagina - margem * 2;
-    const alturaUtil = alturaPagina - margem * 2;
+        return [
+          (numero >> 16) & 255,
+          (numero >> 8) & 255,
+          numero & 255,
+        ];
+      }
 
-    const pixelsPorMilimetro = canvas.width / larguraUtil;
-    const alturaPaginaEmPixels = Math.floor(
-      alturaUtil * pixelsPorMilimetro
-    );
+      async function carregarLogo(): Promise<string | null> {
+        try {
+          const resposta = await fetch("/logo.sequoia.png");
+          if (!resposta.ok) return null;
 
-    let posicaoY = 0;
-    let numeroPagina = 0;
+          const blob = await resposta.blob();
 
-    while (posicaoY < canvas.height) {
-      const alturaRecorte = Math.min(
-        alturaPaginaEmPixels,
-        canvas.height - posicaoY
-      );
+          return await new Promise<string | null>((resolve) => {
+            const reader = new FileReader();
 
-      const canvasPagina = document.createElement("canvas");
+            reader.onloadend = () => {
+              resolve(
+                typeof reader.result === "string"
+                  ? reader.result
+                  : null
+              );
+            };
 
-      canvasPagina.width = canvas.width;
-      canvasPagina.height = alturaRecorte;
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+        } catch {
+          return null;
+        }
+      }
 
-      const contexto = canvasPagina.getContext("2d");
+      const logoBase64 = await carregarLogo();
 
-      if (!contexto) {
-        throw new Error(
-          "Não foi possível preparar as páginas do PDF."
+      function fundoPagina() {
+        pdf.setFillColor(...CORES_PDF.fundo);
+        pdf.rect(0, 0, larguraPagina, alturaPagina, "F");
+      }
+
+      function cabecalho(
+        titulo: string,
+        subtitulo: string,
+        numeroPagina: number
+      ) {
+        fundoPagina();
+
+        pdf.setFillColor(...CORES_PDF.painel2);
+        pdf.roundedRect(
+          margem,
+          9,
+          larguraUtil,
+          28,
+          4,
+          4,
+          "F"
+        );
+
+        pdf.setDrawColor(...CORES_PDF.borda);
+        pdf.roundedRect(
+          margem,
+          9,
+          larguraUtil,
+          28,
+          4,
+          4,
+          "S"
+        );
+
+        if (logoBase64) {
+          try {
+            pdf.addImage(
+              logoBase64,
+              "PNG",
+              margem + 4,
+              14,
+              24,
+              16
+            );
+          } catch {
+            // Mantém o relatório funcionando mesmo se a logo falhar.
+          }
+        }
+
+        const inicioTexto = logoBase64 ? margem + 34 : margem + 5;
+
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(...CORES_PDF.ciano);
+        pdf.text(
+          "SISTEMA DE MANUTENÇÃO • SEQUOIA",
+          inicioTexto,
+          17
+        );
+
+        pdf.setFontSize(17);
+        pdf.setTextColor(...CORES_PDF.branco);
+        pdf.text(titulo, inicioTexto, 25);
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(...CORES_PDF.textoFraco);
+        pdf.text(subtitulo, inicioTexto, 31.5);
+
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(...CORES_PDF.textoFraco);
+        pdf.text(
+          `PÁGINA ${numeroPagina}`,
+          larguraPagina - margem - 5,
+          17,
+          { align: "right" }
+        );
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(7);
+        pdf.setTextColor(...CORES_PDF.textoMuitoFraco);
+        pdf.text(
+          new Date().toLocaleString("pt-BR"),
+          larguraPagina - margem - 5,
+          24,
+          { align: "right" }
         );
       }
 
-      contexto.fillStyle = "#050816";
-      contexto.fillRect(
-        0,
-        0,
-        canvasPagina.width,
-        canvasPagina.height
-      );
+      function rodape() {
+        pdf.setDrawColor(...CORES_PDF.borda);
+        pdf.line(
+          margem,
+          alturaPagina - 10,
+          larguraPagina - margem,
+          alturaPagina - 10
+        );
 
-      contexto.drawImage(
-        canvas,
-        0,
-        posicaoY,
-        canvas.width,
-        alturaRecorte,
-        0,
-        0,
-        canvas.width,
-        alturaRecorte
-      );
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(7);
+        pdf.setTextColor(...CORES_PDF.textoMuitoFraco);
 
-      const imagemPagina = canvasPagina.toDataURL(
-        "image/jpeg",
-        0.92
-      );
+        pdf.text(
+          "Sistema de OS - Sequoia",
+          margem,
+          alturaPagina - 5
+        );
 
-      const alturaImagem =
-        alturaRecorte / pixelsPorMilimetro;
+        pdf.text(
+          "Relatório gerencial de indicadores de manutenção",
+          larguraPagina / 2,
+          alturaPagina - 5,
+          { align: "center" }
+        );
 
-      if (numeroPagina > 0) {
-        pdf.addPage();
+        pdf.text(
+          "Desenvolvido por Pedro H. Laranjeira",
+          larguraPagina - margem,
+          alturaPagina - 5,
+          { align: "right" }
+        );
       }
 
-      pdf.addImage(
-        imagemPagina,
-        "JPEG",
-        margem,
-        margem,
-        larguraUtil,
-        alturaImagem,
-        undefined,
-        "FAST"
+      function tituloSecao(
+        titulo: string,
+        subtitulo: string,
+        x: number,
+        y: number,
+        largura: number
+      ) {
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(10.5);
+        pdf.setTextColor(...CORES_PDF.branco);
+        pdf.text(titulo, x, y);
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(7);
+        pdf.setTextColor(...CORES_PDF.textoFraco);
+        pdf.text(subtitulo, x, y + 5);
+
+        pdf.setDrawColor(...CORES_PDF.borda);
+        pdf.line(x, y + 8, x + largura, y + 8);
+      }
+
+      function chipFiltro(
+        x: number,
+        y: number,
+        largura: number,
+        label: string,
+        valor: string
+      ) {
+        pdf.setFillColor(...CORES_PDF.painel);
+        pdf.roundedRect(x, y, largura, 14, 3, 3, "F");
+
+        pdf.setDrawColor(...CORES_PDF.borda);
+        pdf.roundedRect(x, y, largura, 14, 3, 3, "S");
+
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(5.8);
+        pdf.setTextColor(...CORES_PDF.textoMuitoFraco);
+        pdf.text(label.toUpperCase(), x + 3, y + 4.3);
+
+        pdf.setFontSize(7.2);
+        pdf.setTextColor(...CORES_PDF.branco);
+
+        const linhas = pdf.splitTextToSize(valor || "-", largura - 6);
+        pdf.text(String(linhas[0] ?? "-"), x + 3, y + 9.7);
+      }
+
+      function cardMetricaPDF(
+        x: number,
+        y: number,
+        largura: number,
+        titulo: string,
+        valor: string,
+        descricao: string,
+        cor: [number, number, number]
+      ) {
+        pdf.setFillColor(...CORES_PDF.painel);
+        pdf.roundedRect(x, y, largura, 27, 4, 4, "F");
+
+        pdf.setDrawColor(...CORES_PDF.borda);
+        pdf.roundedRect(x, y, largura, 27, 4, 4, "S");
+
+        pdf.setFillColor(...cor);
+        pdf.roundedRect(x + 4, y + 4, 2.2, 19, 1, 1, "F");
+
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(7);
+        pdf.setTextColor(...CORES_PDF.textoFraco);
+        pdf.text(titulo, x + 10, y + 7);
+
+        pdf.setFontSize(15.5);
+        pdf.setTextColor(...CORES_PDF.branco);
+        pdf.text(valor, x + 10, y + 16.5);
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(6.3);
+        pdf.setTextColor(...CORES_PDF.textoMuitoFraco);
+        pdf.text(descricao, x + 10, y + 22.2);
+      }
+
+      function barrasHorizontais(
+        itens: Array<{
+          label: string;
+          valor: number;
+          cor: [number, number, number];
+        }>,
+        x: number,
+        y: number,
+        largura: number,
+        altura: number
+      ) {
+        pdf.setFillColor(...CORES_PDF.painel);
+        pdf.roundedRect(x, y, largura, altura, 4, 4, "F");
+        pdf.setDrawColor(...CORES_PDF.borda);
+        pdf.roundedRect(x, y, largura, altura, 4, 4, "S");
+
+        const maior = Math.max(...itens.map((item) => item.valor), 1);
+        const alturaLinha = (altura - 11) / Math.max(itens.length, 1);
+
+        itens.forEach((item, indice) => {
+          const linhaY = y + 7 + indice * alturaLinha;
+          const larguraBarra = Math.max(
+            0,
+            ((largura - 58) * item.valor) / maior
+          );
+
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(6.8);
+          pdf.setTextColor(...CORES_PDF.texto);
+          pdf.text(item.label, x + 4, linhaY + 3.2);
+
+          pdf.setFillColor(20, 29, 49);
+          pdf.roundedRect(
+            x + 44,
+            linhaY,
+            largura - 55,
+            4.3,
+            2,
+            2,
+            "F"
+          );
+
+          if (item.valor > 0) {
+            pdf.setFillColor(...item.cor);
+            pdf.roundedRect(
+              x + 44,
+              linhaY,
+              larguraBarra,
+              4.3,
+              2,
+              2,
+              "F"
+            );
+          }
+
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(7);
+          pdf.setTextColor(...item.cor);
+          pdf.text(
+            String(item.valor),
+            x + largura - 5,
+            linhaY + 3.2,
+            { align: "right" }
+          );
+        });
+      }
+
+      function graficoLinha(
+        x: number,
+        y: number,
+        largura: number,
+        altura: number
+      ) {
+        pdf.setFillColor(...CORES_PDF.painel);
+        pdf.roundedRect(x, y, largura, altura, 4, 4, "F");
+        pdf.setDrawColor(...CORES_PDF.borda);
+        pdf.roundedRect(x, y, largura, altura, 4, 4, "S");
+
+        if (dadosEvolucao.length === 0) {
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(8);
+          pdf.setTextColor(...CORES_PDF.textoFraco);
+          pdf.text(
+            "Sem dados para evolução no período.",
+            x + largura / 2,
+            y + altura / 2,
+            { align: "center" }
+          );
+          return;
+        }
+
+        const padLeft = 12;
+        const padRight = 7;
+        const padTop = 9;
+        const padBottom = 16;
+        const chartX = x + padLeft;
+        const chartY = y + padTop;
+        const chartW = largura - padLeft - padRight;
+        const chartH = altura - padTop - padBottom;
+
+        const maxValor = Math.max(
+          ...dadosEvolucao.flatMap((item) => [
+            item.criadas,
+            item.concluidas,
+          ]),
+          1
+        );
+
+        pdf.setDrawColor(39, 50, 72);
+        pdf.setLineWidth(0.2);
+
+        for (let i = 0; i <= 4; i += 1) {
+          const gridY = chartY + (chartH / 4) * i;
+          pdf.line(chartX, gridY, chartX + chartW, gridY);
+
+          const valor = Math.round(maxValor - (maxValor / 4) * i);
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(5.8);
+          pdf.setTextColor(...CORES_PDF.textoMuitoFraco);
+          pdf.text(String(valor), chartX - 2, gridY + 1.8, {
+            align: "right",
+          });
+        }
+
+        const passoX =
+          dadosEvolucao.length > 1
+            ? chartW / (dadosEvolucao.length - 1)
+            : 0;
+
+        const pontosCriadas: Array<[number, number]> = [];
+        const pontosConcluidas: Array<[number, number]> = [];
+
+        dadosEvolucao.forEach((item, indice) => {
+          const px =
+            dadosEvolucao.length > 1
+              ? chartX + passoX * indice
+              : chartX + chartW / 2;
+
+          const pyCriadas =
+            chartY + chartH - (item.criadas / maxValor) * chartH;
+
+          const pyConcluidas =
+            chartY +
+            chartH -
+            (item.concluidas / maxValor) * chartH;
+
+          pontosCriadas.push([px, pyCriadas]);
+          pontosConcluidas.push([px, pyConcluidas]);
+
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(5.5);
+          pdf.setTextColor(...CORES_PDF.textoMuitoFraco);
+          pdf.text(item.mes, px, chartY + chartH + 7, {
+            align: "center",
+          });
+        });
+
+        function desenharSerie(
+          pontos: Array<[number, number]>,
+          cor: [number, number, number]
+        ) {
+          pdf.setDrawColor(...cor);
+          pdf.setLineWidth(0.7);
+
+          for (let i = 1; i < pontos.length; i += 1) {
+            pdf.line(
+              pontos[i - 1][0],
+              pontos[i - 1][1],
+              pontos[i][0],
+              pontos[i][1]
+            );
+          }
+
+          pontos.forEach(([px, py]) => {
+            pdf.setFillColor(...cor);
+            pdf.circle(px, py, 1.1, "F");
+          });
+        }
+
+        desenharSerie(pontosCriadas, CORES_PDF.ciano);
+        desenharSerie(pontosConcluidas, CORES_PDF.verde);
+
+        pdf.setFillColor(...CORES_PDF.ciano);
+        pdf.circle(x + 6, y + altura - 5, 1.2, "F");
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(6.2);
+        pdf.setTextColor(...CORES_PDF.textoFraco);
+        pdf.text("Criadas", x + 9, y + altura - 3.2);
+
+        pdf.setFillColor(...CORES_PDF.verde);
+        pdf.circle(x + 30, y + altura - 5, 1.2, "F");
+        pdf.text("Concluídas", x + 33, y + altura - 3.2);
+      }
+
+      const statusPDF = dadosStatus.map((item) => ({
+        label: item.nome,
+        valor: item.valor,
+        cor: hexParaRgb(item.cor),
+      }));
+
+      const prioridadesPDF = dadosPrioridades.map((item) => ({
+        label: item.nome,
+        valor: item.quantidade,
+        cor: hexParaRgb(item.cor),
+      }));
+
+      // =========================================================
+      // PÁGINA 1 — RESUMO EXECUTIVO
+      // =========================================================
+      cabecalho(
+        "Relatório Executivo de Ordens de Serviço",
+        "Visão consolidada dos principais indicadores operacionais e gerenciais",
+        1
       );
 
-      posicaoY += alturaRecorte;
-      numeroPagina += 1;
+      const chipW = 43;
+      const chipGap = 3.2;
+      const chipY = 43;
+
+      [
+        ["Período", resumoFiltros.periodo],
+        ["Setor", resumoFiltros.setor],
+        ["Máquina", resumoFiltros.maquina],
+        ["Colaborador", resumoFiltros.colaborador],
+        ["Status", resumoFiltros.status],
+        ["Prioridade", resumoFiltros.prioridade],
+      ].forEach(([label, valor], indice) => {
+        chipFiltro(
+          margem + indice * (chipW + chipGap),
+          chipY,
+          chipW,
+          label,
+          valor
+        );
+      });
+
+      const cardGap = 4;
+      const cardW = (larguraUtil - cardGap * 2) / 3;
+
+      cardMetricaPDF(
+        margem,
+        64,
+        cardW,
+        "Total de OS",
+        String(metricas.total),
+        "Ordens encontradas",
+        CORES_PDF.ciano
+      );
+
+      cardMetricaPDF(
+        margem + cardW + cardGap,
+        64,
+        cardW,
+        "Concluídas",
+        String(metricas.concluidas),
+        "Serviços finalizados",
+        CORES_PDF.verde
+      );
+
+      cardMetricaPDF(
+        margem + (cardW + cardGap) * 2,
+        64,
+        cardW,
+        "Pendentes",
+        String(metricas.pendentes),
+        "Não iniciadas ou em andamento",
+        CORES_PDF.azul
+      );
+
+      cardMetricaPDF(
+        margem,
+        95,
+        cardW,
+        "OS atrasadas",
+        String(metricas.atrasadas),
+        "Abertas fora do prazo",
+        CORES_PDF.vermelho
+      );
+
+      cardMetricaPDF(
+        margem + cardW + cardGap,
+        95,
+        cardW,
+        "Taxa de conclusão",
+        `${metricas.taxaConclusao}%`,
+        "Percentual de OS concluídas",
+        CORES_PDF.violeta
+      );
+
+      cardMetricaPDF(
+        margem + (cardW + cardGap) * 2,
+        95,
+        cardW,
+        "Tempo médio",
+        formatarDuracaoMedia(metricas.tempoMedio),
+        "Da criação até a conclusão",
+        CORES_PDF.laranja
+      );
+
+      tituloSecao(
+        "Distribuição operacional",
+        "Situação atual das ordens e níveis de prioridade",
+        margem,
+        134,
+        larguraUtil
+      );
+
+      const graficoGap = 6;
+      const graficoW = (larguraUtil - graficoGap) / 2;
+
+      barrasHorizontais(
+        statusPDF,
+        margem,
+        145,
+        graficoW,
+        48
+      );
+
+      barrasHorizontais(
+        prioridadesPDF,
+        margem + graficoW + graficoGap,
+        145,
+        graficoW,
+        48
+      );
+
+      rodape();
+
+      // =========================================================
+      // PÁGINA 2 — SETORES E EVOLUÇÃO
+      // =========================================================
+      pdf.addPage();
+
+      cabecalho(
+        "Análise Operacional por Setor",
+        "Distribuição de volume, conclusão, pendências e evolução ao longo do período",
+        2
+      );
+
+      tituloSecao(
+        "Desempenho por setor",
+        "Ranking dos setores com maior volume de ordens",
+        margem,
+        48,
+        128
+      );
+
+      autoTable(pdf, {
+        startY: 59,
+        margin: {
+          left: margem,
+          right: larguraPagina - margem - 128,
+        },
+        tableWidth: 128,
+        head: [
+          [
+            "Setor",
+            "Total",
+            "Concl.",
+            "Pend.",
+            "Canc.",
+            "Eficiência",
+          ],
+        ],
+        body:
+          dadosSetores.length > 0
+            ? dadosSetores.slice(0, 12).map((item) => [
+                item.setor,
+                String(item.total),
+                String(item.concluidas),
+                String(item.pendentes),
+                String(item.canceladas),
+                item.total > 0
+                  ? `${Math.round(
+                      (item.concluidas / item.total) * 100
+                    )}%`
+                  : "0%",
+              ])
+            : [["Sem dados", "0", "0", "0", "0", "0%"]],
+        theme: "grid",
+        styles: {
+          font: "helvetica",
+          fontSize: 6.7,
+          cellPadding: 2.1,
+          textColor: CORES_PDF.texto,
+          fillColor: CORES_PDF.painel,
+          lineColor: CORES_PDF.borda,
+          lineWidth: 0.15,
+          valign: "middle",
+        },
+        headStyles: {
+          fillColor: CORES_PDF.ciano,
+          textColor: CORES_PDF.fundo,
+          fontStyle: "bold",
+        },
+        alternateRowStyles: {
+          fillColor: CORES_PDF.painel2,
+        },
+        columnStyles: {
+          0: { cellWidth: 48 },
+          1: { halign: "center" },
+          2: { halign: "center" },
+          3: { halign: "center" },
+          4: { halign: "center" },
+          5: { halign: "center", fontStyle: "bold" },
+        },
+      });
+
+      tituloSecao(
+        "Evolução das ordens",
+        "Comparativo mensal entre OS criadas e concluídas",
+        153,
+        48,
+        132
+      );
+
+      graficoLinha(153, 59, 132, 73);
+
+      tituloSecao(
+        "Cumprimento dos prazos",
+        "Situação das ordens em relação às datas previstas",
+        153,
+        145,
+        132
+      );
+
+      barrasHorizontais(
+        dadosPrazos.map((item, indice) => ({
+          label: item.nome,
+          valor: item.quantidade,
+          cor: [
+            CORES_PDF.verde,
+            CORES_PDF.laranja,
+            CORES_PDF.azul,
+            CORES_PDF.vermelho,
+            CORES_PDF.cinza,
+          ][indice] ?? CORES_PDF.ciano,
+        })),
+        153,
+        156,
+        132,
+        37
+      );
+
+      rodape();
+
+      // =========================================================
+      // PÁGINA 3 — COLABORADORES E MÁQUINAS
+      // =========================================================
+      pdf.addPage();
+
+      cabecalho(
+        "Desempenho de Equipe e Equipamentos",
+        "Visão comparativa de responsáveis e máquinas com maior volume de ocorrências",
+        3
+      );
+
+      tituloSecao(
+        "Desempenho por colaborador",
+        "OS atribuídas, concluídas e pendentes",
+        margem,
+        48,
+        128
+      );
+
+      autoTable(pdf, {
+        startY: 59,
+        margin: {
+          left: margem,
+          right: larguraPagina - margem - 128,
+        },
+        tableWidth: 128,
+        head: [
+          [
+            "Colaborador",
+            "Atribuídas",
+            "Concluídas",
+            "Pendentes",
+            "Eficiência",
+          ],
+        ],
+        body:
+          dadosColaboradores.length > 0
+            ? dadosColaboradores.map((item) => [
+                item.colaborador,
+                String(item.atribuidas),
+                String(item.concluidas),
+                String(item.pendentes),
+                item.atribuidas > 0
+                  ? `${Math.round(
+                      (item.concluidas / item.atribuidas) * 100
+                    )}%`
+                  : "0%",
+              ])
+            : [["Sem dados", "0", "0", "0", "0%"]],
+        theme: "grid",
+        styles: {
+          font: "helvetica",
+          fontSize: 6.7,
+          cellPadding: 2.1,
+          textColor: CORES_PDF.texto,
+          fillColor: CORES_PDF.painel,
+          lineColor: CORES_PDF.borda,
+          lineWidth: 0.15,
+          valign: "middle",
+        },
+        headStyles: {
+          fillColor: CORES_PDF.violeta,
+          textColor: CORES_PDF.branco,
+          fontStyle: "bold",
+        },
+        alternateRowStyles: {
+          fillColor: CORES_PDF.painel2,
+        },
+        columnStyles: {
+          0: { cellWidth: 54 },
+          1: { halign: "center" },
+          2: { halign: "center" },
+          3: { halign: "center" },
+          4: { halign: "center", fontStyle: "bold" },
+        },
+      });
+
+      tituloSecao(
+        "Máquinas com mais ocorrências",
+        "Ranking dos equipamentos com maior número de OS",
+        153,
+        48,
+        132
+      );
+
+      autoTable(pdf, {
+        startY: 59,
+        margin: {
+          left: 153,
+          right: margem,
+        },
+        tableWidth: 132,
+        head: [
+          [
+            "Máquina / equipamento",
+            "Ocorrências",
+            "Concluídas",
+            "Eficiência",
+          ],
+        ],
+        body:
+          dadosMaquinas.length > 0
+            ? dadosMaquinas.map((item) => [
+                item.maquina,
+                String(item.ocorrencias),
+                String(item.concluidas),
+                item.ocorrencias > 0
+                  ? `${Math.round(
+                      (item.concluidas / item.ocorrencias) * 100
+                    )}%`
+                  : "0%",
+              ])
+            : [["Sem dados", "0", "0", "0%"]],
+        theme: "grid",
+        styles: {
+          font: "helvetica",
+          fontSize: 6.7,
+          cellPadding: 2.1,
+          textColor: CORES_PDF.texto,
+          fillColor: CORES_PDF.painel,
+          lineColor: CORES_PDF.borda,
+          lineWidth: 0.15,
+          valign: "middle",
+        },
+        headStyles: {
+          fillColor: CORES_PDF.laranja,
+          textColor: CORES_PDF.branco,
+          fontStyle: "bold",
+        },
+        alternateRowStyles: {
+          fillColor: CORES_PDF.painel2,
+        },
+        columnStyles: {
+          0: { cellWidth: 70 },
+          1: { halign: "center" },
+          2: { halign: "center" },
+          3: { halign: "center", fontStyle: "bold" },
+        },
+      });
+
+      const resumoY = 150;
+
+      pdf.setFillColor(...CORES_PDF.painel2);
+      pdf.roundedRect(
+        margem,
+        resumoY,
+        larguraUtil,
+        42,
+        4,
+        4,
+        "F"
+      );
+
+      pdf.setDrawColor(...CORES_PDF.borda);
+      pdf.roundedRect(
+        margem,
+        resumoY,
+        larguraUtil,
+        42,
+        4,
+        4,
+        "S"
+      );
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.setTextColor(...CORES_PDF.ciano);
+      pdf.text("RESUMO EXECUTIVO", margem + 5, resumoY + 8);
+
+      const principalSetor = dadosSetores[0];
+      const principalMaquina = dadosMaquinas[0];
+      const principalColaborador = dadosColaboradores[0];
+
+      const frases = [
+        `Foram analisadas ${metricas.total} OS. ${metricas.concluidas} estão concluídas, ${metricas.pendentes} permanecem pendentes e ${metricas.canceladas} foram canceladas.`,
+        `A taxa geral de conclusão é de ${metricas.taxaConclusao}% e o tempo médio entre criação e conclusão é ${formatarDuracaoMedia(metricas.tempoMedio)}.`,
+        principalSetor
+          ? `O setor com maior volume é ${principalSetor.setor}, com ${principalSetor.total} OS no período.`
+          : "Não há dados suficientes para destacar um setor.",
+        principalMaquina
+          ? `A máquina com maior número de ocorrências é ${principalMaquina.maquina}, com ${principalMaquina.ocorrencias} OS.`
+          : "Não há dados suficientes para destacar uma máquina.",
+        principalColaborador
+          ? `O colaborador com maior volume de atribuições é ${principalColaborador.colaborador}, com ${principalColaborador.atribuidas} OS atribuídas.`
+          : "Não há dados suficientes para destacar um colaborador.",
+      ];
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7.3);
+      pdf.setTextColor(...CORES_PDF.texto);
+
+      let textoY = resumoY + 15;
+
+      frases.forEach((frase) => {
+        const linhas = pdf.splitTextToSize(frase, larguraUtil - 12);
+        pdf.text(linhas, margem + 5, textoY);
+        textoY += linhas.length * 4.1 + 1.7;
+      });
+
+      rodape();
+
+      const dataArquivo = new Date()
+        .toLocaleDateString("pt-BR")
+        .replaceAll("/", "-");
+
+      pdf.save(`dashboard-os-${dataArquivo}.pdf`);
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      alert("Não foi possível gerar o PDF dos gráficos.");
+    } finally {
+      setGerandoPDF(false);
     }
-
-    const dataArquivo = new Date()
-      .toLocaleDateString("pt-BR")
-      .replaceAll("/", "-");
-
-    pdf.save(`dashboard-os-${dataArquivo}.pdf`);
-  } catch (error) {
-    console.error("Erro ao gerar PDF dos gráficos:", error);
-
-    alert(
-      error instanceof Error
-        ? `Não foi possível gerar o PDF: ${error.message}`
-        : "Não foi possível gerar o PDF dos gráficos."
-    );
-  } finally {
-    setGerandoPDF(false);
   }
-}
 
   return (
     <div className="space-y-6">
