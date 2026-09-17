@@ -1222,33 +1222,33 @@ export default function CardPlanoPreventivo({
       desenharPDF(false);
   }
   return (
-    <article className="flex min-h-[540px] flex-col rounded-3xl border border-cyan-400/20 bg-white/[0.04] p-4 shadow-xl shadow-black/20 transition hover:border-cyan-400/40">
-      <div className="mb-3 flex items-start justify-between gap-3">
+    <article className="flex flex-col rounded-2xl border border-cyan-400/20 bg-white/[0.04] p-3 shadow-lg shadow-black/15 transition hover:border-cyan-400/40">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-cyan-300">
-            <Repeat2 size={12} />
+          <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-cyan-300">
+            <Repeat2 size={10} />
             Plano recorrente
           </div>
 
-          <h2 className="line-clamp-2 text-lg font-black text-white">
+          <h2 className="line-clamp-2 text-base font-black leading-tight text-white">
             {plano.titulo}
           </h2>
         </div>
 
         <span
-          className={`shrink-0 rounded-full border px-3 py-1 text-xs font-black ${situacao.classe}`}
+          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-black ${situacao.classe}`}
         >
           {situacao.texto}
         </span>
       </div>
 
-      <p className="line-clamp-3 min-h-[60px] text-sm leading-relaxed text-slate-400">
+      <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-400">
         {plano.descricao}
       </p>
 
-      <div className="mt-4 grid gap-3">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <Info
-          icon={<CalendarDays size={15} />}
+          icon={<CalendarDays size={12} />}
           label="Próxima execução"
           value={
             proxima
@@ -1260,7 +1260,7 @@ export default function CardPlanoPreventivo({
         />
 
         <Info
-          icon={<Repeat2 size={15} />}
+          icon={<Repeat2 size={12} />}
           label="Periodicidade"
           value={frequenciaLabel(
             plano.frequencia
@@ -1268,21 +1268,29 @@ export default function CardPlanoPreventivo({
         />
 
         <Info
-          icon={<Clock3 size={15} />}
-          label="Duração estimada"
+          icon={<Clock3 size={12} />}
+          label="Duração"
           value={formatarDuracao(
             plano.duracaoEstimadaMinutos
           )}
         />
 
         <Info
-          icon={<Building2 size={15} />}
+          icon={<CalendarClock size={12} />}
+          label="Prioridade"
+          value={prioridadeLabel(
+            plano.prioridade
+          )}
+        />
+
+        <Info
+          icon={<Building2 size={12} />}
           label="Setor"
           value={plano.setor.nome}
         />
 
         <Info
-          icon={<Wrench size={15} />}
+          icon={<Wrench size={12} />}
           label="Máquina"
           value={
             plano.maquina?.nome ??
@@ -1291,74 +1299,76 @@ export default function CardPlanoPreventivo({
         />
 
         <Info
-          icon={<Users size={15} />}
+          icon={<Users size={12} />}
           label="Responsáveis"
           value={responsaveis}
         />
 
         <Info
-          icon={<ShieldAlert size={15} />}
+          icon={<ShieldAlert size={12} />}
           label="Aviso"
           value={`${plano.diasAntesAviso} dia(s) antes`}
         />
-
-        <Info
-          icon={<CalendarClock size={15} />}
-          label="Prioridade"
-          value={prioridadeLabel(
-            plano.prioridade
-          )}
-        />
       </div>
 
-      <div className="mt-auto space-y-3 pt-4">
-        <div className="rounded-2xl border border-white/10 bg-[#050816] p-3">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-            Programação
-          </p>
-
-          <div className="mt-1 flex items-end justify-between gap-3">
-            <p className="text-sm font-black text-white">
-              {plano._count?.execucoes ?? 0} execução(ões)
+      <div className="mt-2.5 rounded-xl border border-white/10 bg-[#050816] px-2.5 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">
+              Programação
             </p>
 
-            <span
-              className={
-                plano.ativo
-                  ? "text-xs font-black text-emerald-300"
-                  : "text-xs font-black text-red-300"
-              }
-            >
-              {plano.ativo
-                ? "Plano ativo"
-                : "Plano inativo"}
-            </span>
+            <p className="mt-0.5 text-xs font-black text-white">
+              {plano._count?.execucoes ?? 0} execução(ões)
+            </p>
           </div>
-        </div>
 
+          <span
+            className={
+              plano.ativo
+                ? "text-[10px] font-black text-emerald-300"
+                : "text-[10px] font-black text-red-300"
+            }
+          >
+            {plano.ativo
+              ? "Plano ativo"
+              : "Plano inativo"}
+          </span>
+        </div>
+      </div>
+
+      <div
+        className={`mt-2.5 grid gap-2 ${
+          proxima
+            ? "grid-cols-2"
+            : "grid-cols-1"
+        }`}
+      >
         <button
           type="button"
           onClick={gerarPDF}
-          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 text-sm font-black text-emerald-300 transition hover:bg-emerald-400 hover:text-slate-950"
+          className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-2 text-[11px] font-black text-emerald-300 transition hover:bg-emerald-400 hover:text-slate-950"
         >
-          <FileDown size={17} />
-          Gerar documento PDF
+          <FileDown size={14} />
+          Gerar PDF
         </button>
 
         {proxima && (
           <Link
             href={`/admin/os/preventivas/execucoes/${proxima.id}`}
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 text-sm font-black text-cyan-300 transition hover:bg-cyan-400 hover:text-slate-950"
+            className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-2 text-[11px] font-black text-cyan-300 transition hover:bg-cyan-400 hover:text-slate-950"
           >
-            <Wrench size={17} />
-            Abrir próxima execução
+            <Wrench size={14} />
+            Abrir execução
           </Link>
         )}
+      </div>
 
+      <div className="mt-2">
         <AcoesPlanoPreventivo
-  planoId={plano.id}
-  titulo={plano.titulo}
-/>
+          planoId={plano.id}
+          titulo={plano.titulo}
+        />
       </div>
     </article>
   );
@@ -1374,16 +1384,16 @@ function Info({
   value: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#050816] p-3">
-      <div className="flex items-center gap-2 text-slate-400">
+    <div className="min-w-0 rounded-xl border border-white/10 bg-[#050816] p-2">
+      <div className="flex items-center gap-1.5 text-slate-500">
         {icon}
 
-        <span className="text-[11px] font-bold uppercase tracking-wide">
+        <span className="truncate text-[9px] font-bold uppercase tracking-wide">
           {label}
         </span>
       </div>
 
-      <p className="mt-1 line-clamp-2 break-words text-sm font-bold text-white">
+      <p className="mt-0.5 line-clamp-1 break-words text-xs font-bold text-white">
         {value}
       </p>
     </div>

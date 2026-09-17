@@ -940,6 +940,22 @@ function ExecucaoCard({
   hoje: string;
   compacto?: boolean;
 }) {
+  const router = useRouter();
+
+  const [reagendando, setReagendando] =
+    useState(false);
+
+  const [novaData, setNovaData] =
+    useState(
+      execucao.dataProgramada.slice(
+        0,
+        10
+      )
+    );
+
+  const [salvando, setSalvando] =
+    useState(false);
+
   const info =
     statusInfo(
       execucao.status,
@@ -962,6 +978,78 @@ function ExecucaoCard({
           )
           .join(", ")
       : "Não definido";
+
+  const podeReagendar =
+    execucao.status === "PROGRAMADA" ||
+    execucao.status === "PENDENTE";
+
+  async function salvarReagendamento() {
+    if (!novaData) {
+      alert(
+        "Selecione a nova data da preventiva."
+      );
+      return;
+    }
+
+    const dataAtual =
+      execucao.dataProgramada.slice(
+        0,
+        10
+      );
+
+    const confirmou =
+      window.confirm(
+        `Reagendar esta preventiva de ${formatarData(
+          dataAtual
+        )} para ${formatarData(
+          novaData
+        )}?\n\nAs próximas execuções pendentes deste plano também serão recalculadas a partir da nova data, mantendo a periodicidade cadastrada.`
+      );
+
+    if (!confirmou) {
+      return;
+    }
+
+    try {
+      setSalvando(true);
+
+      const resposta = await fetch(
+        `/api/admin/os/preventivas/execucoes/${execucao.id}/reagendar`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            dataProgramada:
+              novaData,
+          }),
+        }
+      );
+
+      const dados =
+        await resposta.json();
+
+      if (!resposta.ok) {
+        throw new Error(
+          dados?.error ||
+            "Não foi possível reagendar a preventiva."
+        );
+      }
+
+      setReagendando(false);
+      router.refresh();
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível reagendar a preventiva."
+      );
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   return (
     <article className="rounded-2xl border border-white/10 bg-[#050816] p-4">
@@ -1034,7 +1122,7 @@ function ExecucaoCard({
         )}
       </div>
 
-            {!compacto && (
+      {!compacto && (
         <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3 text-[11px]">
           <span className="text-slate-500">
             {
@@ -1052,13 +1140,95 @@ function ExecucaoCard({
         </div>
       )}
 
-      <Link
-        href={`/admin/os/preventivas/execucoes/${execucao.id}`}
-        className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-500/10 text-xs font-black text-cyan-300 transition hover:bg-cyan-400 hover:text-slate-950"
-      >
-        Abrir execução
-      </Link>
+      {!compacto &&
+        podeReagendar &&
+        reagendando && (
+          <div className="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-500/[0.06] p-3">
+            <p className="text-[11px] font-bold leading-relaxed text-slate-300">
+              A nova data passa a ser a referência para as próximas execuções deste plano.
+            </p>
 
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <input
+                type="date"
+                value={novaData}
+                onChange={(event) =>
+                  setNovaData(
+                    event.target.value
+                  )
+                }
+                disabled={salvando}
+                className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-[#050816] px-3 text-xs font-bold text-white outline-none transition focus:border-cyan-400 disabled:opacity-60"
+              />
+
+              <button
+                type="button"
+                onClick={
+                  salvarReagendamento
+                }
+                disabled={salvando}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-cyan-400 px-4 text-xs font-black text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {salvando
+                  ? "Salvando..."
+                  : "Salvar nova data"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setNovaData(
+                    execucao.dataProgramada.slice(
+                      0,
+                      10
+                    )
+                  );
+                  setReagendando(
+                    false
+                  );
+                }}
+                disabled={salvando}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-xs font-black text-white transition hover:bg-white/10 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+      <div
+        className={`mt-4 grid gap-2 ${
+          !compacto &&
+          podeReagendar
+            ? "grid-cols-2"
+            : "grid-cols-1"
+        }`}
+      >
+        {!compacto &&
+          podeReagendar && (
+            <button
+              type="button"
+              onClick={() =>
+                setReagendando(
+                  (valor) =>
+                    !valor
+                )
+              }
+              className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-black text-slate-200 transition hover:border-cyan-400/30 hover:bg-cyan-500/10 hover:text-cyan-300"
+            >
+              {reagendando
+                ? "Fechar"
+                : "Reagendar"}
+            </button>
+          )}
+
+        <Link
+          href={`/admin/os/preventivas/execucoes/${execucao.id}`}
+          className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 text-xs font-black text-cyan-300 transition hover:bg-cyan-400 hover:text-slate-950"
+        >
+          Abrir execução
+        </Link>
+      </div>
     </article>
   );
 }
