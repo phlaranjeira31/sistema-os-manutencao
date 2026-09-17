@@ -272,58 +272,149 @@ export default function CardPlanoPreventivo({
     const larguraUtil =
       larguraPagina - margem * 2;
 
-    let y = 48;
+    let y = 44;
 
     const img = new Image();
 
     img.src = "/logo.sequoia.png";
 
+    function desenharCabecalho(
+      comLogo: boolean,
+      continuacao = false
+    ) {
+      doc.setFillColor(
+        5,
+        8,
+        22
+      );
+
+      doc.rect(
+        0,
+        0,
+        larguraPagina,
+        32,
+        "F"
+      );
+
+      if (comLogo) {
+        doc.addImage(
+          img,
+          "PNG",
+          margem,
+          5,
+          22,
+          22
+        );
+      }
+
+      const inicioTexto =
+        comLogo
+          ? 42
+          : margem;
+
+      doc.setFont(
+        "helvetica",
+        "bold"
+      );
+
+      doc.setFontSize(15);
+
+      doc.setTextColor(
+        255,
+        255,
+        255
+      );
+
+      doc.text(
+        continuacao
+          ? "PLANO DE MANUTENÇÃO PREVENTIVA - CONTINUAÇÃO"
+          : "PLANO DE MANUTENÇÃO PREVENTIVA",
+        inicioTexto,
+        15
+      );
+
+      doc.setFont(
+        "helvetica",
+        "normal"
+      );
+
+      doc.setFontSize(8.5);
+
+      doc.setTextColor(
+        190,
+        200,
+        215
+      );
+
+      doc.text(
+        "Sistema de Manutenção - Sequoia",
+        inicioTexto,
+        22
+      );
+
+      doc.setDrawColor(
+        34,
+        211,
+        238
+      );
+
+      doc.setLineWidth(1);
+
+      doc.line(
+        inicioTexto,
+        26,
+        larguraPagina - margem,
+        26
+      );
+    }
+
+    function definirTextoCorpo() {
+      doc.setFont(
+        "helvetica",
+        "normal"
+      );
+
+      doc.setFontSize(10);
+
+      doc.setTextColor(
+        20,
+        30,
+        45
+      );
+    }
+
+    function novaPagina(
+      comLogo: boolean
+    ) {
+      doc.addPage();
+      desenharCabecalho(
+        comLogo,
+        true
+      );
+      y = 42;
+      definirTextoCorpo();
+    }
+
     function novaPaginaSePrecisar(
-      espaco: number
+      espaco: number,
+      comLogo: boolean
     ) {
       if (
         y + espaco >
-        alturaPagina - 22
+        alturaPagina - 16
       ) {
-        doc.addPage();
-
-        doc.setFillColor(5, 8, 22);
-
-        doc.rect(
-          0,
-          0,
-          larguraPagina,
-          18,
-          "F"
-        );
-
-        doc.setTextColor(
-          255,
-          255,
-          255
-        );
-
-        doc.setFont(
-          "helvetica",
-          "bold"
-        );
-
-        doc.setFontSize(10);
-
-        doc.text(
-          "PLANO PREVENTIVO - CONTINUAÇÃO",
-          margem,
-          12
-        );
-
-        y = 28;
+        novaPagina(comLogo);
       }
     }
 
     function tituloSecao(
-      titulo: string
+      titulo: string,
+      comLogo: boolean
     ) {
-      novaPaginaSePrecisar(16);
+      novaPaginaSePrecisar(
+        16,
+        comLogo
+      );
 
       doc.setFillColor(
         225,
@@ -365,7 +456,8 @@ export default function CardPlanoPreventivo({
 
     function campo(
       label: string,
-      value: string
+      value: string,
+      comLogo: boolean
     ) {
       const valor =
         value || "-";
@@ -383,7 +475,8 @@ export default function CardPlanoPreventivo({
         );
 
       novaPaginaSePrecisar(
-        altura
+        altura,
+        comLogo
       );
 
       doc.setFont(
@@ -405,16 +498,7 @@ export default function CardPlanoPreventivo({
         y
       );
 
-      doc.setFont(
-        "helvetica",
-        "normal"
-      );
-
-      doc.setTextColor(
-        20,
-        30,
-        45
-      );
+      definirTextoCorpo();
 
       doc.text(
         linhas,
@@ -425,250 +509,84 @@ export default function CardPlanoPreventivo({
       y += altura;
     }
 
-    function montarPDF(
+    function adicionarDescricaoCompleta(
       comLogo: boolean
     ) {
-      doc.setFillColor(
-        5,
-        8,
-        22
-      );
-
-      doc.rect(
-        0,
-        0,
-        larguraPagina,
-        38,
-        "F"
-      );
-
-      if (comLogo) {
-        doc.addImage(
-          img,
-          "PNG",
-          margem,
-          6,
-          26,
-          26
-        );
-      }
-
-      const inicioTexto =
+      tituloSecao(
+        "Descrição da preventiva",
         comLogo
-          ? 47
-          : margem;
-
-      doc.setFont(
-        "helvetica",
-        "bold"
       );
 
-      doc.setFontSize(16);
+      const descricao =
+        plano.descricao || "-";
 
-      doc.setTextColor(
-        255,
-        255,
-        255
-      );
-
-      doc.text(
-        "PLANO DE MANUTENÇÃO PREVENTIVA",
-        inicioTexto,
-        16
-      );
-
-      doc.setFont(
-        "helvetica",
-        "normal"
-      );
-
-      doc.setFontSize(8.5);
-
-      doc.setTextColor(
-        190,
-        200,
-        215
-      );
-
-      doc.text(
-        "Sistema de Manutenção - Sequoia",
-        inicioTexto,
-        23
-      );
-
-      doc.setDrawColor(
-        34,
-        211,
-        238
-      );
-
-      doc.setLineWidth(1.1);
-
-      doc.line(
-        inicioTexto,
-        29,
-        larguraPagina -
-          margem,
-        29
-      );
-
-      doc.setTextColor(
-        20,
-        30,
-        45
-      );
-
-      tituloSecao(
-        "Identificação do plano"
-      );
-
-      campo(
-        "Plano",
-        plano.titulo
-      );
-
-      campo(
-        "Empresa",
-        plano.empresa?.nome ??
-          "Sequoia"
-      );
-
-      campo(
-        "Setor",
-        plano.setor.nome
-      );
-
-      campo(
-        "Máquina",
-        plano.maquina?.nome ??
-          "Não definida"
-      );
-
-      campo(
-        "Prioridade",
-        prioridadeLabel(
-          plano.prioridade
-        )
-      );
-
-      campo(
-        "Periodicidade",
-        frequenciaLabel(
-          plano.frequencia
-        )
-      );
-
-      campo(
-        "Duração estimada",
-        formatarDuracao(
-          plano.duracaoEstimadaMinutos
-        )
-      );
-
-      campo(
-        "Primeira execução",
-        formatDate(
-          plano.dataInicio
-        )
-      );
-
-      campo(
-        "Encerramento",
-        plano.dataFim
-          ? formatDate(
-              plano.dataFim
-            )
-          : "Sem data final"
-      );
-
-      campo(
-        "Aviso",
-        `${plano.diasAntesAviso} dia(s) antes`
-      );
-
-      campo(
-        "Automação",
-        plano.gerarAutomaticamente
-          ? "Geração automática ativada"
-          : "Geração automática desativada"
-      );
-
-      campo(
-        "Status do plano",
-        plano.ativo
-          ? "Ativo"
-          : "Inativo"
-      );
-
-      campo(
-        "Criado por",
-        plano.criadoPor?.nome ??
-          "Não identificado"
-      );
-
-      campo(
-        "Criado em",
-        formatDate(
-          plano.createdAt
-        )
-      );
-
-      tituloSecao(
-        "Descrição da preventiva"
-      );
-
-      const linhasDescricao =
-        doc.splitTextToSize(
-          plano.descricao ||
-            "-",
-          larguraUtil
-        ) as string[];
-
-      doc.setFont(
-        "helvetica",
-        "normal"
-      );
-
-      doc.setFontSize(10);
-
-      doc.setTextColor(
-        20,
-        30,
-        45
-      );
+      const linhasOriginais =
+        descricao
+          .replace(/\r/g, "")
+          .split("\n");
 
       for (
-        const linha of linhasDescricao
+        const linhaOriginal of linhasOriginais
       ) {
-        novaPaginaSePrecisar(
-          7
-        );
+        if (
+          linhaOriginal.length === 0
+        ) {
+          novaPaginaSePrecisar(
+            5,
+            comLogo
+          );
 
-        doc.text(
-          linha,
-          margem,
-          y
-        );
+          y += 5;
+          continue;
+        }
 
-        y += 6;
+        const linhasQuebradas =
+          doc.splitTextToSize(
+            linhaOriginal,
+            larguraUtil
+          ) as string[];
+
+        for (
+          const linha of linhasQuebradas
+        ) {
+          novaPaginaSePrecisar(
+            6,
+            comLogo
+          );
+
+          definirTextoCorpo();
+
+          doc.text(
+            linha,
+            margem,
+            y
+          );
+
+          y += 5.5;
+        }
       }
 
-      y += 5;
+      y += 4;
+    }
 
+    function adicionarResponsaveis(
+      comLogo: boolean
+    ) {
       tituloSecao(
-        "Colaboradores responsáveis"
+        "Colaboradores responsáveis",
+        comLogo
       );
 
       if (
         plano.responsaveis.length ===
         0
       ) {
-        doc.setFont(
-          "helvetica",
-          "normal"
+        novaPaginaSePrecisar(
+          8,
+          comLogo
         );
 
-        doc.setFontSize(10);
+        definirTextoCorpo();
 
         doc.text(
           "Nenhum responsável definido.",
@@ -677,78 +595,102 @@ export default function CardPlanoPreventivo({
         );
 
         y += 10;
-      } else {
-        plano.responsaveis.forEach(
-          (
-            responsavel,
-            index
-          ) => {
-            novaPaginaSePrecisar(
-              8
-            );
-
-            const usuario =
-              responsavel.user;
-
-            const texto =
-              usuario.email
-                ? `${index + 1}. ${usuario.nome} - ${usuario.email}`
-                : `${index + 1}. ${usuario.nome}`;
-
-            const linhas =
-              doc.splitTextToSize(
-                texto,
-                larguraUtil
-              );
-
-            doc.setFont(
-              "helvetica",
-              "normal"
-            );
-
-            doc.setFontSize(
-              9.5
-            );
-
-            doc.text(
-              linhas,
-              margem,
-              y
-            );
-
-            y +=
-              linhas.length *
-                5 +
-              2;
-          }
-        );
+        return;
       }
 
-      y += 4;
+      plano.responsaveis.forEach(
+        (
+          responsavel,
+          index
+        ) => {
+          novaPaginaSePrecisar(
+            8,
+            comLogo
+          );
 
-      tituloSecao(
-        "Cronograma programado"
+          definirTextoCorpo();
+
+          const nome =
+            `${index + 1}. ${responsavel.user.nome}`;
+
+          const linhas =
+            doc.splitTextToSize(
+              nome,
+              larguraUtil
+            ) as string[];
+
+          doc.text(
+            linhas,
+            margem,
+            y
+          );
+
+          y +=
+            linhas.length * 5 + 2;
+        }
       );
 
-      if (
-        plano.execucoes.length ===
+      y += 3;
+    }
+
+    function adicionarAssinaturas(
+      comLogo: boolean
+    ) {
+      tituloSecao(
+        "Assinaturas",
+        comLogo
+      );
+
+      const nomes =
+        plano.responsaveis.length >
         0
+          ? plano.responsaveis.map(
+              (item) =>
+                item.user.nome
+            )
+          : [
+              "Responsável pela manutenção",
+            ];
+
+      const larguraAssinatura =
+        (larguraUtil - 10) / 2;
+
+      for (
+        let i = 0;
+        i < nomes.length;
+        i += 2
       ) {
-        doc.text(
-          "Nenhuma execução programada.",
-          margem,
-          y
+        novaPaginaSePrecisar(
+          38,
+          comLogo
         );
 
-        y += 10;
-      } else {
-        plano.execucoes.forEach(
+        const nomesLinha =
+          nomes.slice(i, i + 2);
+
+        nomesLinha.forEach(
           (
-            execucao,
-            index
+            nome,
+            coluna
           ) => {
-            novaPaginaSePrecisar(
-              9
+            const x =
+              margem +
+              coluna *
+                (larguraAssinatura + 10);
+
+            doc.setDrawColor(
+              90,
+              100,
+              115
+            );
+
+            doc.setLineWidth(0.4);
+
+            doc.line(
+              x,
+              y + 18,
+              x + larguraAssinatura,
+              y + 18
             );
 
             doc.setFont(
@@ -764,10 +706,19 @@ export default function CardPlanoPreventivo({
               45
             );
 
+            const nomeQuebrado =
+              doc.splitTextToSize(
+                nome,
+                larguraAssinatura - 4
+              ) as string[];
+
             doc.text(
-              `${index + 1}.`,
-              margem,
-              y
+              nomeQuebrado,
+              x + larguraAssinatura / 2,
+              y + 24,
+              {
+                align: "center",
+              }
             );
 
             doc.setFont(
@@ -775,186 +726,103 @@ export default function CardPlanoPreventivo({
               "normal"
             );
 
-            doc.text(
-              formatDate(
-                execucao.dataProgramada
-              ),
-              margem + 10,
-              y
+            doc.setFontSize(8);
+
+            doc.setTextColor(
+              95,
+              105,
+              120
             );
 
             doc.text(
-              statusLabel(
-                execucao.status
-              ),
-              margem + 55,
-              y
+              "Assinatura / data",
+              x + larguraAssinatura / 2,
+              y + 32,
+              {
+                align: "center",
+              }
             );
-
-            doc.text(
-              formatarDuracao(
-                execucao.duracaoEstimadaMinutos ??
-                  plano.duracaoEstimadaMinutos
-              ),
-              margem + 115,
-              y
-            );
-
-            y += 7;
           }
         );
-      }
 
-      y += 5;
+        y += 38;
+      }
+    }
+
+    function montarPDF(
+      comLogo: boolean
+    ) {
+      desenharCabecalho(
+        comLogo,
+        false
+      );
 
       tituloSecao(
-        "Assinaturas"
+        "Dados do plano",
+        comLogo
       );
 
-      const nomes =
-        plano.responsaveis.length >
-        0
-          ? plano.responsaveis.map(
-              (item) =>
-                item.user.nome
-            )
-          : [
-              "Responsável pela manutenção",
-            ];
-
-      nomes.push(
-        "Supervisor responsável"
+      campo(
+        "Plano",
+        plano.titulo,
+        comLogo
       );
 
-      for (
-        let i = 0;
-        i < nomes.length;
-        i++
-      ) {
-        novaPaginaSePrecisar(
-          32
-        );
+      campo(
+        "Empresa",
+        plano.empresa?.nome ??
+          "Sequoia",
+        comLogo
+      );
 
-        doc.setDrawColor(
-          90,
-          100,
-          115
-        );
+      campo(
+        "Setor",
+        plano.setor.nome,
+        comLogo
+      );
 
-        doc.line(
-          margem,
-          y + 18,
-          margem + 80,
-          y + 18
-        );
+      campo(
+        "Máquina",
+        plano.maquina?.nome ??
+          "Não definida",
+        comLogo
+      );
 
-        doc.setFont(
-          "helvetica",
-          "bold"
-        );
+      campo(
+        "Prioridade",
+        prioridadeLabel(
+          plano.prioridade
+        ),
+        comLogo
+      );
 
-        doc.setFontSize(9);
+      campo(
+        "Periodicidade",
+        frequenciaLabel(
+          plano.frequencia
+        ),
+        comLogo
+      );
 
-        doc.text(
-          nomes[i],
-          margem + 40,
-          y + 24,
-          {
-            align: "center",
-          }
-        );
+      campo(
+        "Duração estimada",
+        formatarDuracao(
+          plano.duracaoEstimadaMinutos
+        ),
+        comLogo
+      );
 
-        doc.setFont(
-          "helvetica",
-          "normal"
-        );
+      adicionarDescricaoCompleta(
+        comLogo
+      );
 
-        doc.setFontSize(8);
+      adicionarResponsaveis(
+        comLogo
+      );
 
-        doc.setTextColor(
-          95,
-          105,
-          120
-        );
-
-        doc.text(
-          "Assinatura / data",
-          margem + 40,
-          y + 29,
-          {
-            align: "center",
-          }
-        );
-
-        y += 33;
-      }
-
-      const paginas =
-        doc.getNumberOfPages();
-
-      for (
-        let pagina = 1;
-        pagina <= paginas;
-        pagina++
-      ) {
-        doc.setPage(
-          pagina
-        );
-
-        doc.setDrawColor(
-          210,
-          215,
-          225
-        );
-
-        doc.line(
-          margem,
-          alturaPagina - 16,
-          larguraPagina -
-            margem,
-          alturaPagina - 16
-        );
-
-        doc.setFont(
-          "helvetica",
-          "normal"
-        );
-
-        doc.setFontSize(7.5);
-
-        doc.setTextColor(
-          115,
-          125,
-          140
-        );
-
-        doc.text(
-          `Gerado em ${new Date().toLocaleString(
-            "pt-BR"
-          )}`,
-          margem,
-          alturaPagina - 10
-        );
-
-        doc.text(
-          `Página ${pagina} de ${paginas}`,
-          larguraPagina -
-            margem,
-          alturaPagina - 10,
-          {
-            align: "right",
-          }
-        );
-
-        doc.text(
-          "Desenvolvido por Pedro H. Laranjeira",
-          larguraPagina / 2,
-          alturaPagina - 6,
-          {
-            align: "center",
-          }
-        );
-      }
+      adicionarAssinaturas(
+        comLogo
+      );
 
       const nome =
         limparNomeArquivo(
