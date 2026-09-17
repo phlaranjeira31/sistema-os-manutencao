@@ -267,32 +267,424 @@ export default function CardPlanoPreventivo({
     const alturaPagina =
       doc.internal.pageSize.getHeight();
 
-    const margem = 14;
-
+    const margemX = 10;
+    const margemInferior = 9;
+    const alturaCabecalho = 24;
+    const inicioConteudo = 29;
     const larguraUtil =
-      larguraPagina - margem * 2;
-
-    let y = 44;
+      larguraPagina - margemX * 2;
 
     const img = new Image();
 
     img.src = "/logo.sequoia.png";
 
-    function desenharCabecalho(
-      comLogo: boolean,
-      continuacao = false
+    type LinhaDescricao = {
+      texto: string;
+      vazia: boolean;
+    };
+
+    type CaixaMedida = {
+      linhas: string[];
+      altura: number;
+    };
+
+    type LayoutPDF = {
+      fonteCorpo: number;
+      fonteLabel: number;
+      fonteSecao: number;
+      alturaLinha: number;
+      alturaSecao: number;
+      espaco: number;
+      padding: number;
+      plano: CaixaMedida;
+      empresa: CaixaMedida;
+      setor: CaixaMedida;
+      maquina: CaixaMedida;
+      prioridade: CaixaMedida;
+      periodicidade: CaixaMedida;
+      duracao: CaixaMedida;
+      linhasDescricao: LinhaDescricao[];
+      alturaDescricao: number;
+      responsaveisMedidos: string[][];
+      alturaResponsaveis: number;
+      alturaAssinatura: number;
+      quantidadeLinhasAssinatura: number;
+      alturaTotal: number;
+    };
+
+    function prepararDescricao(
+      fonte: number,
+      largura: number,
+      alturaLinha: number
     ) {
-      doc.setFillColor(
-        5,
-        8,
-        22
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(fonte);
+
+      const descricao =
+        plano.descricao || "-";
+
+      const originais = descricao
+        .replace(/\r/g, "")
+        .split("\n");
+
+      const linhas: LinhaDescricao[] = [];
+      let altura = 0;
+
+      for (const original of originais) {
+        if (original.trim().length === 0) {
+          linhas.push({
+            texto: "",
+            vazia: true,
+          });
+
+          altura += alturaLinha * 0.58;
+          continue;
+        }
+
+        const quebradas =
+          doc.splitTextToSize(
+            original,
+            largura
+          ) as string[];
+
+        for (const texto of quebradas) {
+          linhas.push({
+            texto,
+            vazia: false,
+          });
+
+          altura += alturaLinha;
+        }
+      }
+
+      return {
+        linhas,
+        altura,
+      };
+    }
+
+    function montarMedidas(
+      fonteCorpo: number
+    ): LayoutPDF {
+      const fonteLabel = Math.max(
+        4.2,
+        fonteCorpo - 1.15
       );
 
+      const fonteSecao = Math.max(
+        5.2,
+        fonteCorpo + 0.3
+      );
+
+      const alturaLinha =
+        fonteCorpo * 0.405;
+
+      const alturaLabel =
+        fonteLabel * 0.38;
+
+      const alturaSecao = Math.max(
+        6,
+        fonteSecao * 0.68
+      );
+
+      const espaco = Math.max(
+        1.25,
+        fonteCorpo * 0.12
+      );
+
+      const padding = Math.max(
+        1.35,
+        fonteCorpo * 0.13
+      );
+
+      const gapColunas = 3;
+
+      const larguraMeia =
+        (larguraUtil - gapColunas) / 2;
+
+      function medirCaixa(
+        valor: string,
+        largura: number
+      ): CaixaMedida {
+        doc.setFont(
+          "helvetica",
+          "normal"
+        );
+
+        doc.setFontSize(
+          fonteCorpo
+        );
+
+        const linhas =
+          doc.splitTextToSize(
+            valor || "-",
+            largura - padding * 2
+          ) as string[];
+
+        const altura =
+          padding +
+          alturaLabel +
+          0.7 +
+          Math.max(1, linhas.length) *
+            alturaLinha +
+          padding;
+
+        return {
+          linhas,
+          altura,
+        };
+      }
+
+      const planoMedido = medirCaixa(
+        plano.titulo,
+        larguraUtil
+      );
+
+      const empresaMedida = medirCaixa(
+        plano.empresa?.nome ??
+          "Sequoia",
+        larguraMeia
+      );
+
+      const setorMedido = medirCaixa(
+        plano.setor.nome,
+        larguraMeia
+      );
+
+      const maquinaMedida = medirCaixa(
+        plano.maquina?.nome ??
+          "Não definida",
+        larguraMeia
+      );
+
+      const prioridadeMedida = medirCaixa(
+        prioridadeLabel(
+          plano.prioridade
+        ),
+        larguraMeia
+      );
+
+      const periodicidadeMedida = medirCaixa(
+        frequenciaLabel(
+          plano.frequencia
+        ),
+        larguraMeia
+      );
+
+      const duracaoMedida = medirCaixa(
+        formatarDuracao(
+          plano.duracaoEstimadaMinutos
+        ),
+        larguraMeia
+      );
+
+      const descricaoMedida =
+        prepararDescricao(
+          fonteCorpo,
+          larguraUtil - padding * 2,
+          alturaLinha
+        );
+
+      const nomesResponsaveis =
+        plano.responsaveis.length > 0
+          ? plano.responsaveis.map(
+              (item) =>
+                item.user.nome
+            )
+          : [
+              "Responsável pela manutenção",
+            ];
+
+      const larguraResponsavel =
+        larguraMeia - padding * 2;
+
+      const responsaveisMedidos =
+        nomesResponsaveis.map(
+          (nome, index) => {
+            doc.setFont(
+              "helvetica",
+              "normal"
+            );
+
+            doc.setFontSize(
+              fonteCorpo
+            );
+
+            return doc.splitTextToSize(
+              `${index + 1}. ${nome}`,
+              larguraResponsavel
+            ) as string[];
+          }
+        );
+
+      let alturaResponsaveis = 0;
+
+      for (
+        let i = 0;
+        i < responsaveisMedidos.length;
+        i += 2
+      ) {
+        const esquerda =
+          responsaveisMedidos[i]
+            ?.length ?? 0;
+
+        const direita =
+          responsaveisMedidos[i + 1]
+            ?.length ?? 0;
+
+        alturaResponsaveis +=
+          Math.max(
+            1,
+            esquerda,
+            direita
+          ) *
+            alturaLinha +
+          0.8;
+      }
+
+      const alturaAssinatura = Math.max(
+        13.5,
+        alturaLinha * 3.7
+      );
+
+      const quantidadeLinhasAssinatura =
+        Math.max(
+          1,
+          Math.ceil(
+            nomesResponsaveis.length / 2
+          )
+        );
+
+      const alturaDados =
+        alturaSecao +
+        espaco +
+        planoMedido.altura +
+        espaco +
+        Math.max(
+          empresaMedida.altura,
+          setorMedido.altura
+        ) +
+        espaco +
+        Math.max(
+          maquinaMedida.altura,
+          prioridadeMedida.altura
+        ) +
+        espaco +
+        Math.max(
+          periodicidadeMedida.altura,
+          duracaoMedida.altura
+        );
+
+      const alturaBlocoDescricao =
+        espaco * 1.4 +
+        alturaSecao +
+        espaco +
+        padding +
+        descricaoMedida.altura +
+        padding;
+
+      const alturaBlocoResponsaveis =
+        espaco * 1.4 +
+        alturaSecao +
+        espaco +
+        padding +
+        alturaResponsaveis +
+        padding;
+
+      const alturaBlocoAssinaturas =
+        espaco * 1.4 +
+        alturaSecao +
+        espaco +
+        quantidadeLinhasAssinatura *
+          alturaAssinatura;
+
+      const alturaTotal =
+        alturaDados +
+        alturaBlocoDescricao +
+        alturaBlocoResponsaveis +
+        alturaBlocoAssinaturas;
+
+      return {
+        fonteCorpo,
+        fonteLabel,
+        fonteSecao,
+        alturaLinha,
+        alturaSecao,
+        espaco,
+        padding,
+        plano: planoMedido,
+        empresa: empresaMedida,
+        setor: setorMedido,
+        maquina: maquinaMedida,
+        prioridade: prioridadeMedida,
+        periodicidade: periodicidadeMedida,
+        duracao: duracaoMedida,
+        linhasDescricao:
+          descricaoMedida.linhas,
+        alturaDescricao:
+          descricaoMedida.altura,
+        responsaveisMedidos,
+        alturaResponsaveis,
+        alturaAssinatura,
+        quantidadeLinhasAssinatura,
+        alturaTotal,
+      };
+    }
+
+    function escolherLayout() {
+      const alturaDisponivel =
+        alturaPagina -
+        inicioConteudo -
+        margemInferior;
+
+      for (
+        let fonte = 10.5;
+        fonte >= 3.5;
+        fonte -= 0.25
+      ) {
+        const layout =
+          montarMedidas(fonte);
+
+        if (
+          layout.alturaTotal <=
+          alturaDisponivel
+        ) {
+          return layout;
+        }
+      }
+
+      return montarMedidas(3.25);
+    }
+
+    function desenharPDF(
+      comLogo: boolean
+    ) {
+      const layout =
+        escolherLayout();
+
+      const {
+        fonteCorpo,
+        fonteLabel,
+        fonteSecao,
+        alturaLinha,
+        alturaSecao,
+        espaco,
+        padding,
+      } = layout;
+
+      const gapColunas = 3;
+
+      const larguraMeia =
+        (larguraUtil - gapColunas) / 2;
+
+      let y = inicioConteudo;
+
+      doc.setFillColor(5, 8, 22);
       doc.rect(
         0,
         0,
         larguraPagina,
-        32,
+        alturaCabecalho,
         "F"
       );
 
@@ -300,24 +692,24 @@ export default function CardPlanoPreventivo({
         doc.addImage(
           img,
           "PNG",
-          margem,
-          5,
-          22,
-          22
+          margemX,
+          4,
+          17,
+          17
         );
       }
 
       const inicioTexto =
         comLogo
-          ? 42
-          : margem;
+          ? 32
+          : margemX;
 
       doc.setFont(
         "helvetica",
         "bold"
       );
 
-      doc.setFontSize(15);
+      doc.setFontSize(13.5);
 
       doc.setTextColor(
         255,
@@ -326,11 +718,9 @@ export default function CardPlanoPreventivo({
       );
 
       doc.text(
-        continuacao
-          ? "PLANO DE MANUTENÇÃO PREVENTIVA - CONTINUAÇÃO"
-          : "PLANO DE MANUTENÇÃO PREVENTIVA",
+        "PLANO DE MANUTENÇÃO PREVENTIVA",
         inicioTexto,
-        15
+        11
       );
 
       doc.setFont(
@@ -338,7 +728,7 @@ export default function CardPlanoPreventivo({
         "normal"
       );
 
-      doc.setFontSize(8.5);
+      doc.setFontSize(7.5);
 
       doc.setTextColor(
         190,
@@ -349,7 +739,7 @@ export default function CardPlanoPreventivo({
       doc.text(
         "Sistema de Manutenção - Sequoia",
         inicioTexto,
-        22
+        17
       );
 
       doc.setDrawColor(
@@ -358,292 +748,350 @@ export default function CardPlanoPreventivo({
         238
       );
 
-      doc.setLineWidth(1);
+      doc.setLineWidth(0.8);
 
       doc.line(
         inicioTexto,
-        26,
-        larguraPagina - margem,
-        26
+        20,
+        larguraPagina - margemX,
+        20
       );
-    }
 
-    function definirTextoCorpo() {
+      function secao(
+        titulo: string
+      ) {
+        doc.setFillColor(
+          225,
+          247,
+          250
+        );
+
+        doc.roundedRect(
+          margemX,
+          y,
+          larguraUtil,
+          alturaSecao,
+          1.5,
+          1.5,
+          "F"
+        );
+
+        doc.setFont(
+          "helvetica",
+          "bold"
+        );
+
+        doc.setFontSize(
+          fonteSecao
+        );
+
+        doc.setTextColor(
+          8,
+          100,
+          120
+        );
+
+        doc.text(
+          titulo.toUpperCase(),
+          margemX + 3,
+          y + alturaSecao * 0.68
+        );
+
+        y += alturaSecao + espaco;
+      }
+
+      function caixa(
+        x: number,
+        largura: number,
+        label: string,
+        medida: CaixaMedida
+      ) {
+        doc.setFillColor(
+          248,
+          250,
+          252
+        );
+
+        doc.setDrawColor(
+          226,
+          232,
+          240
+        );
+
+        doc.setLineWidth(0.2);
+
+        doc.roundedRect(
+          x,
+          y,
+          largura,
+          medida.altura,
+          1.5,
+          1.5,
+          "FD"
+        );
+
+        doc.setFont(
+          "helvetica",
+          "bold"
+        );
+
+        doc.setFontSize(
+          fonteLabel
+        );
+
+        doc.setTextColor(
+          100,
+          116,
+          139
+        );
+
+        doc.text(
+          label.toUpperCase(),
+          x + padding,
+          y + padding +
+            fonteLabel * 0.31
+        );
+
+        doc.setFont(
+          "helvetica",
+          "bold"
+        );
+
+        doc.setFontSize(
+          fonteCorpo
+        );
+
+        doc.setTextColor(
+          15,
+          23,
+          42
+        );
+
+        const yValor =
+          y +
+          padding +
+          fonteLabel * 0.38 +
+          1.2 +
+          alturaLinha * 0.72;
+
+        doc.text(
+          medida.linhas,
+          x + padding,
+          yValor,
+          {
+            lineHeightFactor: 1.02,
+          }
+        );
+      }
+
+      secao("Dados do plano");
+
+      caixa(
+        margemX,
+        larguraUtil,
+        "Plano",
+        layout.plano
+      );
+
+      y +=
+        layout.plano.altura +
+        espaco;
+
+      caixa(
+        margemX,
+        larguraMeia,
+        "Empresa",
+        layout.empresa
+      );
+
+      caixa(
+        margemX +
+          larguraMeia +
+          gapColunas,
+        larguraMeia,
+        "Setor",
+        layout.setor
+      );
+
+      y +=
+        Math.max(
+          layout.empresa.altura,
+          layout.setor.altura
+        ) +
+        espaco;
+
+      caixa(
+        margemX,
+        larguraMeia,
+        "Máquina",
+        layout.maquina
+      );
+
+      caixa(
+        margemX +
+          larguraMeia +
+          gapColunas,
+        larguraMeia,
+        "Prioridade",
+        layout.prioridade
+      );
+
+      y +=
+        Math.max(
+          layout.maquina.altura,
+          layout.prioridade.altura
+        ) +
+        espaco;
+
+      caixa(
+        margemX,
+        larguraMeia,
+        "Periodicidade",
+        layout.periodicidade
+      );
+
+      caixa(
+        margemX +
+          larguraMeia +
+          gapColunas,
+        larguraMeia,
+        "Duração estimada",
+        layout.duracao
+      );
+
+      y +=
+        Math.max(
+          layout.periodicidade.altura,
+          layout.duracao.altura
+        ) +
+        espaco * 1.4;
+
+      secao(
+        "Descrição da preventiva"
+      );
+
       doc.setFont(
         "helvetica",
         "normal"
       );
 
-      doc.setFontSize(10);
+      doc.setFontSize(
+        fonteCorpo
+      );
 
       doc.setTextColor(
         20,
         30,
         45
       );
-    }
 
-    function novaPagina(
-      comLogo: boolean
-    ) {
-      doc.addPage();
-      desenharCabecalho(
-        comLogo,
-        true
-      );
-      y = 42;
-      definirTextoCorpo();
-    }
-
-    function novaPaginaSePrecisar(
-      espaco: number,
-      comLogo: boolean
-    ) {
-      if (
-        y + espaco >
-        alturaPagina - 16
-      ) {
-        novaPagina(comLogo);
-      }
-    }
-
-    function tituloSecao(
-      titulo: string,
-      comLogo: boolean
-    ) {
-      novaPaginaSePrecisar(
-        16,
-        comLogo
-      );
-
-      doc.setFillColor(
-        225,
-        247,
-        250
-      );
-
-      doc.roundedRect(
-        margem,
-        y,
-        larguraUtil,
-        9,
-        2,
-        2,
-        "F"
-      );
-
-      doc.setFont(
-        "helvetica",
-        "bold"
-      );
-
-      doc.setFontSize(10);
-
-      doc.setTextColor(
-        8,
-        100,
-        120
-      );
-
-      doc.text(
-        titulo.toUpperCase(),
-        margem + 4,
-        y + 6
-      );
-
-      y += 14;
-    }
-
-    function campo(
-      label: string,
-      value: string,
-      comLogo: boolean
-    ) {
-      const valor =
-        value || "-";
-
-      const linhas =
-        doc.splitTextToSize(
-          valor,
-          larguraUtil - 55
-        ) as string[];
-
-      const altura =
-        Math.max(
-          8,
-          linhas.length * 5 + 3
-        );
-
-      novaPaginaSePrecisar(
-        altura,
-        comLogo
-      );
-
-      doc.setFont(
-        "helvetica",
-        "bold"
-      );
-
-      doc.setFontSize(9.5);
-
-      doc.setTextColor(
-        55,
-        65,
-        80
-      );
-
-      doc.text(
-        `${label}:`,
-        margem,
-        y
-      );
-
-      definirTextoCorpo();
-
-      doc.text(
-        linhas,
-        margem + 52,
-        y
-      );
-
-      y += altura;
-    }
-
-    function adicionarDescricaoCompleta(
-      comLogo: boolean
-    ) {
-      tituloSecao(
-        "Descrição da preventiva",
-        comLogo
-      );
-
-      const descricao =
-        plano.descricao || "-";
-
-      const linhasOriginais =
-        descricao
-          .replace(/\r/g, "")
-          .split("\n");
+      y += padding;
 
       for (
-        const linhaOriginal of linhasOriginais
+        const linha of layout.linhasDescricao
       ) {
-        if (
-          linhaOriginal.length === 0
-        ) {
-          novaPaginaSePrecisar(
-            5,
-            comLogo
-          );
-
-          y += 5;
+        if (linha.vazia) {
+          y += alturaLinha * 0.58;
           continue;
         }
 
-        const linhasQuebradas =
-          doc.splitTextToSize(
-            linhaOriginal,
-            larguraUtil
-          ) as string[];
-
-        for (
-          const linha of linhasQuebradas
-        ) {
-          novaPaginaSePrecisar(
-            6,
-            comLogo
-          );
-
-          definirTextoCorpo();
-
-          doc.text(
-            linha,
-            margem,
-            y
-          );
-
-          y += 5.5;
-        }
-      }
-
-      y += 4;
-    }
-
-    function adicionarResponsaveis(
-      comLogo: boolean
-    ) {
-      tituloSecao(
-        "Colaboradores responsáveis",
-        comLogo
-      );
-
-      if (
-        plano.responsaveis.length ===
-        0
-      ) {
-        novaPaginaSePrecisar(
-          8,
-          comLogo
-        );
-
-        definirTextoCorpo();
-
         doc.text(
-          "Nenhum responsável definido.",
-          margem,
-          y
+          linha.texto,
+          margemX + padding,
+          y + alturaLinha * 0.72
         );
 
-        y += 10;
-        return;
+        y += alturaLinha;
       }
 
-      plano.responsaveis.forEach(
-        (
-          responsavel,
-          index
-        ) => {
-          novaPaginaSePrecisar(
-            8,
-            comLogo
-          );
+      y +=
+        padding +
+        espaco * 1.4;
 
-          definirTextoCorpo();
+      secao(
+        "Colaboradores responsáveis"
+      );
 
-          const nome =
-            `${index + 1}. ${responsavel.user.nome}`;
+      y += padding;
 
-          const linhas =
-            doc.splitTextToSize(
-              nome,
-              larguraUtil
-            ) as string[];
+      const larguraResp =
+        larguraMeia - padding * 2;
 
+      for (
+        let i = 0;
+        i < layout.responsaveisMedidos.length;
+        i += 2
+      ) {
+        const esquerda =
+          layout.responsaveisMedidos[i];
+
+        const direita =
+          layout.responsaveisMedidos[i + 1];
+
+        const alturaLinhaResp =
+          Math.max(
+            esquerda?.length ?? 0,
+            direita?.length ?? 0,
+            1
+          ) *
+            alturaLinha +
+          0.8;
+
+        doc.setFont(
+          "helvetica",
+          "normal"
+        );
+
+        doc.setFontSize(
+          fonteCorpo
+        );
+
+        doc.setTextColor(
+          20,
+          30,
+          45
+        );
+
+        if (esquerda) {
           doc.text(
-            linhas,
-            margem,
-            y
+            esquerda,
+            margemX + padding,
+            y + alturaLinha * 0.72,
+            {
+              maxWidth:
+                larguraResp,
+              lineHeightFactor: 1,
+            }
           );
-
-          y +=
-            linhas.length * 5 + 2;
         }
-      );
 
-      y += 3;
-    }
+        if (direita) {
+          doc.text(
+            direita,
+            margemX +
+              larguraMeia +
+              gapColunas +
+              padding,
+            y + alturaLinha * 0.72,
+            {
+              maxWidth:
+                larguraResp,
+              lineHeightFactor: 1,
+            }
+          );
+        }
 
-    function adicionarAssinaturas(
-      comLogo: boolean
-    ) {
-      tituloSecao(
-        "Assinaturas",
-        comLogo
-      );
+        y += alturaLinhaResp;
+      }
+
+      y +=
+        padding +
+        espaco * 1.4;
+
+      secao("Assinaturas");
 
       const nomes =
-        plano.responsaveis.length >
-        0
+        plano.responsaveis.length > 0
           ? plano.responsaveis.map(
               (item) =>
                 item.user.nome
@@ -653,30 +1101,28 @@ export default function CardPlanoPreventivo({
             ];
 
       const larguraAssinatura =
-        (larguraUtil - 10) / 2;
+        (larguraUtil - gapColunas) / 2;
 
       for (
         let i = 0;
         i < nomes.length;
         i += 2
       ) {
-        novaPaginaSePrecisar(
-          38,
-          comLogo
-        );
-
         const nomesLinha =
           nomes.slice(i, i + 2);
 
         nomesLinha.forEach(
-          (
-            nome,
-            coluna
-          ) => {
+          (nome, coluna) => {
             const x =
-              margem +
+              margemX +
               coluna *
-                (larguraAssinatura + 10);
+                (larguraAssinatura +
+                  gapColunas);
+
+            const yLinha =
+              y +
+              layout.alturaAssinatura *
+                0.52;
 
             doc.setDrawColor(
               90,
@@ -684,13 +1130,13 @@ export default function CardPlanoPreventivo({
               115
             );
 
-            doc.setLineWidth(0.4);
+            doc.setLineWidth(0.35);
 
             doc.line(
               x,
-              y + 18,
+              yLinha,
               x + larguraAssinatura,
-              y + 18
+              yLinha
             );
 
             doc.setFont(
@@ -698,7 +1144,9 @@ export default function CardPlanoPreventivo({
               "bold"
             );
 
-            doc.setFontSize(9);
+            doc.setFontSize(
+              fonteCorpo
+            );
 
             doc.setTextColor(
               20,
@@ -714,10 +1162,13 @@ export default function CardPlanoPreventivo({
 
             doc.text(
               nomeQuebrado,
-              x + larguraAssinatura / 2,
-              y + 24,
+              x +
+                larguraAssinatura / 2,
+              yLinha +
+                alturaLinha * 1.15,
               {
                 align: "center",
+                lineHeightFactor: 1,
               }
             );
 
@@ -726,7 +1177,9 @@ export default function CardPlanoPreventivo({
               "normal"
             );
 
-            doc.setFontSize(8);
+            doc.setFontSize(
+              fonteLabel
+            );
 
             doc.setTextColor(
               95,
@@ -736,8 +1189,11 @@ export default function CardPlanoPreventivo({
 
             doc.text(
               "Assinatura / data",
-              x + larguraAssinatura / 2,
-              y + 32,
+              x +
+                larguraAssinatura / 2,
+              y +
+                layout.alturaAssinatura -
+                1.3,
               {
                 align: "center",
               }
@@ -745,84 +1201,9 @@ export default function CardPlanoPreventivo({
           }
         );
 
-        y += 38;
+        y +=
+          layout.alturaAssinatura;
       }
-    }
-
-    function montarPDF(
-      comLogo: boolean
-    ) {
-      desenharCabecalho(
-        comLogo,
-        false
-      );
-
-      tituloSecao(
-        "Dados do plano",
-        comLogo
-      );
-
-      campo(
-        "Plano",
-        plano.titulo,
-        comLogo
-      );
-
-      campo(
-        "Empresa",
-        plano.empresa?.nome ??
-          "Sequoia",
-        comLogo
-      );
-
-      campo(
-        "Setor",
-        plano.setor.nome,
-        comLogo
-      );
-
-      campo(
-        "Máquina",
-        plano.maquina?.nome ??
-          "Não definida",
-        comLogo
-      );
-
-      campo(
-        "Prioridade",
-        prioridadeLabel(
-          plano.prioridade
-        ),
-        comLogo
-      );
-
-      campo(
-        "Periodicidade",
-        frequenciaLabel(
-          plano.frequencia
-        ),
-        comLogo
-      );
-
-      campo(
-        "Duração estimada",
-        formatarDuracao(
-          plano.duracaoEstimadaMinutos
-        ),
-        comLogo
-      );
-
-      adicionarDescricaoCompleta(
-        comLogo
-      );
-
-      adicionarResponsaveis(
-        comLogo
-      );
-
-      adicionarAssinaturas(
-        comLogo
-      );
 
       const nome =
         limparNomeArquivo(
@@ -835,12 +1216,11 @@ export default function CardPlanoPreventivo({
     }
 
     img.onload = () =>
-      montarPDF(true);
+      desenharPDF(true);
 
     img.onerror = () =>
-      montarPDF(false);
+      desenharPDF(false);
   }
-
   return (
     <article className="flex min-h-[540px] flex-col rounded-3xl border border-cyan-400/20 bg-white/[0.04] p-4 shadow-xl shadow-black/20 transition hover:border-cyan-400/40">
       <div className="mb-3 flex items-start justify-between gap-3">
