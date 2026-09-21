@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   Clock3,
   FileDown,
-  Play,
   Users,
   Wrench,
 } from "lucide-react";
@@ -13,7 +12,6 @@ import {
 import { useRouter } from "next/navigation";
 
 import {
-  useEffect,
   useState,
 } from "react";
 
@@ -129,26 +127,6 @@ function formatarData(
   ).format(new Date(data));
 }
 
-function formatarDataHora(
-  data: string | null
-) {
-  if (!data) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat(
-    "pt-BR",
-    {
-      timeZone:
-        "America/Sao_Paulo",
-
-      dateStyle: "short",
-
-      timeStyle: "short",
-    }
-  ).format(new Date(data));
-}
-
 function formatarDuracao(
   minutos:
     | number
@@ -200,13 +178,6 @@ export default function ExecucaoPreventivaForm({
   );
 
   const [
-    dataInicio,
-    setDataInicio,
-  ] = useState(
-    execucao.dataInicio
-  );
-
-  const [
     processando,
     setProcessando,
   ] = useState(false);
@@ -233,6 +204,34 @@ export default function ExecucaoPreventivaForm({
   ] = useState(
     execucao.observacoes ??
       ""
+  );
+
+  const duracaoInicial =
+    execucao.duracaoRealMinutos ??
+    0;
+
+  const [
+    horasUtilizadas,
+    setHorasUtilizadas,
+  ] = useState(
+    duracaoInicial > 0
+      ? String(
+          Math.floor(
+            duracaoInicial / 60
+          )
+        )
+      : ""
+  );
+
+  const [
+    minutosUtilizados,
+    setMinutosUtilizados,
+  ] = useState(
+    duracaoInicial > 0
+      ? String(
+          duracaoInicial % 60
+        )
+      : ""
   );
 
   const [
@@ -280,123 +279,17 @@ export default function ExecucaoPreventivaForm({
         ""
     );
 
-  const [
-    agora,
-    setAgora,
-  ] = useState(
-    new Date()
-  );
-
-  useEffect(() => {
-    if (
-      status !==
-        "EM_EXECUCAO" ||
-      !dataInicio
-    ) {
-      return;
-    }
-
-    const intervalo =
-      window.setInterval(
-        () => {
-          setAgora(
-            new Date()
-          );
-        },
-        1000
-      );
-
-    return () => {
-      window.clearInterval(
-        intervalo
-      );
-    };
-  }, [
-    status,
-    dataInicio,
-  ]);
-
-  const minutosEmExecucao =
-    dataInicio
-      ? Math.max(
-          0,
-          Math.floor(
-            (agora.getTime() -
-              new Date(
-                dataInicio
-              ).getTime()) /
-              60000
-          )
-        )
-      : 0;
-
   const concluida =
     status ===
     "CONCLUIDA";
 
-  async function iniciar() {
-    try {
-      setProcessando(true);
-
-      const resposta =
-        await fetch(
-          `/api/admin/os/preventivas/execucoes/${execucao.id}`,
-          {
-            method:
-              "PATCH",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                acao:
-                  "INICIAR",
-              }),
-          }
-        );
-
-      const dados =
-        await resposta.json();
-
-      if (
-        !resposta.ok
-      ) {
-        alert(
-          dados?.error ??
-            "Erro ao iniciar preventiva."
-        );
-
-        return;
-      }
-
-      setStatus(
-        "EM_EXECUCAO"
-      );
-
-      setDataInicio(
-        dados.execucao
-          ?.dataInicio ??
-          new Date().toISOString()
-      );
-
-      router.refresh();
-    } catch (error) {
-      console.error(
-        error
-      );
-
-      alert(
-        "Erro ao iniciar preventiva."
-      );
-    } finally {
-      setProcessando(
-        false
-      );
-    }
-  }
+  const podeConcluir =
+    status !==
+      "CONCLUIDA" &&
+    status !==
+      "CANCELADA" &&
+    status !==
+      "NAO_REALIZADA";
 
   async function concluir() {
     if (
@@ -404,6 +297,59 @@ export default function ExecucaoPreventivaForm({
     ) {
       alert(
         "Descreva o serviço executado."
+      );
+
+      return;
+    }
+
+    const horas =
+      Number(
+        horasUtilizadas ||
+          "0"
+      );
+
+    const minutos =
+      Number(
+        minutosUtilizados ||
+          "0"
+      );
+
+    if (
+      !Number.isInteger(
+        horas
+      ) ||
+      horas < 0
+    ) {
+      alert(
+        "Informe uma quantidade válida de horas utilizadas."
+      );
+
+      return;
+    }
+
+    if (
+      !Number.isInteger(
+        minutos
+      ) ||
+      minutos < 0 ||
+      minutos > 59
+    ) {
+      alert(
+        "Os minutos utilizados devem estar entre 0 e 59."
+      );
+
+      return;
+    }
+
+    const duracaoRealMinutos =
+      horas * 60 +
+      minutos;
+
+    if (
+      duracaoRealMinutos <= 0
+    ) {
+      alert(
+        "Informe o tempo real utilizado na preventiva."
       );
 
       return;
@@ -459,6 +405,8 @@ export default function ExecucaoPreventivaForm({
                 pecasUtilizadas,
 
                 observacoes,
+
+                duracaoRealMinutos,
 
                 checkQuantidadePecas,
 
@@ -616,52 +564,17 @@ export default function ExecucaoPreventivaForm({
 
             <h2 className="mt-1 text-2xl font-black">
               {status ===
-              "EM_EXECUCAO"
-                ? "Preventiva em execução"
+              "CONCLUIDA"
+                ? "Preventiva concluída"
                 : status ===
-                    "CONCLUIDA"
-                  ? "Preventiva concluída"
-                  : "Aguardando execução"}
+                    "CANCELADA"
+                  ? "Preventiva cancelada"
+                  : status ===
+                      "NAO_REALIZADA"
+                    ? "Preventiva não realizada"
+                    : "Aguardando execução"}
             </h2>
-
-            {status ===
-              "EM_EXECUCAO" &&
-              dataInicio && (
-                <p className="mt-2 text-sm text-slate-400">
-                  Iniciada em{" "}
-                  {formatarDataHora(
-                    dataInicio
-                  )}{" "}
-                  •{" "}
-                  {formatarDuracao(
-                    minutosEmExecucao
-                  )}{" "}
-                  decorridos
-                </p>
-              )}
           </div>
-
-          {status !==
-            "EM_EXECUCAO" &&
-            status !==
-              "CONCLUIDA" && (
-              <button
-                type="button"
-                onClick={
-                  iniciar
-                }
-                disabled={
-                  processando
-                }
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-6 font-black text-slate-950"
-              >
-                <Play
-                  size={17}
-                />
-
-                Iniciar preventiva
-              </button>
-            )}
 
           {concluida && (
             <button
@@ -770,6 +683,79 @@ export default function ExecucaoPreventivaForm({
               placeholder="Observações adicionais..."
             />
           </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-300">
+              Tempo real utilizado *
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-500">
+                  Horas
+                </label>
+
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  disabled={
+                    concluida
+                  }
+                  value={
+                    horasUtilizadas
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setHorasUtilizadas(
+                      event.target
+                        .value
+                    )
+                  }
+                  className={
+                    inputClass
+                  }
+                  placeholder="0"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-500">
+                  Minutos
+                </label>
+
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  step={1}
+                  disabled={
+                    concluida
+                  }
+                  value={
+                    minutosUtilizados
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setMinutosUtilizados(
+                      event.target
+                        .value
+                    )
+                  }
+                  className={
+                    inputClass
+                  }
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <p className="mt-2 text-xs text-slate-500">
+              Informe o tempo realmente utilizado na execução da preventiva.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -851,8 +837,7 @@ export default function ExecucaoPreventivaForm({
           />
         </div>
 
-        {status ===
-          "EM_EXECUCAO" && (
+        {podeConcluir && (
           <button
             type="button"
             onClick={
@@ -867,7 +852,7 @@ export default function ExecucaoPreventivaForm({
               size={19}
             />
 
-            Concluir preventiva
+            Concluir preventiva / Dar baixa
           </button>
         )}
       </section>
@@ -980,3 +965,6 @@ function Pergunta({
 
 const textareaClass =
   "w-full resize-y rounded-2xl border border-white/10 bg-[#050816] p-4 text-white outline-none focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-70";
+
+const inputClass =
+  "h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-white outline-none focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-70";

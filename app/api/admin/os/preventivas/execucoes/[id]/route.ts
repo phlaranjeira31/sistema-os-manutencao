@@ -84,11 +84,32 @@ export async function PATCH(
 
     /*
      * ==========================================================
-     * INICIAR EXECUÇÃO
+     * INÍCIO AUTOMÁTICO DESATIVADO
      * ==========================================================
+     *
+     * O tempo real da preventiva agora é informado manualmente
+     * no momento da conclusão.
      */
 
     if (acao === "INICIAR") {
+      return NextResponse.json(
+        {
+          error:
+            "O início automático da preventiva foi desativado. Informe o tempo real utilizado e conclua a preventiva diretamente.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * ==========================================================
+     * CONCLUIR EXECUÇÃO
+     * ==========================================================
+     */
+
+    if (acao === "CONCLUIR") {
       if (execucao.status === "CONCLUIDA") {
         return NextResponse.json(
           {
@@ -123,60 +144,6 @@ export async function PATCH(
         );
       }
 
-      if (execucao.status === "EM_EXECUCAO") {
-        return NextResponse.json({
-          success: true,
-          message: "A preventiva já está em execução.",
-        });
-      }
-
-      const atualizada =
-        await prisma.execucaoPreventiva.update({
-          where: {
-            id,
-          },
-          data: {
-            status: "EM_EXECUCAO",
-            dataInicio: execucao.dataInicio ?? new Date(),
-          },
-        });
-
-      return NextResponse.json({
-        success: true,
-        execucao: atualizada,
-      });
-    }
-
-    /*
-     * ==========================================================
-     * CONCLUIR EXECUÇÃO
-     * ==========================================================
-     */
-
-    if (acao === "CONCLUIR") {
-      if (!execucao.dataInicio) {
-        return NextResponse.json(
-          {
-            error:
-              "Inicie a preventiva antes de concluí-la.",
-          },
-          {
-            status: 400,
-          }
-        );
-      }
-
-      if (execucao.status === "CONCLUIDA") {
-        return NextResponse.json(
-          {
-            error: "Esta preventiva já foi concluída.",
-          },
-          {
-            status: 400,
-          }
-        );
-      }
-
       const descricaoExecucao = String(
         body?.descricaoExecucao ?? ""
       ).trim();
@@ -188,6 +155,10 @@ export async function PATCH(
       const observacoes = String(
         body?.observacoes ?? ""
       ).trim();
+
+      const duracaoRealMinutos = Number(
+        body?.duracaoRealMinutos
+      );
 
       const checkQuantidadePecas = String(
         body?.checkQuantidadePecas ?? ""
@@ -221,6 +192,23 @@ export async function PATCH(
         );
       }
 
+      if (
+        !Number.isInteger(
+          duracaoRealMinutos
+        ) ||
+        duracaoRealMinutos <= 0
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Informe o tempo real utilizado na preventiva.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
       const checklist = [
         checkQuantidadePecas,
         checkFerramentasRecolhidas,
@@ -247,15 +235,6 @@ export async function PATCH(
       }
 
       const agora = new Date();
-
-      const duracaoRealMinutos = Math.max(
-        1,
-        Math.round(
-          (agora.getTime() -
-            execucao.dataInicio.getTime()) /
-            60000
-        )
-      );
 
       const atualizada =
         await prisma.execucaoPreventiva.update({

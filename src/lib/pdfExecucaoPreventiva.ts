@@ -1476,28 +1476,6 @@ let y = 0;
   linhaDupla(
     {
       titulo:
-        "Início real",
-
-      valor:
-        formatarDataHora(
-          dados.dataInicio
-        ),
-    },
-
-    {
-      titulo:
-        "Término real",
-
-      valor:
-        formatarDataHora(
-          dados.dataConclusao
-        ),
-    }
-  );
-
-  linhaDupla(
-    {
-      titulo:
         "Duração prevista",
 
       valor:
@@ -1510,7 +1488,7 @@ let y = 0;
 
     {
       titulo:
-        "Duração real",
+        "Tempo utilizado",
 
       valor:
         formatarDuracao(
