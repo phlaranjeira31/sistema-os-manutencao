@@ -1,15 +1,16 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import {
-  Activity,
+  ArrowLeft,
   BrainCircuit,
   CalendarClock,
   ClipboardX,
-  Repeat2,
   Sparkles,
-  TrendingUp,
 } from "lucide-react";
 
+import PainelInteligenciaGeral, {
+  type OrdemInteligenciaGeral,
+  type PreventivaInteligenciaGeral,
+} from "@/components/PainelInteligenciaGeral";
 import PainelReincidenciasInteligentes, {
   type ReincidenciaPainel,
 } from "@/components/PainelReincidenciasInteligentes";
@@ -279,26 +280,17 @@ const COMPONENTES_FALHA: ComponenteFalha[] = [
   {
     id: "ENGRENAGEM",
     label: "Engrenagem",
-    padroes: [
-      /\bengrenagem\b/,
-      /\bengrenagens\b/,
-    ],
+    padroes: [/\bengrenagem\b/, /\bengrenagens\b/],
   },
   {
     id: "ROLAMENTO",
     label: "Rolamento",
-    padroes: [
-      /\brolamento\b/,
-      /\brolamentos\b/,
-    ],
+    padroes: [/\brolamento\b/, /\brolamentos\b/],
   },
   {
     id: "MOTOR",
     label: "Motor",
-    padroes: [
-      /\bmotor\b/,
-      /\bmotores\b/,
-    ],
+    padroes: [/\bmotor\b/, /\bmotores\b/],
   },
   {
     id: "REDUTOR",
@@ -312,106 +304,67 @@ const COMPONENTES_FALHA: ComponenteFalha[] = [
   {
     id: "CORREIA",
     label: "Correia",
-    padroes: [
-      /\bcorreia\b/,
-      /\bcorreias\b/,
-    ],
+    padroes: [/\bcorreia\b/, /\bcorreias\b/],
   },
   {
     id: "CORRENTE",
     label: "Corrente",
-    padroes: [
-      /\bcorrente\b/,
-      /\bcorrentes\b/,
-    ],
+    padroes: [/\bcorrente\b/, /\bcorrentes\b/],
   },
   {
     id: "POLIA",
     label: "Polia",
-    padroes: [
-      /\bpolia\b/,
-      /\bpolias\b/,
-    ],
+    padroes: [/\bpolia\b/, /\bpolias\b/],
   },
   {
     id: "BOMBA",
     label: "Bomba",
-    padroes: [
-      /\bbomba\b/,
-      /\bbombas\b/,
-    ],
+    padroes: [/\bbomba\b/, /\bbombas\b/],
   },
   {
     id: "VALVULA",
     label: "Válvula",
-    padroes: [
-      /\bvalvula\b/,
-      /\bvalvulas\b/,
-    ],
+    padroes: [/\bvalvula\b/, /\bvalvulas\b/],
   },
   {
     id: "MANGUEIRA",
     label: "Mangueira",
-    padroes: [
-      /\bmangueira\b/,
-      /\bmangueiras\b/,
-    ],
+    padroes: [/\bmangueira\b/, /\bmangueiras\b/],
   },
   {
     id: "CILINDRO",
     label: "Cilindro",
-    padroes: [
-      /\bcilindro\b/,
-      /\bcilindros\b/,
-    ],
+    padroes: [/\bcilindro\b/, /\bcilindros\b/],
   },
   {
     id: "PISTAO",
     label: "Pistão",
-    padroes: [
-      /\bpistao\b/,
-      /\bpistoes\b/,
-    ],
+    padroes: [/\bpistao\b/, /\bpistoes\b/],
   },
   {
     id: "SENSOR",
     label: "Sensor",
-    padroes: [
-      /\bsensor\b/,
-      /\bsensores\b/,
-    ],
+    padroes: [/\bsensor\b/, /\bsensores\b/],
   },
   {
     id: "INVERSOR",
     label: "Inversor",
-    padroes: [
-      /\binversor\b/,
-      /\binversores\b/,
-    ],
+    padroes: [/\binversor\b/, /\binversores\b/],
   },
   {
     id: "EIXO",
     label: "Eixo",
-    padroes: [
-      /\beixo\b/,
-      /\beixos\b/,
-    ],
+    padroes: [/\beixo\b/, /\beixos\b/],
   },
   {
     id: "ACOPLAMENTO",
     label: "Acoplamento",
-    padroes: [
-      /\bacoplamento\b/,
-      /\bacoplamentos\b/,
-    ],
+    padroes: [/\bacoplamento\b/, /\bacoplamentos\b/],
   },
   {
     id: "ESTEIRA",
     label: "Esteira",
-    padroes: [
-      /\besteira\b/,
-      /\besteiras\b/,
-    ],
+    padroes: [/\besteira\b/, /\besteiras\b/],
   },
 ];
 
@@ -657,194 +610,126 @@ function montarReincidencias(
   });
 }
 
-function CardResumo({
-  titulo,
-  valor,
-  descricao,
-  icon,
-  destaque = "cyan",
-}: {
-  titulo: string;
-  valor: number;
-  descricao: string;
-  icon: ReactNode;
-  destaque?:
-    | "cyan"
-    | "rose"
-    | "amber"
-    | "violet";
-}) {
-  const estilos = {
-    cyan: {
-      borda: "border-cyan-400/20",
-      fundo: "bg-cyan-400/10",
-      texto: "text-cyan-300",
-    },
-    rose: {
-      borda: "border-rose-400/20",
-      fundo: "bg-rose-400/10",
-      texto: "text-rose-300",
-    },
-    amber: {
-      borda: "border-amber-400/20",
-      fundo: "bg-amber-400/10",
-      texto: "text-amber-300",
-    },
-    violet: {
-      borda: "border-violet-400/20",
-      fundo: "bg-violet-400/10",
-      texto: "text-violet-300",
-    },
-  }[destaque];
-
-  return (
-    <div
-      className={`rounded-3xl border ${estilos.borda} bg-white/[0.04] p-5 shadow-xl shadow-black/20`}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
-            {titulo}
-          </p>
-
-          <p className="mt-3 text-4xl font-black text-white">
-            {valor}
-          </p>
-
-          <p className="mt-1 text-sm text-slate-400">
-            {descricao}
-          </p>
-        </div>
-
-        <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${estilos.fundo} ${estilos.texto}`}
-        >
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default async function InteligenciaManutencaoPage() {
   const agora = new Date();
   const inicioHoje = inicioDoDiaSaoPaulo(agora);
 
-  const [
-    ordensBrutas,
-    execucoesPreventivasAtrasadas,
-  ] = await Promise.all([
-    prisma.ordemServico.findMany({
-      where: {
-        status: {
-          not: "CANCELADA",
-        },
-      },
+  const limitePreventivas = new Date(
+    agora.getTime() - 90 * DIA_MS
+  );
 
-      select: {
-        id: true,
-        numero: true,
-        titulo: true,
-        descricao: true,
-        status: true,
-        prioridade: true,
-        createdAt: true,
-        updatedAt: true,
-        dataPrevista: true,
-        dataConclusao: true,
-        registroFinal: true,
-        setorId: true,
-        maquinaId: true,
-
-        setor: {
-          select: {
-            id: true,
-            nome: true,
+  const [ordensBrutas, preventivasBrutas] =
+    await Promise.all([
+      prisma.ordemServico.findMany({
+        where: {
+          status: {
+            not: "CANCELADA",
           },
         },
 
-        maquina: {
-          select: {
-            id: true,
-            nome: true,
-          },
-        },
+        select: {
+          id: true,
+          numero: true,
+          titulo: true,
+          descricao: true,
+          status: true,
+          prioridade: true,
+          createdAt: true,
+          updatedAt: true,
+          dataPrevista: true,
+          dataConclusao: true,
+          registroFinal: true,
+          setorId: true,
+          maquinaId: true,
 
-        responsaveis: {
-          select: {
-            user: {
-              select: {
-                id: true,
-                nome: true,
+          setor: {
+            select: {
+              id: true,
+              nome: true,
+            },
+          },
+
+          maquina: {
+            select: {
+              id: true,
+              nome: true,
+            },
+          },
+
+          responsaveis: {
+            select: {
+              user: {
+                select: {
+                  id: true,
+                  nome: true,
+                },
               },
             },
           },
         },
-      },
 
-      orderBy: {
-        createdAt: "desc",
-      },
-    }),
-
-    prisma.execucaoPreventiva.findMany({
-      where: {
-        dataProgramada: {
-          lt: inicioHoje,
+        orderBy: {
+          createdAt: "desc",
         },
+      }),
 
-        status: {
-          in: [
-            "PROGRAMADA",
-            "PENDENTE",
-            "EM_EXECUCAO",
+      prisma.execucaoPreventiva.findMany({
+        where: {
+          OR: [
+            {
+              dataProgramada: {
+                gte: limitePreventivas,
+              },
+            },
+            {
+              dataProgramada: {
+                lt: inicioHoje,
+              },
+              status: {
+                in: [
+                  "PROGRAMADA",
+                  "PENDENTE",
+                  "EM_EXECUCAO",
+                ],
+              },
+            },
           ],
         },
-      },
 
-      select: {
-        id: true,
-        dataProgramada: true,
-        status: true,
+        select: {
+          id: true,
+          dataProgramada: true,
+          dataConclusao: true,
+          status: true,
 
-        plano: {
-          select: {
-            id: true,
-            titulo: true,
-            prioridade: true,
+          plano: {
+            select: {
+              id: true,
+              titulo: true,
+              prioridade: true,
 
-            setor: {
-              select: {
-                nome: true,
+              setor: {
+                select: {
+                  nome: true,
+                },
               },
-            },
 
-            maquina: {
-              select: {
-                nome: true,
-              },
-            },
-          },
-        },
-
-        responsaveis: {
-          select: {
-            user: {
-              select: {
-                nome: true,
+              maquina: {
+                select: {
+                  nome: true,
+                },
               },
             },
           },
         },
-      },
 
-      orderBy: {
-        dataProgramada: "asc",
-      },
+        orderBy: {
+          dataProgramada: "desc",
+        },
 
-      take: 50,
-    }),
-  ]);
+        take: 500,
+      }),
+    ]);
 
   const ordens =
     ordensBrutas as OrdemInteligencia[];
@@ -853,24 +738,6 @@ export default async function InteligenciaManutencaoPage() {
     ordens,
     agora
   );
-
-  const semRelatorio = ordens
-    .filter(
-      (os) =>
-        os.status === "CONCLUIDA" &&
-        !os.registroFinal?.trim()
-    )
-    .sort((a, b) => {
-      const dataA =
-        a.dataConclusao?.getTime() ??
-        a.updatedAt.getTime();
-
-      const dataB =
-        b.dataConclusao?.getTime() ??
-        b.updatedAt.getTime();
-
-      return dataB - dataA;
-    });
 
   const reincidenciasPainel: ReincidenciaPainel[] =
     reincidencias.map((item) => ({
@@ -900,11 +767,77 @@ export default async function InteligenciaManutencaoPage() {
       ),
     }));
 
-  const totalOcorrenciasReincidentes =
-    reincidencias.reduce(
-      (total, item) => total + item.total,
-      0
-    );
+  const ordensPainel: OrdemInteligenciaGeral[] =
+    ordens.map((os) => ({
+      id: os.id,
+      numero: os.numero,
+      titulo: os.titulo,
+      status: os.status,
+      prioridade: os.prioridade,
+      createdAt: os.createdAt.toISOString(),
+      dataConclusao:
+        os.dataConclusao?.toISOString() ?? null,
+      dataPrevista:
+        os.dataPrevista?.toISOString() ?? null,
+      setorNome: os.setor.nome,
+      maquinaNome: os.maquina?.nome ?? null,
+      temRelatorio: Boolean(
+        os.registroFinal?.trim()
+      ),
+      responsaveisCount:
+        os.responsaveis.length,
+    }));
+
+  const preventivasPainel: PreventivaInteligenciaGeral[] =
+    preventivasBrutas.map((execucao) => ({
+      id: execucao.id,
+      titulo: execucao.plano.titulo,
+      status: execucao.status,
+      dataProgramada:
+        execucao.dataProgramada.toISOString(),
+      dataConclusao:
+        execucao.dataConclusao?.toISOString() ??
+        null,
+      setorNome: execucao.plano.setor.nome,
+      maquinaNome:
+        execucao.plano.maquina?.nome ?? null,
+    }));
+
+  const semRelatorio = ordens
+    .filter(
+      (os) =>
+        os.status === "CONCLUIDA" &&
+        !os.registroFinal?.trim()
+    )
+    .sort((a, b) => {
+      const dataA =
+        a.dataConclusao?.getTime() ??
+        a.updatedAt.getTime();
+
+      const dataB =
+        b.dataConclusao?.getTime() ??
+        b.updatedAt.getTime();
+
+      return dataB - dataA;
+    });
+
+  const preventivasAtrasadas =
+    preventivasBrutas
+      .filter(
+        (execucao) =>
+          execucao.dataProgramada.getTime() <
+            inicioHoje.getTime() &&
+          (
+            execucao.status === "PROGRAMADA" ||
+            execucao.status === "PENDENTE" ||
+            execucao.status === "EM_EXECUCAO"
+          )
+      )
+      .sort(
+        (a, b) =>
+          a.dataProgramada.getTime() -
+          b.dataProgramada.getTime()
+      );
 
   const reincidenciasAltas =
     reincidencias.filter(
@@ -924,7 +857,7 @@ export default async function InteligenciaManutencaoPage() {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-300">
-                    Inteligência operacional
+                    Inteligência do sistema
                   </p>
 
                   <span className="inline-flex items-center gap-1 rounded-full border border-violet-400/20 bg-violet-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-violet-300">
@@ -937,81 +870,36 @@ export default async function InteligenciaManutencaoPage() {
                   Central de Inteligência da Manutenção
                 </h1>
 
-                <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400 sm:text-base">
-                  Identifique falhas reincidentes, padrões de
-                  manutenção e pendências importantes usando os
-                  dados reais das ordens de serviço e preventivas.
+                <p className="mt-2 max-w-4xl text-sm leading-relaxed text-slate-400 sm:text-base">
+                  Uma leitura geral da operação: entrada e
+                  conclusão de OS, envelhecimento do backlog,
+                  prioridades, documentação, preventivas e
+                  reincidências de falha.
                 </p>
               </div>
             </div>
 
-            <div className="grid min-w-[290px] grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-violet-400/15 bg-violet-400/[0.06] px-4 py-3">
-                <p className="text-[10px] font-black uppercase tracking-wider text-violet-300">
-                  Janela de reincidência
-                </p>
-
-                <p className="mt-1 text-2xl font-black">
-                  60 dias
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.06] px-4 py-3">
-                <p className="text-[10px] font-black uppercase tracking-wider text-cyan-300">
-                  Padrões encontrados
-                </p>
-
-                <p className="mt-1 text-2xl font-black">
-                  {reincidencias.length}
-                </p>
-              </div>
-            </div>
+            <Link
+              href="/admin"
+              className="inline-flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-5 text-sm font-black text-slate-950 shadow-lg transition hover:bg-cyan-50 sm:w-fit"
+            >
+              <ArrowLeft size={17} />
+              Voltar
+            </Link>
           </div>
         </header>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <CardResumo
-            titulo="Padrões reincidentes"
-            valor={reincidencias.length}
-            descricao="Falhas repetidas detectadas"
-            icon={<Repeat2 size={22} />}
-            destaque="violet"
-          />
-
-          <CardResumo
-            titulo="OS relacionadas"
-            valor={totalOcorrenciasReincidentes}
-            descricao="Ocorrências dentro dos padrões"
-            icon={<TrendingUp size={22} />}
-            destaque="cyan"
-          />
-
-          <CardResumo
-            titulo="Alta reincidência"
-            valor={reincidenciasAltas}
-            descricao="Padrões que merecem investigação"
-            icon={<Activity size={22} />}
-            destaque="rose"
-          />
-
-          <CardResumo
-            titulo="Sem relatório"
-            valor={semRelatorio.length}
-            descricao="OS concluídas sem documentação"
-            icon={<ClipboardX size={22} />}
-            destaque="amber"
-          />
-
-          <CardResumo
-            titulo="Preventivas atrasadas"
-            valor={
-              execucoesPreventivasAtrasadas.length
-            }
-            descricao="Execuções fora da programação"
-            icon={<CalendarClock size={22} />}
-            destaque="rose"
-          />
-        </section>
+        <PainelInteligenciaGeral
+          ordens={ordensPainel}
+          preventivas={preventivasPainel}
+          reincidenciasTotal={
+            reincidencias.length
+          }
+          reincidenciasAltas={
+            reincidenciasAltas
+          }
+          agoraISO={agora.toISOString()}
+        />
 
         <PainelReincidenciasInteligentes
           reincidencias={reincidenciasPainel}
@@ -1104,20 +992,17 @@ export default async function InteligenciaManutencaoPage() {
               </div>
 
               <p className="text-2xl font-black text-rose-300">
-                {
-                  execucoesPreventivasAtrasadas.length
-                }
+                {preventivasAtrasadas.length}
               </p>
             </div>
 
-            {execucoesPreventivasAtrasadas.length ===
-            0 ? (
+            {preventivasAtrasadas.length === 0 ? (
               <div className="px-6 py-12 text-center text-sm text-slate-500">
                 Nenhuma execução preventiva está atrasada.
               </div>
             ) : (
               <div className="divide-y divide-white/10">
-                {execucoesPreventivasAtrasadas
+                {preventivasAtrasadas
                   .slice(0, 8)
                   .map((execucao) => {
                     const atrasoDias = diasDesde(
@@ -1148,10 +1033,7 @@ export default async function InteligenciaManutencaoPage() {
                           </div>
 
                           <p className="mt-1 text-xs text-slate-500">
-                            {
-                              execucao.plano.setor
-                                .nome
-                            }
+                            {execucao.plano.setor.nome}
                             {" • "}
                             {execucao.plano.maquina
                               ?.nome ?? "Sem máquina"}
@@ -1185,24 +1067,22 @@ export default async function InteligenciaManutencaoPage() {
 
             <div>
               <h2 className="font-black">
-                Como a reincidência é reconhecida
+                O que esta central considera
               </h2>
 
-              <p className="mt-2 max-w-5xl text-sm leading-relaxed text-slate-400">
-                OS canceladas são ignoradas. Para considerar
-                uma falha reincidente, a análise exige a mesma
-                máquina, um padrão de defeito reconhecido e uma
-                repetição relevante dentro de uma janela de até
-                60 dias. Quando um componente é identificado,
-                ele também entra na comparação. Duas ocorrências
-                só são destacadas quando acontecem em até 14
-                dias; com três ou mais ocorrências, o padrão já
-                é considerado relevante.
+              <p className="mt-2 max-w-6xl text-sm leading-relaxed text-slate-400">
+                OS canceladas não entram nas análises.
+                A leitura geral considera fluxo de abertura e
+                conclusão, idade das OS abertas, prioridades,
+                atribuições, cobertura dos relatórios,
+                cumprimento das preventivas e padrões de
+                reincidência. A reincidência exige mesma
+                máquina, padrão de falha compatível e repetição
+                relevante dentro de até 60 dias.
               </p>
 
               <p className="mt-3 text-xs font-semibold text-slate-500">
-                Atualizado em{" "}
-                {formatarDataHora(agora)}.
+                Atualizado em {formatarDataHora(agora)}.
               </p>
             </div>
           </div>
