@@ -11,9 +11,16 @@ export default async function DashboardRelatoriosPage() {
     await Promise.all([
       prisma.ordemServico.findMany({
         where: {
-          registroFinal: {
-            not: null,
-          },
+          OR: [
+            {
+              registroFinal: {
+                not: null,
+              },
+            },
+            {
+              status: "CONCLUIDA",
+            },
+          ],
         },
 
         select: {
@@ -106,24 +113,35 @@ export default async function DashboardRelatoriosPage() {
     ]);
 
   const relatorios = relatoriosEncontrados
-    .filter((relatorio) => relatorio.registroFinal?.trim())
-    .map((relatorio) => ({
-      id: relatorio.id,
-      numero: relatorio.numero,
-      titulo: relatorio.titulo,
-      status: relatorio.status,
-      prioridade: relatorio.prioridade,
-      registroFinal: relatorio.registroFinal ?? "",
-      updatedAt: relatorio.updatedAt.toISOString(),
-      dataConclusao: relatorio.dataConclusao?.toISOString() ?? null,
-      setor: relatorio.setor,
-      maquina: relatorio.maquina,
+    .filter(
+      (relatorio) =>
+        relatorio.status === "CONCLUIDA" ||
+        Boolean(relatorio.registroFinal?.trim())
+    )
+    .map((relatorio) => {
+      const temRelatorio = Boolean(
+        relatorio.registroFinal?.trim()
+      );
 
-      responsaveis: relatorio.responsaveis.map((responsavel) => ({
-        id: responsavel.user.id,
-        nome: responsavel.user.nome,
-      })),
-    }));
+      return {
+        id: relatorio.id,
+        numero: relatorio.numero,
+        titulo: relatorio.titulo,
+        status: relatorio.status,
+        prioridade: relatorio.prioridade,
+        registroFinal: relatorio.registroFinal ?? "",
+        temRelatorio,
+        updatedAt: relatorio.updatedAt.toISOString(),
+        dataConclusao: relatorio.dataConclusao?.toISOString() ?? null,
+        setor: relatorio.setor,
+        maquina: relatorio.maquina,
+
+        responsaveis: relatorio.responsaveis.map((responsavel) => ({
+          id: responsavel.user.id,
+          nome: responsavel.user.nome,
+        })),
+      };
+    });
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#050816] px-3 py-6 text-white sm:px-4 md:px-10">

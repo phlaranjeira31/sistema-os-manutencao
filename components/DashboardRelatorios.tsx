@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import type { FormEvent, ReactNode } from "react";
 import { useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
   BarChart3,
   Building2,
   CalendarDays,
@@ -56,6 +58,7 @@ type Relatorio = {
   status: string;
   prioridade: string;
   registroFinal: string;
+  temRelatorio: boolean;
   updatedAt: string;
   dataConclusao: string | null;
   setor: Setor | null;
@@ -215,7 +218,12 @@ export default function DashboardRelatorios({
       .toLocaleLowerCase("pt-BR");
 
     return relatorios.filter((relatorio) => {
-      const dataRelatorio = new Date(relatorio.updatedAt);
+      const dataBase =
+        relatorio.temRelatorio
+          ? relatorio.updatedAt
+          : relatorio.dataConclusao ?? relatorio.updatedAt;
+
+      const dataRelatorio = new Date(dataBase);
 
       if (inicio && dataRelatorio < inicio) return false;
       if (fim && dataRelatorio > fim) return false;
@@ -249,6 +257,9 @@ export default function DashboardRelatorios({
           String(relatorio.numero),
           relatorio.titulo,
           relatorio.registroFinal,
+          relatorio.temRelatorio
+            ? "com relatório"
+            : "sem relatório relatório pendente",
           relatorio.setor?.nome ?? "",
           relatorio.maquina?.nome ?? "",
           relatorio.responsaveis
@@ -265,6 +276,24 @@ export default function DashboardRelatorios({
     });
   }, [filtrosAplicados, relatorios]);
 
+  const relatoriosComDocumentoFiltrados = useMemo(
+    () =>
+      relatoriosFiltrados.filter(
+        (relatorio) => relatorio.temRelatorio
+      ),
+    [relatoriosFiltrados]
+  );
+
+  const semRelatorioFiltrados = useMemo(
+    () =>
+      relatoriosFiltrados.filter(
+        (relatorio) =>
+          !relatorio.temRelatorio &&
+          relatorio.status === "CONCLUIDA"
+      ),
+    [relatoriosFiltrados]
+  );
+
   const dadosColaboradores = useMemo(() => {
     const mapa = new Map<
       string,
@@ -274,7 +303,7 @@ export default function DashboardRelatorios({
       }
     >();
 
-    relatoriosFiltrados.forEach((relatorio) => {
+    relatoriosComDocumentoFiltrados.forEach((relatorio) => {
       if (relatorio.responsaveis.length === 0) {
         const atual = mapa.get("sem-responsavel") ?? {
           colaborador: "Sem responsável",
@@ -300,7 +329,7 @@ export default function DashboardRelatorios({
     return Array.from(mapa.values()).sort(
       (a, b) => b.relatorios - a.relatorios
     );
-  }, [relatoriosFiltrados]);
+  }, [relatoriosComDocumentoFiltrados]);
 
   const dadosSetores = useMemo(() => {
     const mapa = new Map<
@@ -311,7 +340,7 @@ export default function DashboardRelatorios({
       }
     >();
 
-    relatoriosFiltrados.forEach((relatorio) => {
+    relatoriosComDocumentoFiltrados.forEach((relatorio) => {
       const id = relatorio.setor?.id ?? "sem-setor";
       const nome = relatorio.setor?.nome ?? "Sem setor";
 
@@ -327,7 +356,7 @@ export default function DashboardRelatorios({
     return Array.from(mapa.values()).sort(
       (a, b) => b.relatorios - a.relatorios
     );
-  }, [relatoriosFiltrados]);
+  }, [relatoriosComDocumentoFiltrados]);
 
   const dadosMaquinas = useMemo(() => {
     const mapa = new Map<
@@ -338,7 +367,7 @@ export default function DashboardRelatorios({
       }
     >();
 
-    relatoriosFiltrados.forEach((relatorio) => {
+    relatoriosComDocumentoFiltrados.forEach((relatorio) => {
       if (!relatorio.maquina) return;
 
       const atual = mapa.get(relatorio.maquina.id) ?? {
@@ -353,7 +382,7 @@ export default function DashboardRelatorios({
     return Array.from(mapa.values())
       .sort((a, b) => b.relatorios - a.relatorios)
       .slice(0, 12);
-  }, [relatoriosFiltrados]);
+  }, [relatoriosComDocumentoFiltrados]);
 
   const dadosEvolucao = useMemo(() => {
     const mapa = new Map<
@@ -364,7 +393,7 @@ export default function DashboardRelatorios({
       }
     >();
 
-    relatoriosFiltrados.forEach((relatorio) => {
+    relatoriosComDocumentoFiltrados.forEach((relatorio) => {
       const chave = chaveMes(relatorio.updatedAt);
 
       const atual = mapa.get(chave) ?? {
@@ -382,32 +411,32 @@ export default function DashboardRelatorios({
         mes: formatarMes(item.chave),
         quantidade: item.quantidade,
       }));
-  }, [relatoriosFiltrados]);
+  }, [relatoriosComDocumentoFiltrados]);
 
   const dadosStatus = useMemo(() => {
     return Object.keys(STATUS_LABELS).map((status) => ({
       nome: STATUS_LABELS[status],
-      quantidade: relatoriosFiltrados.filter(
+      quantidade: relatoriosComDocumentoFiltrados.filter(
         (relatorio) => relatorio.status === status
       ).length,
       cor: CORES_STATUS[status],
     }));
-  }, [relatoriosFiltrados]);
+  }, [relatoriosComDocumentoFiltrados]);
 
   const dadosPrioridades = useMemo(() => {
     return Object.keys(PRIORIDADE_LABELS).map((prioridade) => ({
       nome: PRIORIDADE_LABELS[prioridade],
-      quantidade: relatoriosFiltrados.filter(
+      quantidade: relatoriosComDocumentoFiltrados.filter(
         (relatorio) => relatorio.prioridade === prioridade
       ).length,
       cor: CORES_PRIORIDADE[prioridade],
     }));
-  }, [relatoriosFiltrados]);
+  }, [relatoriosComDocumentoFiltrados]);
 
   const metricas = useMemo(() => {
     const dataReferencia = new Date(geradoEm);
 
-    const totalMesAtual = relatoriosFiltrados.filter((relatorio) => {
+    const totalMesAtual = relatoriosComDocumentoFiltrados.filter((relatorio) => {
       const data = new Date(relatorio.updatedAt);
 
       return (
@@ -417,31 +446,36 @@ export default function DashboardRelatorios({
     }).length;
 
     const colaboradoresUnicos = new Set(
-      relatoriosFiltrados.flatMap((relatorio) =>
+      relatoriosComDocumentoFiltrados.flatMap((relatorio) =>
         relatorio.responsaveis.map((responsavel) => responsavel.id)
       )
     ).size;
 
     const setoresUnicos = new Set(
-      relatoriosFiltrados
+      relatoriosComDocumentoFiltrados
         .map((relatorio) => relatorio.setor?.id)
         .filter(Boolean)
     ).size;
 
     const maquinasUnicas = new Set(
-      relatoriosFiltrados
+      relatoriosComDocumentoFiltrados
         .map((relatorio) => relatorio.maquina?.id)
         .filter(Boolean)
     ).size;
 
     return {
-      total: relatoriosFiltrados.length,
+      total: relatoriosComDocumentoFiltrados.length,
       totalMesAtual,
       colaboradoresUnicos,
       setoresUnicos,
       maquinasUnicas,
+      semRelatorio: semRelatorioFiltrados.length,
     };
-  }, [geradoEm, relatoriosFiltrados]);
+  }, [
+    geradoEm,
+    relatoriosComDocumentoFiltrados,
+    semRelatorioFiltrados,
+  ]);
 
   const resumoFiltros = useMemo(() => {
     const colaborador =
@@ -650,8 +684,16 @@ export default function DashboardRelatorios({
         Prioridade:
           PRIORIDADE_LABELS[relatorio.prioridade] ??
           relatorio.prioridade,
-        "Data do relatório": formatarData(relatorio.updatedAt),
-        Relatório: relatorio.registroFinal,
+        "Situação do relatório": relatorio.temRelatorio
+          ? "Preenchido"
+          : "Pendente",
+        "Data de conclusão": formatarData(relatorio.dataConclusao),
+        "Data do relatório": relatorio.temRelatorio
+          ? formatarData(relatorio.updatedAt)
+          : "-",
+        Relatório: relatorio.temRelatorio
+          ? relatorio.registroFinal
+          : "RELATÓRIO PENDENTE",
       }));
 
       const resumo = [
@@ -662,6 +704,10 @@ export default function DashboardRelatorios({
         {
           Indicador: "Relatórios no mês atual",
           Valor: metricas.totalMesAtual,
+        },
+        {
+          Indicador: "OS concluídas sem relatório",
+          Valor: metricas.semRelatorio,
         },
         {
           Indicador: "Colaboradores envolvidos",
@@ -990,6 +1036,13 @@ export default function DashboardRelatorios({
           />
 
           <CardMetrica
+            titulo="Sem relatório"
+            valor={metricas.semRelatorio}
+            descricao="OS concluídas sem documentação"
+            icon={<AlertTriangle size={23} />}
+          />
+
+          <CardMetrica
             titulo="Colaboradores"
             valor={metricas.colaboradoresUnicos}
             descricao="Profissionais envolvidos"
@@ -1024,7 +1077,90 @@ export default function DashboardRelatorios({
           />
         </section>
 
-        {relatoriosFiltrados.length === 0 ? (
+        {semRelatorioFiltrados.length > 0 && (
+          <section className="overflow-hidden rounded-3xl border border-amber-400/25 bg-amber-400/[0.06] shadow-2xl shadow-black/25">
+            <div className="flex flex-col gap-4 border-b border-amber-400/15 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-300">
+                  <AlertTriangle size={21} />
+                </div>
+
+                <div>
+                  <h2 className="text-xl font-black text-white">
+                    OS concluídas sem relatório
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-400">
+                    Estas ordens já foram concluídas, mas ainda precisam do
+                    relatório de manutenção.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-amber-400/25 bg-[#050816] px-4 py-3 text-center">
+                <p className="text-2xl font-black text-amber-300">
+                  {semRelatorioFiltrados.length}
+                </p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  pendente(s)
+                </p>
+              </div>
+            </div>
+
+            <div className="divide-y divide-white/10">
+              {semRelatorioFiltrados.map((relatorio) => (
+                <div
+                  key={relatorio.id}
+                  className="grid gap-4 p-5 lg:grid-cols-[120px_minmax(0,1fr)_180px] lg:items-center sm:p-6"
+                >
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Ordem de serviço
+                    </p>
+                    <p className="mt-1 text-lg font-black text-amber-300">
+                      #{relatorio.numero}
+                    </p>
+                  </div>
+
+                  <div className="min-w-0">
+                    <h3 className="break-words font-black text-white">
+                      {relatorio.titulo}
+                    </h3>
+
+                    <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-400">
+                      <span>
+                        Setor: {relatorio.setor?.nome ?? "-"}
+                      </span>
+                      <span>
+                        Máquina: {relatorio.maquina?.nome ?? "-"}
+                      </span>
+                      <span>
+                        Concluída em:{" "}
+                        {formatarData(relatorio.dataConclusao)}
+                      </span>
+                    </div>
+
+                    <p className="mt-2 text-sm text-slate-400">
+                      Responsáveis:{" "}
+                      {relatorio.responsaveis
+                        .map((responsavel) => responsavel.nome)
+                        .join(", ") || "-"}
+                    </p>
+                  </div>
+
+                  <Link
+                    href={`/admin/relatorios/${relatorio.id}`}
+                    className="inline-flex h-12 items-center justify-center rounded-2xl bg-amber-300 px-5 text-sm font-black text-slate-950 transition hover:bg-amber-200"
+                  >
+                    Preencher relatório
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {relatoriosComDocumentoFiltrados.length === 0 ? (
           <section className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] px-6 py-20 text-center">
             <BarChart3
               size={44}
@@ -1032,7 +1168,7 @@ export default function DashboardRelatorios({
             />
 
             <h2 className="mt-4 text-xl font-black">
-              Nenhum relatório encontrado
+              Nenhum relatório preenchido encontrado
             </h2>
 
             <p className="mt-2 text-sm text-slate-400">
@@ -1364,7 +1500,9 @@ export default function DashboardRelatorios({
           </h2>
 
           <p className="mt-1 text-sm text-slate-400">
-            {relatoriosFiltrados.length} relatório(s) encontrado(s).
+            {relatoriosComDocumentoFiltrados.length} relatório(s) preenchido(s)
+            {" • "}
+            {semRelatorioFiltrados.length} OS concluída(s) sem relatório.
           </p>
         </div>
 
@@ -1431,13 +1569,32 @@ export default function DashboardRelatorios({
                   </td>
 
                   <td className="px-4 py-4 text-sm text-slate-300">
-                    {formatarData(relatorio.updatedAt)}
+                    {formatarData(
+                      relatorio.temRelatorio
+                        ? relatorio.updatedAt
+                        : relatorio.dataConclusao
+                    )}
                   </td>
 
                   <td className="max-w-[360px] px-4 py-4 text-sm leading-relaxed text-slate-300">
-                    <p className="line-clamp-3 whitespace-pre-line">
-                      {relatorio.registroFinal}
-                    </p>
+                    {relatorio.temRelatorio ? (
+                      <p className="line-clamp-3 whitespace-pre-line">
+                        {relatorio.registroFinal}
+                      </p>
+                    ) : (
+                      <div className="flex flex-col items-start gap-2">
+                        <span className="inline-flex rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-black text-amber-300">
+                          Relatório pendente
+                        </span>
+
+                        <Link
+                          href={`/admin/relatorios/${relatorio.id}`}
+                          className="text-xs font-black text-cyan-300 transition hover:text-cyan-200"
+                        >
+                          Preencher relatório
+                        </Link>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -1448,7 +1605,7 @@ export default function DashboardRelatorios({
                     colSpan={7}
                     className="px-6 py-12 text-center text-sm text-slate-500"
                   >
-                    Nenhum relatório encontrado.
+                    Nenhuma OS encontrada.
                   </td>
                 </tr>
               )}
