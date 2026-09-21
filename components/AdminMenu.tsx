@@ -3,9 +3,9 @@
 import {
   Activity,
   BarChart3,
+  BrainCircuit,
   Building2,
   CalendarClock,
-  CalendarDays,
   ClipboardList,
   FileDown,
   LayoutDashboard,
@@ -91,10 +91,10 @@ export default function AdminMenu() {
           />
 
           <MenuItem
-            icon={<CalendarDays size={19} />}
-            label="Agenda da Manutenção"
-            href="/admin/os/agenda"
-            active={pathname === "/admin/os/agenda"}
+            icon={<BrainCircuit size={19} />}
+            label="Inteligência"
+            href="/admin/inteligencia"
+            active={pathname.startsWith("/admin/inteligencia")}
           />
 
           <MenuItem
