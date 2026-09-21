@@ -46,7 +46,7 @@ export default async function AdminPage() {
    * Atualmente são considerados serviços externos:
    *
    * - EMPREITEIRA
-   * - Zeze serralheiro
+   * - Zeze Serralheiro
    *
    * Uma OS atribuída a qualquer um desses usuários será
    * contabilizada como serviço externo no indicador de eficiência.
@@ -194,11 +194,15 @@ export default async function AdminPage() {
     }),
 
     /*
-     * Total de OS consideradas serviços externos.
+     * Total de OS consideradas serviços externos na eficiência.
+     * OS canceladas não entram no cálculo.
      */
     prisma.ordemServico.count({
       where: {
         empresaId: empresaSequoiaId,
+        status: {
+          not: "CANCELADA",
+        },
 
         responsaveis: {
           some: {
@@ -229,9 +233,14 @@ export default async function AdminPage() {
     }),
   ]);
 
+  const totalOSConsideradas =
+    totalOS - canceladas;
+
   const eficienciaPercentual =
-    totalOS > 0
-      ? Math.round((concluidas / totalOS) * 100)
+    totalOSConsideradas > 0
+      ? Math.round(
+          (concluidas / totalOSConsideradas) * 100
+        )
       : 0;
 
   /*
@@ -241,7 +250,7 @@ export default async function AdminPage() {
    */
 
   const totalInternas =
-    totalOS - totalExternas;
+    totalOSConsideradas - totalExternas;
 
   const concluidasInternas =
     concluidas - concluidasExternas;
@@ -416,7 +425,7 @@ export default async function AdminPage() {
                     </p>
 
                     <p className="mt-1 text-xs text-slate-400">
-                      {concluidas}/{totalOS} ordens concluídas
+                      {concluidas}/{totalOSConsideradas} ordens concluídas
                     </p>
                   </div>
 
