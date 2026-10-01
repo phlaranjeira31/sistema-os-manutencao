@@ -3,12 +3,12 @@
 import {
   Activity,
   BarChart3,
-  BrainCircuit,
   Building2,
   CalendarClock,
   ClipboardList,
   FileDown,
   LayoutDashboard,
+  Map as MapIcon,
   Pencil,
   Plus,
   Users,
@@ -91,10 +91,10 @@ export default function AdminMenu() {
           />
 
           <MenuItem
-            icon={<BrainCircuit size={19} />}
-            label="Inteligência"
-            href="/admin/inteligencia"
-            active={pathname.startsWith("/admin/inteligencia")}
+            icon={<MapIcon size={19} />}
+            label="Mapa da Fábrica"
+            href="/admin/mapa-fabrica"
+            active={pathname.startsWith("/admin/mapa-fabrica")}
           />
 
           <MenuItem
