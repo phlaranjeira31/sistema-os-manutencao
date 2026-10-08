@@ -542,17 +542,49 @@ export default async function OrdensServicoPage({
 
         ativo: true,
 
-        perfil: "COLABORADOR",
+        OR: [
 
-        setor: {
+          {
 
-          is: {
-
-            tipo: "MANUTENCAO",
+            perfil: "COLABORADOR",
 
           },
 
-        },
+          {
+
+            setor: {
+
+              is: {
+
+                tipo: "MANUTENCAO",
+
+              },
+
+            },
+
+          },
+
+          {
+
+            setor: {
+
+              is: {
+
+                nome: {
+
+                  contains: "manuten",
+
+                  mode: "insensitive",
+
+                },
+
+              },
+
+            },
+
+          },
+
+        ],
 
       },
 
