@@ -13,6 +13,7 @@ import { prisma } from "@/src/lib/prisma";
 import CardPreventiva from "@/components/CardPreventiva";
 import CardPlanoPreventivo from "@/components/CardPlanoPreventivo";
 import DashboardPreventivas from "@/components/DashboardPreventivas";
+import ExportarPlanoPreventivo from "./ExportarPlanoPreventivo";
 
 export const dynamic =
   "force-dynamic";
@@ -148,6 +149,7 @@ export default async function ListaPreventivasPage({
     proximas7,
     atrasadas,
     concluidasMes,
+    setoresExportacao,
   ] = await Promise.all([
     prisma.planoPreventivo.findMany({
       include: {
@@ -371,6 +373,42 @@ export default async function ListaPreventivasPage({
           "CONCLUIDA",
       },
     }),
+
+    prisma.setor.findMany({
+      where: {
+        ativo: true,
+
+        maquinas: {
+          some: {
+            ativo: true,
+          },
+        },
+      },
+
+      orderBy: {
+        nome: "asc",
+      },
+
+      select: {
+        id: true,
+        nome: true,
+
+        maquinas: {
+          where: {
+            ativo: true,
+          },
+
+          orderBy: {
+            nome: "asc",
+          },
+
+          select: {
+            id: true,
+            nome: true,
+          },
+        },
+      },
+    }),
   ]);
 
   const minutosPrevistosMes =
@@ -516,6 +554,12 @@ export default async function ListaPreventivasPage({
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
+            <ExportarPlanoPreventivo
+              mesAtual={mesAtual}
+              hoje={hojeTexto}
+              setores={setoresExportacao}
+            />
+
             <Link
               href="/admin/os/preventivas"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-5 text-sm font-black text-cyan-300 transition hover:bg-cyan-400 hover:text-slate-950"
