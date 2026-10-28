@@ -9,6 +9,7 @@ import {
   Clock3,
   Repeat2,
   TriangleAlert,
+  Trash2,
   Users,
   Wrench,
 } from "lucide-react";
@@ -956,6 +957,9 @@ function ExecucaoCard({
   const [salvando, setSalvando] =
     useState(false);
 
+  const [removendo, setRemovendo] =
+    useState(false);
+
   const info =
     statusInfo(
       execucao.status,
@@ -982,6 +986,60 @@ function ExecucaoCard({
   const podeReagendar =
     execucao.status === "PROGRAMADA" ||
     execucao.status === "PENDENTE";
+
+  const podeRemoverOcorrencia =
+    execucao.status === "PROGRAMADA" ||
+    execucao.status === "PENDENTE";
+
+  async function removerOcorrencia() {
+    const dataAtual =
+      execucao.dataProgramada.slice(
+        0,
+        10
+      );
+
+    const confirmou =
+      window.confirm(
+        `Apagar esta preventiva programada do dia ${formatarData(
+          dataAtual
+        )}?\n\nSomente esta ocorrência será retirada do calendário. O plano preventivo, a recorrência e as próximas datas continuarão normalmente.`
+      );
+
+    if (!confirmou) {
+      return;
+    }
+
+    try {
+      setRemovendo(true);
+
+      const resposta = await fetch(
+        `/api/admin/os/preventivas/execucoes/${execucao.id}/cancelar`,
+        {
+          method: "PATCH",
+        }
+      );
+
+      const dados =
+        await resposta.json();
+
+      if (!resposta.ok) {
+        throw new Error(
+          dados?.error ||
+            "Não foi possível apagar esta ocorrência."
+        );
+      }
+
+      router.refresh();
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível apagar esta ocorrência."
+      );
+    } finally {
+      setRemovendo(false);
+    }
+  }
 
   async function salvarReagendamento() {
     if (!novaData) {
@@ -1199,8 +1257,9 @@ function ExecucaoCard({
       <div
         className={`mt-4 grid gap-2 ${
           !compacto &&
-          podeReagendar
-            ? "grid-cols-2"
+          (podeReagendar ||
+            podeRemoverOcorrencia)
+            ? "sm:grid-cols-3"
             : "grid-cols-1"
         }`}
       >
@@ -1214,7 +1273,11 @@ function ExecucaoCard({
                     !valor
                 )
               }
-              className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-black text-slate-200 transition hover:border-cyan-400/30 hover:bg-cyan-500/10 hover:text-cyan-300"
+              disabled={
+                salvando ||
+                removendo
+              }
+              className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-black text-slate-200 transition hover:border-cyan-400/30 hover:bg-cyan-500/10 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {reagendando
                 ? "Fechar"
@@ -1222,9 +1285,37 @@ function ExecucaoCard({
             </button>
           )}
 
+        {!compacto &&
+          podeRemoverOcorrencia && (
+            <button
+              type="button"
+              onClick={
+                removerOcorrencia
+              }
+              disabled={
+                removendo ||
+                salvando
+              }
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-red-400/20 bg-red-500/[0.06] px-3 text-xs font-black text-red-300 transition hover:border-red-400/40 hover:bg-red-500/15 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2
+                size={14}
+              />
+
+              {removendo
+                ? "Apagando..."
+                : "Apagar do dia"}
+            </button>
+          )}
+
         <Link
           href={`/admin/os/preventivas/execucoes/${execucao.id}`}
-          className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 text-xs font-black text-cyan-300 transition hover:bg-cyan-400 hover:text-slate-950"
+          className={`inline-flex h-10 w-full items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 text-xs font-black text-cyan-300 transition hover:bg-cyan-400 hover:text-slate-950 ${
+            removendo ||
+            salvando
+              ? "pointer-events-none opacity-50"
+              : ""
+          }`}
         >
           Abrir execução
         </Link>

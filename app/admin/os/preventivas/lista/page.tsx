@@ -245,6 +245,13 @@ export default async function ListaPreventivasPage({
           gte: inicioMes,
           lt: fimMes,
         },
+
+        status: {
+          notIn: [
+            "CANCELADA",
+            "NAO_REALIZADA",
+          ],
+        },
       },
 
       include: {
