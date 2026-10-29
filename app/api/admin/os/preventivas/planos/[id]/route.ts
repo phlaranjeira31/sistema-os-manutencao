@@ -22,10 +22,29 @@ const PRIORIDADES_VALIDAS = [
   "URGENTE",
 ];
 
+const STATUS_EDITAVEIS = [
+  "PROGRAMADA",
+  "PENDENTE",
+] as const;
+
 function criarDataUTC(valor: string) {
   return new Date(
     `${valor}T00:00:00.000Z`
   );
+}
+
+function formatarDataInput(
+  data: Date | null | undefined
+) {
+  if (!data) {
+    return "";
+  }
+
+  return data.toISOString().slice(0, 10);
+}
+
+function chaveDataUTC(data: Date) {
+  return data.toISOString().slice(0, 10);
 }
 
 function adicionarDias(
@@ -227,6 +246,26 @@ function calcularStatusInicial(
   }
 
   return "PROGRAMADA";
+}
+
+function arraysIguais(
+  listaA: string[],
+  listaB: string[]
+) {
+  if (
+    listaA.length !==
+    listaB.length
+  ) {
+    return false;
+  }
+
+  const a = [...listaA].sort();
+  const b = [...listaB].sort();
+
+  return a.every(
+    (valor, indice) =>
+      valor === b[indice]
+  );
 }
 
 async function verificarUsuario() {
@@ -510,6 +549,12 @@ export async function PATCH(
           )
         : null;
 
+    const intervaloNormalizado =
+      frequencia ===
+      "PERSONALIZADA"
+        ? intervaloPersonalizadoDias
+        : null;
+
     const gerarAutomaticamente =
       formData.get(
         "gerarAutomaticamente"
@@ -533,9 +578,7 @@ export async function PATCH(
                   item
                 ).trim()
             )
-            .filter(
-              Boolean
-            )
+            .filter(Boolean)
         )
       );
 
@@ -632,6 +675,32 @@ export async function PATCH(
 
           select: {
             id: true,
+
+            dataInicio: true,
+
+            dataFim: true,
+
+            frequencia: true,
+
+            intervaloPersonalizadoDias:
+              true,
+
+            responsaveis: {
+              select: {
+                userId: true,
+              },
+            },
+
+            execucoes: {
+              select: {
+                id: true,
+
+                status: true,
+
+                dataProgramada:
+                  true,
+              },
+            },
           },
         }
       );
@@ -732,41 +801,138 @@ export async function PATCH(
       );
     }
 
+    const responsaveisAtuais =
+      planoAtual.responsaveis.map(
+        (item) =>
+          item.userId
+      );
+
+    const responsaveisAlterados =
+      !arraysIguais(
+        responsaveisAtuais,
+        responsavelIds
+      );
+
+    const dataInicioAlterada =
+      formatarDataInput(
+        planoAtual.dataInicio
+      ) !== dataInicioTexto;
+
+    const dataFimAtual =
+      formatarDataInput(
+        planoAtual.dataFim
+      );
+
+    const dataFimAlterada =
+      dataFimAtual !==
+      dataFimTexto;
+
+    const frequenciaAlterada =
+      planoAtual.frequencia !==
+      frequencia;
+
+    const intervaloAlterado =
+      (
+        planoAtual
+          .intervaloPersonalizadoDias ??
+        null
+      ) !==
+      intervaloNormalizado;
+
+    const cronogramaAlterado =
+      dataInicioAlterada ||
+      dataFimAlterada ||
+      frequenciaAlterada ||
+      intervaloAlterado;
+
     const novasDatas =
-      gerarDatasExecucao({
-        dataInicio,
-        dataFim,
-        frequencia,
-        intervaloPersonalizadoDias,
-      });
+      cronogramaAlterado
+        ? gerarDatasExecucao({
+            dataInicio,
+            dataFim,
+            frequencia,
+            intervaloPersonalizadoDias:
+              intervaloNormalizado,
+          })
+        : [];
 
     await prisma.$transaction(
       async (tx) => {
         /*
-         * Apagamos somente execuções que
-         * ainda não viraram histórico.
+         * ======================================================
+         * ATUALIZAÇÃO DO PLANO
+         * ======================================================
          *
-         * CONCLUIDA
-         * NAO_REALIZADA
-         * CANCELADA
-         * EM_EXECUCAO
+         * Aqui atualizamos os dados do plano sem reconstruir
+         * automaticamente todas as execuções.
          *
-         * são preservadas.
+         * O cronograma só será recalculado caso as datas ou a
+         * periodicidade tenham realmente sido alteradas.
+         * ======================================================
          */
-        await tx.execucaoPreventiva.deleteMany(
-          {
-            where: {
-              planoId: id,
 
-              status: {
-                in: [
-                  "PROGRAMADA",
-                  "PENDENTE",
-                ],
-              },
-            },
-          }
-        );
+        await tx.planoPreventivo.update({
+          where: {
+            id,
+          },
+
+          data: {
+            titulo,
+
+            descricao,
+
+            prioridade:
+              prioridade as any,
+
+            empresaId:
+              setor.empresaId ??
+              null,
+
+            setorId,
+
+            maquinaId:
+              maquinaId ||
+              null,
+
+            frequencia:
+              frequencia as any,
+
+            intervaloPersonalizadoDias:
+              intervaloNormalizado,
+
+            dataInicio,
+
+            dataFim,
+
+            diasAntesAviso,
+
+            duracaoEstimadaMinutos,
+
+            gerarAutomaticamente,
+
+            ativo,
+
+            ...(cronogramaAlterado
+              ? {
+                  ultimaGeracaoEm:
+                    new Date(),
+                }
+              : {}),
+          },
+        });
+
+        /*
+         * ======================================================
+         * RESPONSÁVEIS DO PLANO
+         * ======================================================
+         *
+         * Sempre substituímos os vínculos.
+         *
+         * Isso evita conflito da chave única:
+         *
+         * planoId + userId
+         * ======================================================
+         */
 
         await tx.responsavelPlanoPreventivo.deleteMany(
           {
@@ -776,107 +942,304 @@ export async function PATCH(
           }
         );
 
-        await tx.planoPreventivo.update(
-          {
-            where: {
-              id,
-            },
+        if (
+          responsavelIds.length >
+          0
+        ) {
+          await tx.responsavelPlanoPreventivo.createMany(
+            {
+              data:
+                responsavelIds.map(
+                  (userId) => ({
+                    planoId: id,
+                    userId,
+                  })
+                ),
 
-            data: {
-              titulo,
+              skipDuplicates:
+                true,
+            }
+          );
+        }
 
-              descricao,
+        /*
+         * ======================================================
+         * CRONOGRAMA ALTERADO
+         * ======================================================
+         *
+         * Só reconstruímos PROGRAMADA/PENDENTE quando realmente
+         * houve mudança de:
+         *
+         * - primeira execução
+         * - data final
+         * - frequência
+         * - intervalo personalizado
+         *
+         * Histórico é preservado.
+         * ======================================================
+         */
 
-              prioridade:
-                prioridade as any,
+        if (cronogramaAlterado) {
+          const execucoesHistoricas =
+            planoAtual.execucoes.filter(
+              (execucao) =>
+                !STATUS_EDITAVEIS.includes(
+                  execucao.status as
+                    (typeof STATUS_EDITAVEIS)[number]
+                )
+            );
 
-              empresaId:
-                setor.empresaId ??
-                null,
+          const datasHistoricas =
+            new Set(
+              execucoesHistoricas.map(
+                (execucao) =>
+                  chaveDataUTC(
+                    execucao.dataProgramada
+                  )
+              )
+            );
 
-              setorId,
+          /*
+           * Remove SOMENTE o que ainda pode ser reprogramado.
+           *
+           * CONCLUIDA
+           * EM_EXECUCAO
+           * NAO_REALIZADA
+           * CANCELADA
+           *
+           * permanecem intactas.
+           */
 
-              maquinaId:
-                maquinaId ||
-                null,
+          await tx.execucaoPreventiva.deleteMany(
+            {
+              where: {
+                planoId: id,
 
-              frequencia:
-                frequencia as any,
-
-              intervaloPersonalizadoDias:
-                frequencia ===
-                "PERSONALIZADA"
-                  ? intervaloPersonalizadoDias
-                  : null,
-
-              dataInicio,
-
-              dataFim,
-
-              proximaExecucao:
-                novasDatas[0],
-
-              diasAntesAviso,
-
-              duracaoEstimadaMinutos,
-
-              gerarAutomaticamente,
-
-              ativo,
-
-              ultimaGeracaoEm:
-                new Date(),
-
-              responsaveis:
-                responsavelIds.length >
-                0
-                  ? {
-                      create:
-                        responsavelIds.map(
-                          (
-                            userId
-                          ) => ({
-                            userId,
-                          })
-                        ),
-                    }
-                  : undefined,
-
-              execucoes: {
-                create:
-                  novasDatas.map(
-                    (
-                      dataProgramada
-                    ) => ({
-                      dataProgramada,
-
-                      status:
-                        calcularStatusInicial(
-                          dataProgramada
-                        ) as any,
-
-                      duracaoEstimadaMinutos,
-
-                      responsaveis:
-                        responsavelIds.length >
-                        0
-                          ? {
-                              create:
-                                responsavelIds.map(
-                                  (
-                                    userId
-                                  ) => ({
-                                    userId,
-                                  })
-                                ),
-                            }
-                          : undefined,
-                    })
-                  ),
+                status: {
+                  in: [
+                    "PROGRAMADA",
+                    "PENDENTE",
+                  ],
+                },
               },
-            },
+            }
+          );
+
+          /*
+           * Não recriamos uma data que já pertence ao histórico.
+           *
+           * Isso evita conflito com:
+           *
+           * @@unique([planoId, dataProgramada])
+           */
+
+          const datasParaCriar =
+            novasDatas.filter(
+              (data) =>
+                !datasHistoricas.has(
+                  chaveDataUTC(
+                    data
+                  )
+                )
+            );
+
+          for (
+            const dataProgramada
+            of datasParaCriar
+          ) {
+            await tx.execucaoPreventiva.create(
+              {
+                data: {
+                  planoId: id,
+
+                  dataProgramada,
+
+                  status:
+                    calcularStatusInicial(
+                      dataProgramada
+                    ) as any,
+
+                  duracaoEstimadaMinutos,
+
+                  notificado:
+                    false,
+
+                  avisoEnviadoEm:
+                    null,
+
+                  responsaveis:
+                    responsavelIds.length >
+                    0
+                      ? {
+                          create:
+                            responsavelIds.map(
+                              (
+                                userId
+                              ) => ({
+                                userId,
+                              })
+                            ),
+                        }
+                      : undefined,
+                },
+              }
+            );
           }
-        );
+
+          const primeiraDataDisponivel =
+            datasParaCriar[0] ??
+            novasDatas[0] ??
+            dataInicio;
+
+          await tx.planoPreventivo.update(
+            {
+              where: {
+                id,
+              },
+
+              data: {
+                proximaExecucao:
+                  primeiraDataDisponivel,
+              },
+            }
+          );
+
+          return;
+        }
+
+        /*
+         * ======================================================
+         * CRONOGRAMA NÃO FOI ALTERADO
+         * ======================================================
+         *
+         * Esse é exatamente o caso da sua tela:
+         *
+         * Thiago -> Lucas
+         *
+         * Não apagamos datas.
+         * Não recriamos datas.
+         * Não alteramos histórico.
+         *
+         * Apenas sincronizamos os responsáveis das execuções
+         * PROGRAMADA/PENDENTE.
+         * ======================================================
+         */
+
+        const execucoesEditaveis =
+          await tx.execucaoPreventiva.findMany(
+            {
+              where: {
+                planoId: id,
+
+                status: {
+                  in: [
+                    "PROGRAMADA",
+                    "PENDENTE",
+                  ],
+                },
+              },
+
+              select: {
+                id: true,
+              },
+            }
+          );
+
+        const execucaoIds =
+          execucoesEditaveis.map(
+            (execucao) =>
+              execucao.id
+          );
+
+        /*
+         * A duração prevista também acompanha a alteração
+         * do plano nas execuções ainda não realizadas.
+         */
+
+        if (
+          execucaoIds.length >
+          0
+        ) {
+          await tx.execucaoPreventiva.updateMany(
+            {
+              where: {
+                id: {
+                  in: execucaoIds,
+                },
+              },
+
+              data: {
+                duracaoEstimadaMinutos,
+
+                /*
+                 * Se houve troca de responsável,
+                 * permitimos que o sistema faça
+                 * uma nova notificação posteriormente.
+                 */
+                ...(responsaveisAlterados
+                  ? {
+                      notificado:
+                        false,
+
+                      avisoEnviadoEm:
+                        null,
+                    }
+                  : {}),
+              },
+            }
+          );
+
+          /*
+           * Remove os responsáveis antigos somente das
+           * execuções que ainda não viraram histórico.
+           */
+
+          await tx.responsavelExecucaoPreventiva.deleteMany(
+            {
+              where: {
+                execucaoId: {
+                  in: execucaoIds,
+                },
+              },
+            }
+          );
+
+          /*
+           * Vincula os novos responsáveis nas execuções
+           * PROGRAMADA/PENDENTE.
+           */
+
+          if (
+            responsavelIds.length >
+            0
+          ) {
+            const novosVinculos =
+              execucaoIds.flatMap(
+                (execucaoId) =>
+                  responsavelIds.map(
+                    (userId) => ({
+                      execucaoId,
+                      userId,
+                    })
+                  )
+              );
+
+            if (
+              novosVinculos.length >
+              0
+            ) {
+              await tx.responsavelExecucaoPreventiva.createMany(
+                {
+                  data:
+                    novosVinculos,
+
+                  skipDuplicates:
+                    true,
+                }
+              );
+            }
+          }
+        }
       }
     );
 
@@ -884,7 +1247,11 @@ export async function PATCH(
       success: true,
 
       message:
-        "Plano preventivo atualizado com sucesso.",
+        cronogramaAlterado
+          ? "Plano preventivo e cronograma atualizados com sucesso."
+          : responsaveisAlterados
+            ? "Plano preventivo e responsáveis atualizados com sucesso."
+            : "Plano preventivo atualizado com sucesso.",
     });
   } catch (error) {
     console.error(
@@ -895,7 +1262,9 @@ export async function PATCH(
     return NextResponse.json(
       {
         error:
-          "Erro ao editar plano preventivo.",
+          error instanceof Error
+            ? error.message
+            : "Erro ao editar plano preventivo.",
       },
       {
         status: 500,
