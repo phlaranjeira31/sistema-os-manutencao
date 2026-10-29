@@ -1831,6 +1831,49 @@ function listarMeses(
   return meses;
 }
 
+function resumirTextoPdf(
+  doc: any,
+  texto: string,
+  larguraMaxima: number
+) {
+  const valor = (texto || "").trim();
+
+  if (!valor) {
+    return "—";
+  }
+
+  const primeiraLinha =
+    doc.splitTextToSize(
+      valor,
+      larguraMaxima
+    )[0] ?? valor;
+
+  let textoFinal =
+    String(primeiraLinha);
+
+  while (
+    textoFinal.length > 1 &&
+    doc.getTextWidth(
+      `${textoFinal}…`
+    ) > larguraMaxima
+  ) {
+    textoFinal =
+      textoFinal.slice(
+        0,
+        -1
+      );
+  }
+
+  if (
+    textoFinal.length <
+    valor.length
+  ) {
+    return `${textoFinal}…`;
+  }
+
+  return textoFinal;
+}
+
 function desenharCalendarioMes(
   doc: any,
   resultado: ResultadoPlano,
@@ -2084,83 +2127,150 @@ function desenharCalendarioMes(
         y + 4
       );
 
-      eventos
-        .slice(0, 2)
-        .forEach(
-          (
-            evento,
-            indiceEvento
-          ) => {
-            const yy =
-              y +
-              8 +
-              indiceEvento *
-                4.5;
+      if (
+        eventos.length === 0
+      ) {
+        continue;
+      }
 
-            doc.setFillColor(
-              ...cores.ciano
-            );
+      const quantidadeTexto =
+        String(eventos.length);
 
-            doc.circle(
-              x + 2.2,
-              yy - 1.2,
-              0.8,
-              "F"
-            );
+      doc.setFont(
+        "helvetica",
+        "bold"
+      );
 
-            doc.setFont(
-              "helvetica",
-              "normal"
-            );
+      doc.setFontSize(5.8);
 
-            doc.setFontSize(
-              5.4
-            );
-
-            doc.setTextColor(
-              ...cores.texto
-            );
-
-            const nome =
-              evento.maquina
-                ?.nome ??
-              evento.titulo;
-
-            const texto =
-              doc.splitTextToSize(
-                nome,
-                larguraCelula -
-                  7
-              )[0];
-
-            doc.text(
-              texto,
-              x + 4.5,
-              yy
-            );
-          }
+      const larguraBadge =
+        Math.max(
+          6,
+          doc.getTextWidth(
+            quantidadeTexto
+          ) + 4
         );
 
+      doc.setFillColor(
+        ...cores.escuro
+      );
+
+      doc.roundedRect(
+        x +
+          larguraCelula -
+          larguraBadge -
+          1.8,
+        y + 1.4,
+        larguraBadge,
+        4.2,
+        1.2,
+        1.2,
+        "F"
+      );
+
+      doc.setTextColor(
+        255,
+        255,
+        255
+      );
+
+      doc.text(
+        quantidadeTexto,
+        x +
+          larguraCelula -
+          larguraBadge / 2 -
+          1.8,
+        y + 4.4,
+        {
+          align: "center",
+        }
+      );
+
+      const eventoPrincipal =
+        eventos[0];
+
+      const nomePrincipal =
+        eventoPrincipal
+          .maquina?.nome ||
+        eventoPrincipal
+          .titulo;
+
+      doc.setFont(
+        "helvetica",
+        "bold"
+      );
+
+      doc.setFontSize(5.2);
+
+      const tituloCompacto =
+        resumirTextoPdf(
+          doc,
+          nomePrincipal,
+          larguraCelula - 7
+        );
+
+      doc.setFillColor(
+        ...cores.cianoClaro
+      );
+
+      doc.roundedRect(
+        x + 1.5,
+        y + 6.2,
+        larguraCelula - 3,
+        4.8,
+        0.8,
+        0.8,
+        "F"
+      );
+
+      doc.setDrawColor(
+        ...cores.ciano
+      );
+
+      doc.setLineWidth(
+        0.4
+      );
+
+      doc.line(
+        x + 2.4,
+        y + 7.2,
+        x + 2.4,
+        y + 9.8
+      );
+
+      doc.setTextColor(
+        ...cores.texto
+      );
+
+      doc.text(
+        tituloCompacto,
+        x + 3.4,
+        y + 9.2
+      );
+
       if (
-        eventos.length > 2
+        eventos.length > 1
       ) {
         doc.setFont(
           "helvetica",
-          "bold"
+          "normal"
         );
 
-        doc.setFontSize(5);
+        doc.setFontSize(4.9);
 
         doc.setTextColor(
           ...cores.ciano
         );
 
+        const restantes =
+          eventos.length - 1;
+
         doc.text(
-          `+${eventos.length - 2} atividade(s)`,
+          `+${restantes} outra${restantes > 1 ? "s" : ""}`,
           x + 2,
           y +
             alturaCelula -
-            2
+            1.8
         );
       }
     }
