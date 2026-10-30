@@ -33,6 +33,7 @@ import { prisma } from "@/src/lib/prisma";
 import {
   fimDoDia,
   formatarDuracaoMinutos,
+  obterDataConclusaoKpi,
   obterDuracaoKpiMinutos,
 } from "@/src/lib/kpiColaborador";
 
@@ -93,6 +94,13 @@ export default async function DashboardColaboradoresPage({
   inicio30Dias.setDate(
     inicio30Dias.getDate() -
       30
+  );
+
+  inicio30Dias.setHours(
+    0,
+    0,
+    0,
+    0
   );
 
   const colaboradores =
@@ -264,14 +272,27 @@ export default async function DashboardColaboradoresPage({
 
         const concluidas30Dias =
           ordens.filter(
-            (os) =>
-              os.status ===
-                "CONCLUIDA" &&
-              os.dataConclusao &&
-              new Date(
-                os.dataConclusao
-              ) >=
-                inicio30Dias
+            (os) => {
+              if (
+                os.status !==
+                "CONCLUIDA"
+              ) {
+                return false;
+              }
+
+              const dataConclusaoKpi =
+                obterDataConclusaoKpi(
+                  os
+                );
+
+              return Boolean(
+                dataConclusaoKpi &&
+                  dataConclusaoKpi >=
+                    inicio30Dias &&
+                  dataConclusaoKpi <=
+                    agora
+              );
+            }
           ).length;
 
         /*
@@ -511,14 +532,27 @@ export default async function DashboardColaboradoresPage({
 
   const concluidas30DiasEquipe =
     ordensEquipe.filter(
-      (os) =>
-        os.status ===
-          "CONCLUIDA" &&
-        os.dataConclusao &&
-        new Date(
-          os.dataConclusao
-        ) >=
-          inicio30Dias
+      (os) => {
+        if (
+          os.status !==
+          "CONCLUIDA"
+        ) {
+          return false;
+        }
+
+        const dataConclusaoKpi =
+          obterDataConclusaoKpi(
+            os
+          );
+
+        return Boolean(
+          dataConclusaoKpi &&
+            dataConclusaoKpi >=
+              inicio30Dias &&
+            dataConclusaoKpi <=
+              agora
+        );
+      }
     ).length;
 
   const eficienciaEquipe =

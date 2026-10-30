@@ -38,6 +38,123 @@ function extrairCampo(
   return linha?.trim() || null;
 }
 
+
+function criarDataHoraSaoPaulo(
+  dataTexto: string,
+  horaTexto?: string | null
+) {
+  const data =
+    normalizarData(
+      dataTexto
+    );
+
+  if (!data) {
+    return null;
+  }
+
+  const hora =
+    horaTexto?.trim() ||
+    "12:00";
+
+  const valor =
+    new Date(
+      `${data}T${hora.padStart(
+        5,
+        "0"
+      )}:00-03:00`
+    );
+
+  if (
+    Number.isNaN(
+      valor.getTime()
+    )
+  ) {
+    return null;
+  }
+
+  return valor;
+}
+
+export function obterDataTerminoRelatorio(
+  registroFinal:
+    | string
+    | null
+    | undefined
+) {
+  const relatorio =
+    registroFinal?.trim() ?? "";
+
+  if (!relatorio) {
+    return null;
+  }
+
+  const dataTerminoTexto =
+    extrairCampo(
+      relatorio,
+      /Data\s+de\s+t[eé]rmino:\s*\n?\s*([^\n\r]+)/i
+    );
+
+  if (!dataTerminoTexto) {
+    return null;
+  }
+
+  const horaTermino =
+    extrairCampo(
+      relatorio,
+      /Hora\s+de\s+t[eé]rmino:\s*\n?\s*([0-2]?\d:[0-5]\d)/i
+    );
+
+  return criarDataHoraSaoPaulo(
+    dataTerminoTexto,
+    horaTermino
+  );
+}
+
+export type OrdemParaDataConclusao = {
+  registroFinal:
+    | string
+    | null;
+  dataConclusao:
+    | Date
+    | string
+    | null;
+};
+
+/**
+ * Data oficial usada pelos KPIs de conclusão:
+ * 1. Data/hora de término informada no relatório técnico;
+ * 2. dataConclusao do banco como fallback.
+ */
+export function obterDataConclusaoKpi(
+  os: OrdemParaDataConclusao
+) {
+  const peloRelatorio =
+    obterDataTerminoRelatorio(
+      os.registroFinal
+    );
+
+  if (peloRelatorio) {
+    return peloRelatorio;
+  }
+
+  if (os.dataConclusao) {
+    const fallback =
+      new Date(
+        os.dataConclusao
+      );
+
+    if (
+      !Number.isNaN(
+        fallback.getTime()
+      )
+    ) {
+      return fallback;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Calcula a duração usando EXCLUSIVAMENTE os horários
  * informados no relatório técnico da OS.
@@ -102,38 +219,24 @@ export function obterDuracaoRelatorioMinutos(
     return null;
   }
 
-  const dataInicio =
-    normalizarData(
-      dataInicioTexto
-    );
-
-  const dataTermino =
-    normalizarData(
-      dataTerminoTexto
-    );
-
-  if (
-    !dataInicio ||
-    !dataTermino
-  ) {
-    return null;
-  }
-
   const inicio =
-    new Date(
-      `${dataInicio}T${horaInicio.padStart(
-        5,
-        "0"
-      )}:00-03:00`
+    criarDataHoraSaoPaulo(
+      dataInicioTexto,
+      horaInicio
     );
 
   const fim =
-    new Date(
-      `${dataTermino}T${horaTermino.padStart(
-        5,
-        "0"
-      )}:00-03:00`
+    criarDataHoraSaoPaulo(
+      dataTerminoTexto,
+      horaTermino
     );
+
+  if (
+    !inicio ||
+    !fim
+  ) {
+    return null;
+  }
 
   if (
     Number.isNaN(
