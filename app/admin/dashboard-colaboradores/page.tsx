@@ -252,6 +252,7 @@ export default async function DashboardColaboradoresPage({
                   true,
                 registroFinal: true,
                 createdAt: true,
+                updatedAt: true,
               },
             },
           },
@@ -287,50 +288,121 @@ export default async function DashboardColaboradoresPage({
             (item) => item.os
           );
 
+        /*
+         * =====================================================
+         * DATA DE REFERÊNCIA DA OS NO FILTRO
+         * =====================================================
+         *
+         * CONCLUÍDA:
+         *   usa exclusivamente a data/hora de término
+         *   preenchida no relatório técnico.
+         *
+         * CANCELADA:
+         *   usa updatedAt, pois não existe dataCancelamento
+         *   própria no modelo atual.
+         *
+         * ABERTA / EM ANDAMENTO:
+         *   usa createdAt, representando a entrada da OS
+         *   na carteira dentro da janela selecionada.
+         *
+         * GERAL:
+         *   não aplica janela de data.
+         * =====================================================
+         */
+        function dataReferenciaOs(
+          os: (typeof ordens)[number]
+        ) {
+          if (
+            os.status ===
+            "CONCLUIDA"
+          ) {
+            return obterDataTerminoRelatorio(
+              os.registroFinal
+            );
+          }
+
+          if (
+            os.status ===
+            "CANCELADA"
+          ) {
+            return new Date(
+              os.updatedAt
+            );
+          }
+
+          return new Date(
+            os.createdAt
+          );
+        }
+
+        const ordensPeriodo =
+          periodoDias ===
+          "geral"
+            ? ordens
+            : ordens.filter(
+                (os) =>
+                  dentroDoPeriodo(
+                    dataReferenciaOs(
+                      os
+                    ),
+                    inicioPeriodo,
+                    agora
+                  )
+              );
+
         const total =
-          ordens.length;
+          ordensPeriodo.length;
 
         const canceladas =
-          ordens.filter(
+          ordensPeriodo.filter(
             (os) =>
               os.status ===
               "CANCELADA"
           ).length;
 
         const validas =
-          ordens.filter(
+          ordensPeriodo.filter(
             (os) =>
               os.status !==
               "CANCELADA"
           );
 
         const naoIniciadas =
-          ordens.filter(
+          ordensPeriodo.filter(
             (os) =>
               os.status ===
               "NAO_INICIADA"
           ).length;
 
         const emAndamento =
-          ordens.filter(
+          ordensPeriodo.filter(
             (os) =>
               os.status ===
               "EM_ANDAMENTO"
           ).length;
 
-        const concluidas =
-          ordens.filter(
+        /*
+         * No modo Geral, toda OS concluída entra na eficiência
+         * histórica. Nos filtros de dias, somente entram
+         * concluídas cuja data de término existe no relatório
+         * e está dentro da janela.
+         */
+        const concluidasPeriodoLista =
+          ordensPeriodo.filter(
             (os) =>
               os.status ===
               "CONCLUIDA"
-          ).length;
+          );
+
+        const concluidas =
+          concluidasPeriodoLista.length;
 
         const abertas =
           naoIniciadas +
           emAndamento;
 
         const atrasadas =
-          ordens.filter(
+          ordensPeriodo.filter(
             (os) => {
               if (
                 os.status ===
@@ -351,7 +423,7 @@ export default async function DashboardColaboradoresPage({
           ).length;
 
         const urgentesAbertas =
-          ordens.filter(
+          ordensPeriodo.filter(
             (os) =>
               os.status !==
                 "CONCLUIDA" &&
@@ -361,44 +433,6 @@ export default async function DashboardColaboradoresPage({
                 "URGENTE"
           ).length;
 
-        /*
-         * PERFORMANCE NO PERÍODO
-         *
-         * Para OS concluídas, a referência é EXCLUSIVAMENTE
-         * a data/hora de término preenchida no relatório.
-         *
-         * dataConclusao não entra neste indicador.
-         */
-        const ordensConcluidasPeriodo =
-          ordens.filter(
-            (os) => {
-              if (
-                os.status !==
-                "CONCLUIDA"
-              ) {
-                return false;
-              }
-
-              const terminoRelatorio =
-                obterDataTerminoRelatorio(
-                  os.registroFinal
-                );
-
-              return dentroDoPeriodo(
-                terminoRelatorio,
-                inicioPeriodo,
-                agora
-              );
-            }
-          );
-
-        const concluidasPeriodo =
-          ordensConcluidasPeriodo.length;
-
-        /*
-         * Canceladas não entram no denominador.
-         * Esse KPI continua histórico/global.
-         */
         const eficiencia =
           validas.length > 0
             ? Math.round(
@@ -409,11 +443,12 @@ export default async function DashboardColaboradoresPage({
             : 0;
 
         /*
-         * Cumprimento de prazo no período:
-         * usa a data/hora de término escrita no relatório.
+         * Prazo sempre usa a conclusão registrada no relatório.
+         * Mesmo no modo Geral, não usamos dataConclusao como
+         * substituta para este KPI.
          */
         const concluidasComPrazo =
-          ordensConcluidasPeriodo
+          concluidasPeriodoLista
             .map((os) => ({
               os,
               terminoRelatorio:
@@ -453,14 +488,11 @@ export default async function DashboardColaboradoresPage({
             : null;
 
         /*
-         * MTTR DO PERÍODO
-         *
-         * Usa SOMENTE os horários de início/término
-         * preenchidos no relatório técnico.
-         * Sem fallback para tempo de atribuição da OS.
+         * MTTR sempre vem dos horários preenchidos
+         * no relatório técnico.
          */
         const duracoes =
-          ordensConcluidasPeriodo
+          concluidasPeriodoLista
             .map((os) =>
               obterDuracaoRelatorioMinutos(
                 os.registroFinal
@@ -497,8 +529,48 @@ export default async function DashboardColaboradoresPage({
               item.execucao
           );
 
+        /*
+         * =====================================================
+         * PREVENTIVAS DO PERÍODO
+         * =====================================================
+         *
+         * CONCLUÍDA:
+         *   dataConclusao.
+         *
+         * DEMAIS STATUS:
+         *   dataProgramada.
+         *
+         * GERAL:
+         *   todo o histórico atribuído ao colaborador.
+         * =====================================================
+         */
+        const preventivasPeriodo =
+          periodoDias ===
+          "geral"
+            ? execucoesPreventivas
+            : execucoesPreventivas.filter(
+                (execucao) => {
+                  const referencia =
+                    execucao.status ===
+                      "CONCLUIDA" &&
+                    execucao.dataConclusao
+                      ? new Date(
+                          execucao.dataConclusao
+                        )
+                      : new Date(
+                          execucao.dataProgramada
+                        );
+
+                  return dentroDoPeriodo(
+                    referencia,
+                    inicioPeriodo,
+                    agora
+                  );
+                }
+              );
+
         const preventivasAtivas =
-          execucoesPreventivas.filter(
+          preventivasPeriodo.filter(
             (execucao) =>
               execucao.status ===
                 "PROGRAMADA" ||
@@ -509,14 +581,14 @@ export default async function DashboardColaboradoresPage({
           );
 
         const preventivasConcluidas =
-          execucoesPreventivas.filter(
+          preventivasPeriodo.filter(
             (execucao) =>
               execucao.status ===
               "CONCLUIDA"
           ).length;
 
         const preventivasAtrasadas =
-          execucoesPreventivas.filter(
+          preventivasPeriodo.filter(
             (execucao) =>
               (execucao.status ===
                 "PROGRAMADA" ||
@@ -528,24 +600,16 @@ export default async function DashboardColaboradoresPage({
                 inicioHoje
           ).length;
 
-        const preventivasConcluidasPeriodo =
-          execucoesPreventivas.filter(
-            (execucao) =>
-              execucao.status ===
-                "CONCLUIDA" &&
-              execucao.dataConclusao &&
-              dentroDoPeriodo(
-                new Date(
-                  execucao.dataConclusao
-                ),
-                inicioPeriodo,
-                agora
-              )
-          ).length;
-
         return {
           colaborador,
-          ordens,
+
+          /*
+           * ordensPeriodo é retornado para que os indicadores
+           * gerais da equipe usem exatamente o mesmo recorte.
+           */
+          ordens:
+            ordensPeriodo,
+
           total,
           naoIniciadas,
           emAndamento,
@@ -554,26 +618,34 @@ export default async function DashboardColaboradoresPage({
           abertas,
           atrasadas,
           urgentesAbertas,
-          concluidasPeriodo,
           eficiencia,
           cumprimentoPrazo,
           mttrMinutos,
           amostraMttr:
             duracoes.length,
+
           preventivasTotal:
-            execucoesPreventivas.length,
+            preventivasPeriodo.length,
+
           preventivasAtivas:
             preventivasAtivas.length,
+
           preventivasConcluidas,
+
           preventivasAtrasadas,
-          preventivasConcluidasPeriodo,
         };
       }
     );
 
   /*
-   * Indicadores gerais:
-   * deduplicamos OS pelo ID.
+   * =========================================================
+   * INDICADORES GERAIS DA EQUIPE
+   * =========================================================
+   *
+   * Cada card individual já devolve apenas as OS do período.
+   * Aqui apenas deduplicamos pelo ID, evitando contar uma
+   * mesma OS duas vezes quando há mais de um responsável.
+   * =========================================================
    */
   const mapaOrdensEquipe =
     new Map<
@@ -638,31 +710,7 @@ export default async function DashboardColaboradoresPage({
         return (
           fimDoDia(
             os.dataPrevista
-          ) <
-          agora
-        );
-      }
-    ).length;
-
-  const concluidasPeriodoEquipe =
-    ordensEquipe.filter(
-      (os) => {
-        if (
-          os.status !==
-          "CONCLUIDA"
-        ) {
-          return false;
-        }
-
-        const terminoRelatorio =
-          obterDataTerminoRelatorio(
-            os.registroFinal
-          );
-
-        return dentroDoPeriodo(
-          terminoRelatorio,
-          inicioPeriodo,
-          agora
+          ) < agora
         );
       }
     ).length;
@@ -675,6 +723,14 @@ export default async function DashboardColaboradoresPage({
             100
         )
       : 0;
+
+  const colaboradoresComMovimento =
+    dadosColaboradores.filter(
+      (item) =>
+        item.total > 0 ||
+        item.preventivasTotal >
+          0
+    ).length;
 
   return (
     <main className="min-h-screen bg-[#050816] font-sans text-slate-100 antialiased">
@@ -792,7 +848,7 @@ export default async function DashboardColaboradoresPage({
             </div>
 
             <p className="mt-1.5 text-[12px] leading-5 text-slate-500">
-              Conclusões de OS, prazo e MTTR usam exclusivamente a data e os horários preenchidos no relatório técnico. Em Geral, considera todo o histórico disponível.
+              O período selecionado controla todos os KPIs da página: eficiência, carteira, andamento, atrasos, urgências, distribuição das OS, MTTR, prazo e preventivas. Concluídas usam a data/hora do relatório técnico.
             </p>
           </div>
 
@@ -859,9 +915,15 @@ export default async function DashboardColaboradoresPage({
           <KpiEquipe
             titulo="Equipe"
             valor={String(
-              dadosColaboradores.length
+              periodoDias === "geral"
+                ? dadosColaboradores.length
+                : colaboradoresComMovimento
             )}
-            descricao="Com OS vinculadas"
+            descricao={
+              periodoDias === "geral"
+                ? "Com OS vinculadas"
+                : "Com atividade no período"
+            }
             icon={
               <Users size={19} />
             }
@@ -869,11 +931,11 @@ export default async function DashboardColaboradoresPage({
           />
 
           <KpiEquipe
-            titulo="Backlog atual"
+            titulo={`Backlog ${rotuloPeriodo(periodoDias)}`}
             valor={String(
               backlogEquipe
             )}
-            descricao="OS abertas da equipe"
+            descricao="OS abertas no recorte"
             icon={
               <ClipboardList
                 size={19}
@@ -883,11 +945,11 @@ export default async function DashboardColaboradoresPage({
           />
 
           <KpiEquipe
-            titulo="OS atrasadas"
+            titulo={`Atrasadas ${rotuloPeriodo(periodoDias)}`}
             valor={String(
               atrasadasEquipe
             )}
-            descricao="Abertas fora do prazo"
+            descricao="Do recorte selecionado"
             icon={
               <AlertTriangle
                 size={19}
@@ -903,7 +965,7 @@ export default async function DashboardColaboradoresPage({
           <KpiEquipe
             titulo={`Concluídas ${rotuloPeriodo(periodoDias)}`}
             valor={String(
-              concluidasPeriodoEquipe
+              concluidasEquipe
             )}
             descricao="Pela data do relatório"
             icon={
@@ -915,9 +977,9 @@ export default async function DashboardColaboradoresPage({
           />
 
           <KpiEquipe
-            titulo="Eficiência"
+            titulo={`Eficiência ${rotuloPeriodo(periodoDias)}`}
             valor={`${eficienciaEquipe}%`}
-            descricao="Canceladas fora do cálculo"
+            descricao="Do período selecionado"
             icon={
               <TrendingUp
                 size={19}
@@ -1097,7 +1159,6 @@ function ColaboradorCard({
     abertas,
     atrasadas,
     urgentesAbertas,
-    concluidasPeriodo,
     eficiencia,
     cumprimentoPrazo,
     mttrMinutos,
@@ -1106,7 +1167,6 @@ function ColaboradorCard({
     preventivasAtivas,
     preventivasConcluidas,
     preventivasAtrasadas,
-    preventivasConcluidasPeriodo,
   } = item;
 
   const iniciais =
@@ -1188,9 +1248,9 @@ function ColaboradorCard({
 
       <div className="grid grid-cols-2 gap-px bg-white/[0.05] sm:grid-cols-4">
         <KpiIndividual
-          label="Eficiência"
+          label={`Eficiência ${rotuloPeriodo(periodoDias)}`}
           value={`${eficiencia}%`}
-          helper="OS válidas concluídas"
+          helper="Do recorte selecionado"
           icon={
             <TrendingUp
               size={15}
@@ -1235,7 +1295,7 @@ function ColaboradorCard({
         <KpiIndividual
           label={`Concluídas ${rotuloPeriodo(periodoDias)}`}
           value={String(
-            concluidasPeriodo
+            concluidas
           )}
           helper="Data do relatório"
           icon={
@@ -1250,23 +1310,23 @@ function ColaboradorCard({
       <div className="p-5 sm:p-6">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatusCard
-            label="Em carteira"
+            label={`Em carteira ${rotuloPeriodo(periodoDias)}`}
             value={abertas}
             helper={`${naoIniciadas} não iniciada(s)`}
             tone="orange"
           />
 
           <StatusCard
-            label="Em andamento"
+            label={`Em andamento ${rotuloPeriodo(periodoDias)}`}
             value={emAndamento}
-            helper="Em execução agora"
+            helper="Do recorte selecionado"
             tone="cyan"
           />
 
           <StatusCard
-            label="Atrasadas"
+            label={`Atrasadas ${rotuloPeriodo(periodoDias)}`}
             value={atrasadas}
-            helper="Fora da data prevista"
+            helper="Do recorte selecionado"
             tone={
               atrasadas > 0
                 ? "red"
@@ -1275,11 +1335,11 @@ function ColaboradorCard({
           />
 
           <StatusCard
-            label="Urgentes"
+            label={`Urgentes ${rotuloPeriodo(periodoDias)}`}
             value={
               urgentesAbertas
             }
-            helper="Urgentes ainda abertas"
+            helper="Do recorte selecionado"
             tone={
               urgentesAbertas >
               0
@@ -1298,11 +1358,13 @@ function ColaboradorCard({
                     size={16}
                     className="text-cyan-300"
                   />
-                  Distribuição das OS
+                  Distribuição das OS · {rotuloPeriodo(
+                    periodoDias
+                  )}
                 </p>
 
                 <p className="mt-1 text-[10px] text-slate-600">
-                  {total} atribuição(ões) no histórico
+                  {total} atribuição(ões) no recorte
                 </p>
               </div>
 
@@ -1382,7 +1444,7 @@ function ColaboradorCard({
                 </p>
 
                 <p className="mt-1 text-[10px] text-slate-600">
-                  Execuções atribuídas no sistema recorrente
+                  Execuções do período selecionado
                 </p>
               </div>
 
@@ -1393,7 +1455,7 @@ function ColaboradorCard({
 
             <div className="mt-4 grid grid-cols-2 gap-3">
               <MiniPreventiva
-                label="Em agenda"
+                label={`Em agenda ${rotuloPeriodo(periodoDias)}`}
                 value={
                   preventivasAtivas
                 }
@@ -1406,7 +1468,7 @@ function ColaboradorCard({
               />
 
               <MiniPreventiva
-                label="Concluídas"
+                label={`Concluídas ${rotuloPeriodo(periodoDias)}`}
                 value={
                   preventivasConcluidas
                 }
@@ -1419,7 +1481,7 @@ function ColaboradorCard({
               />
 
               <MiniPreventiva
-                label="Atrasadas"
+                label={`Atrasadas ${rotuloPeriodo(periodoDias)}`}
                 value={
                   preventivasAtrasadas
                 }
@@ -1437,9 +1499,9 @@ function ColaboradorCard({
               />
 
               <MiniPreventiva
-                label={`Concl. ${rotuloPeriodo(periodoDias)}`}
+                label={`Total ${rotuloPeriodo(periodoDias)}`}
                 value={
-                  preventivasConcluidasPeriodo
+                  preventivasTotal
                 }
                 tone="violet"
                 icon={
@@ -1454,7 +1516,7 @@ function ColaboradorCard({
 
         <div className="mt-5 flex flex-col gap-3 border-t border-white/[0.06] pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[10px] font-normal text-slate-600">
-            Conclusões, prazo e MTTR do período usam o relatório técnico. OS sem relatório preenchido não entram nas conclusões do período. Eficiência permanece histórica e exclui canceladas.
+            Todo o card respeita o período selecionado. Concluídas, prazo e MTTR usam o relatório técnico; abertas usam a data de criação; canceladas usam a última atualização. No modo Geral, todo o histórico é considerado.
           </p>
 
           <Link
