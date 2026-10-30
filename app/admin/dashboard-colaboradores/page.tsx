@@ -8,6 +8,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeft,
+  CalendarRange,
   ArrowRight,
   CheckCircle2,
   ClipboardCheck,
@@ -33,8 +34,8 @@ import { prisma } from "@/src/lib/prisma";
 import {
   fimDoDia,
   formatarDuracaoMinutos,
-  obterDataConclusaoKpi,
-  obterDuracaoKpiMinutos,
+  obterDataTerminoRelatorio,
+  obterDuracaoRelatorioMinutos,
 } from "@/src/lib/kpiColaborador";
 
 export const dynamic =
@@ -45,8 +46,47 @@ export const revalidate = 0;
 type PageProps = {
   searchParams?: Promise<{
     colaborador?: string;
+    periodo?: string;
   }>;
 };
+
+const PERIODOS_DISPONIVEIS = [
+  7,
+  15,
+  30,
+  45,
+  60,
+] as const;
+
+function normalizarPeriodo(
+  valor:
+    | string
+    | undefined
+) {
+  const numero =
+    Number(valor);
+
+  return PERIODOS_DISPONIVEIS.includes(
+    numero as
+      (typeof PERIODOS_DISPONIVEIS)[number]
+  )
+    ? numero
+    : 30;
+}
+
+function dentroDoPeriodo(
+  data:
+    | Date
+    | null,
+  inicio: Date,
+  fim: Date
+) {
+  return Boolean(
+    data &&
+      data >= inicio &&
+      data <= fim
+  );
+}
 
 function limitarPercentual(
   valor: number
@@ -76,6 +116,11 @@ export default async function DashboardColaboradoresPage({
     params?.colaborador?.trim() ??
     "";
 
+  const periodoDias =
+    normalizarPeriodo(
+      params?.periodo
+    );
+
   const agora = new Date();
 
   const inicioHoje =
@@ -88,15 +133,15 @@ export default async function DashboardColaboradoresPage({
     0
   );
 
-  const inicio30Dias =
+  const inicioPeriodo =
     new Date(agora);
 
-  inicio30Dias.setDate(
-    inicio30Dias.getDate() -
-      30
+  inicioPeriodo.setDate(
+    inicioPeriodo.getDate() -
+      periodoDias
   );
 
-  inicio30Dias.setHours(
+  inicioPeriodo.setHours(
     0,
     0,
     0,
@@ -270,7 +315,15 @@ export default async function DashboardColaboradoresPage({
                 "URGENTE"
           ).length;
 
-        const concluidas30Dias =
+        /*
+         * PERFORMANCE NO PERÍODO
+         *
+         * Para OS concluídas, a referência é EXCLUSIVAMENTE
+         * a data/hora de término preenchida no relatório.
+         *
+         * dataConclusao não entra neste indicador.
+         */
+        const ordensConcluidasPeriodo =
           ordens.filter(
             (os) => {
               if (
@@ -280,23 +333,25 @@ export default async function DashboardColaboradoresPage({
                 return false;
               }
 
-              const dataConclusaoKpi =
-                obterDataConclusaoKpi(
-                  os
+              const terminoRelatorio =
+                obterDataTerminoRelatorio(
+                  os.registroFinal
                 );
 
-              return Boolean(
-                dataConclusaoKpi &&
-                  dataConclusaoKpi >=
-                    inicio30Dias &&
-                  dataConclusaoKpi <=
-                    agora
+              return dentroDoPeriodo(
+                terminoRelatorio,
+                inicioPeriodo,
+                agora
               );
             }
-          ).length;
+          );
+
+        const concluidasPeriodo =
+          ordensConcluidasPeriodo.length;
 
         /*
          * Canceladas não entram no denominador.
+         * Esse KPI continua histórico/global.
          */
         const eficiencia =
           validas.length > 0
@@ -307,25 +362,37 @@ export default async function DashboardColaboradoresPage({
               )
             : 0;
 
+        /*
+         * Cumprimento de prazo no período:
+         * usa a data/hora de término escrita no relatório.
+         */
         const concluidasComPrazo =
-          ordens.filter(
-            (os) =>
-              os.status ===
-                "CONCLUIDA" &&
-              os.dataPrevista &&
-              os.dataConclusao
-          );
+          ordensConcluidasPeriodo
+            .map((os) => ({
+              os,
+              terminoRelatorio:
+                obterDataTerminoRelatorio(
+                  os.registroFinal
+                ),
+            }))
+            .filter(
+              (item) =>
+                item.os
+                  .dataPrevista &&
+                item
+                  .terminoRelatorio
+            );
 
         const concluidasNoPrazo =
           concluidasComPrazo.filter(
-            (os) =>
-              os.dataConclusao &&
-              os.dataPrevista &&
-              new Date(
-                os.dataConclusao
-              ) <=
+            (item) =>
+              item.terminoRelatorio &&
+              item.os
+                .dataPrevista &&
+              item.terminoRelatorio <=
                 fimDoDia(
-                  os.dataPrevista
+                  item.os
+                    .dataPrevista
                 )
           ).length;
 
@@ -340,19 +407,17 @@ export default async function DashboardColaboradoresPage({
             : null;
 
         /*
-         * MTTR:
-         * fonte principal = horário informado no relatório.
+         * MTTR DO PERÍODO
+         *
+         * Usa SOMENTE os horários de início/término
+         * preenchidos no relatório técnico.
+         * Sem fallback para tempo de atribuição da OS.
          */
         const duracoes =
-          ordens
-            .filter(
-              (os) =>
-                os.status ===
-                "CONCLUIDA"
-            )
+          ordensConcluidasPeriodo
             .map((os) =>
-              obterDuracaoKpiMinutos(
-                os
+              obterDuracaoRelatorioMinutos(
+                os.registroFinal
               )
             )
             .filter(
@@ -417,16 +482,19 @@ export default async function DashboardColaboradoresPage({
                 inicioHoje
           ).length;
 
-        const preventivasConcluidas30Dias =
+        const preventivasConcluidasPeriodo =
           execucoesPreventivas.filter(
             (execucao) =>
               execucao.status ===
                 "CONCLUIDA" &&
               execucao.dataConclusao &&
-              new Date(
-                execucao.dataConclusao
-              ) >=
-                inicio30Dias
+              dentroDoPeriodo(
+                new Date(
+                  execucao.dataConclusao
+                ),
+                inicioPeriodo,
+                agora
+              )
           ).length;
 
         return {
@@ -440,7 +508,7 @@ export default async function DashboardColaboradoresPage({
           abertas,
           atrasadas,
           urgentesAbertas,
-          concluidas30Dias,
+          concluidasPeriodo,
           eficiencia,
           cumprimentoPrazo,
           mttrMinutos,
@@ -452,7 +520,7 @@ export default async function DashboardColaboradoresPage({
             preventivasAtivas.length,
           preventivasConcluidas,
           preventivasAtrasadas,
-          preventivasConcluidas30Dias,
+          preventivasConcluidasPeriodo,
         };
       }
     );
@@ -530,7 +598,7 @@ export default async function DashboardColaboradoresPage({
       }
     ).length;
 
-  const concluidas30DiasEquipe =
+  const concluidasPeriodoEquipe =
     ordensEquipe.filter(
       (os) => {
         if (
@@ -540,17 +608,15 @@ export default async function DashboardColaboradoresPage({
           return false;
         }
 
-        const dataConclusaoKpi =
-          obterDataConclusaoKpi(
-            os
+        const terminoRelatorio =
+          obterDataTerminoRelatorio(
+            os.registroFinal
           );
 
-        return Boolean(
-          dataConclusaoKpi &&
-            dataConclusaoKpi >=
-              inicio30Dias &&
-            dataConclusaoKpi <=
-              agora
+        return dentroDoPeriodo(
+          terminoRelatorio,
+          inicioPeriodo,
+          agora
         );
       }
     ).length;
@@ -668,6 +734,70 @@ export default async function DashboardColaboradoresPage({
         </section>
 
         {/* =====================================================
+            PERÍODO DE ANÁLISE
+        ====================================================== */}
+        <section className="mt-5 flex flex-col gap-4 rounded-2xl border border-white/[0.07] bg-[#080d1b] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div>
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.13em] text-cyan-300">
+              <CalendarRange
+                size={15}
+              />
+              Período de análise
+            </div>
+
+            <p className="mt-1.5 text-[12px] leading-5 text-slate-500">
+              Conclusões de OS, prazo e MTTR usam exclusivamente a data e os horários preenchidos no relatório técnico.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {PERIODOS_DISPONIVEIS.map(
+              (dias) => {
+                const query =
+                  new URLSearchParams();
+
+                query.set(
+                  "periodo",
+                  String(dias)
+                );
+
+                if (
+                  filtroColaborador
+                ) {
+                  query.set(
+                    "colaborador",
+                    filtroColaborador
+                  );
+                }
+
+                const ativo =
+                  periodoDias ===
+                  dias;
+
+                return (
+                  <Link
+                    key={dias}
+                    href={`/admin/dashboard-colaboradores?${query.toString()}`}
+                    className={[
+                      "inline-flex h-10 min-w-[62px] items-center justify-center rounded-xl border px-3 text-[12px] font-semibold transition",
+                      ativo
+                        ? "border-cyan-300/40 bg-cyan-400 text-slate-950"
+                        : "border-white/[0.08] bg-white/[0.02] text-slate-400 hover:border-cyan-400/25 hover:bg-cyan-400/[0.05] hover:text-cyan-200",
+                    ].join(
+                      " "
+                    )}
+                  >
+                    {dias === 7
+                      ? "Semanal"
+                      : `${dias} dias`}
+                  </Link>
+                );
+              }
+            )}
+          </div>
+        </section>
+
+        {/* =====================================================
             KPI GERAL
         ====================================================== */}
         <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -716,11 +846,11 @@ export default async function DashboardColaboradoresPage({
           />
 
           <KpiEquipe
-            titulo="Concluídas 30d"
+            titulo={`Concluídas ${periodoDias}d`}
             valor={String(
-              concluidas30DiasEquipe
+              concluidasPeriodoEquipe
             )}
-            descricao="Entregas recentes"
+            descricao="Pela data do relatório"
             icon={
               <CheckCircle2
                 size={19}
@@ -746,6 +876,12 @@ export default async function DashboardColaboradoresPage({
             FILTRO
         ====================================================== */}
         <form className="mt-5 rounded-2xl border border-white/[0.07] bg-[#080d1b] p-4 sm:p-5">
+          <input
+            type="hidden"
+            name="periodo"
+            value={periodoDias}
+          />
+
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
             <label className="min-w-0 flex-1">
               <span className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500">
@@ -768,7 +904,7 @@ export default async function DashboardColaboradoresPage({
             </button>
 
             <Link
-              href="/admin/dashboard-colaboradores"
+              href={`/admin/dashboard-colaboradores?periodo=${periodoDias}`}
               className="inline-flex h-12 items-center justify-center rounded-xl border border-white/[0.08] px-6 text-[13px] font-semibold text-slate-300 transition hover:bg-white/[0.04] hover:text-white"
             >
               Limpar
@@ -806,6 +942,9 @@ export default async function DashboardColaboradoresPage({
                     item.colaborador.id
                   }
                   item={item}
+                  periodoDias={
+                    periodoDias
+                  }
                 />
               )
             )}
@@ -888,8 +1027,10 @@ function KpiEquipe({
 
 function ColaboradorCard({
   item,
+  periodoDias,
 }: {
   item: any;
+  periodoDias: number;
 }) {
   const {
     colaborador,
@@ -901,7 +1042,7 @@ function ColaboradorCard({
     abertas,
     atrasadas,
     urgentesAbertas,
-    concluidas30Dias,
+    concluidasPeriodo,
     eficiencia,
     cumprimentoPrazo,
     mttrMinutos,
@@ -910,7 +1051,7 @@ function ColaboradorCard({
     preventivasAtivas,
     preventivasConcluidas,
     preventivasAtrasadas,
-    preventivasConcluidas30Dias,
+    preventivasConcluidasPeriodo,
   } = item;
 
   const iniciais =
@@ -1004,14 +1145,14 @@ function ColaboradorCard({
         />
 
         <KpiIndividual
-          label="No prazo"
+          label={`No prazo ${periodoDias}d`}
           value={
             cumprimentoPrazo ===
             null
               ? "—"
               : `${cumprimentoPrazo}%`
           }
-          helper="Conclusões com prazo"
+          helper="Pela data do relatório"
           icon={
             <Target size={15} />
           }
@@ -1019,7 +1160,7 @@ function ColaboradorCard({
         />
 
         <KpiIndividual
-          label="MTTR relatório"
+          label={`MTTR ${periodoDias}d`}
           value={formatarDuracaoMinutos(
             mttrMinutos
           )}
@@ -1037,11 +1178,11 @@ function ColaboradorCard({
         />
 
         <KpiIndividual
-          label="Concluídas 30d"
+          label={`Concluídas ${periodoDias}d`}
           value={String(
-            concluidas30Dias
+            concluidasPeriodo
           )}
-          helper="Entrega recente"
+          helper="Data do relatório"
           icon={
             <CheckCircle2
               size={15}
@@ -1241,9 +1382,9 @@ function ColaboradorCard({
               />
 
               <MiniPreventiva
-                label="Concl. 30d"
+                label={`Concl. ${periodoDias}d`}
                 value={
-                  preventivasConcluidas30Dias
+                  preventivasConcluidasPeriodo
                 }
                 tone="violet"
                 icon={
@@ -1258,7 +1399,7 @@ function ColaboradorCard({
 
         <div className="mt-5 flex flex-col gap-3 border-t border-white/[0.06] pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[10px] font-normal text-slate-600">
-            MTTR usa o horário informado no relatório técnico. Eficiência exclui OS canceladas.
+            Conclusões, prazo e MTTR do período usam o relatório técnico. OS sem relatório preenchido não entram nas conclusões do período. Eficiência permanece histórica e exclui canceladas.
           </p>
 
           <Link
