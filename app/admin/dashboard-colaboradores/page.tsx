@@ -51,6 +51,7 @@ type PageProps = {
 };
 
 const PERIODOS_DISPONIVEIS = [
+  "geral",
   7,
   15,
   30,
@@ -58,19 +59,36 @@ const PERIODOS_DISPONIVEIS = [
   60,
 ] as const;
 
+type PeriodoSelecionado =
+  | "geral"
+  | 7
+  | 15
+  | 30
+  | 45
+  | 60;
+
 function normalizarPeriodo(
   valor:
     | string
     | undefined
-) {
+): PeriodoSelecionado {
+  if (
+    valor === "geral"
+  ) {
+    return "geral";
+  }
+
   const numero =
     Number(valor);
 
-  return PERIODOS_DISPONIVEIS.includes(
-    numero as
-      (typeof PERIODOS_DISPONIVEIS)[number]
-  )
-    ? numero
+  return [
+    7,
+    15,
+    30,
+    45,
+    60,
+  ].includes(numero)
+    ? (numero as PeriodoSelecionado)
     : 30;
 }
 
@@ -78,14 +96,33 @@ function dentroDoPeriodo(
   data:
     | Date
     | null,
-  inicio: Date,
+  inicio:
+    | Date
+    | null,
   fim: Date
 ) {
-  return Boolean(
-    data &&
-      data >= inicio &&
-      data <= fim
+  if (!data) {
+    return false;
+  }
+
+  if (!inicio) {
+    return data <= fim;
+  }
+
+  return (
+    data >= inicio &&
+    data <= fim
   );
+}
+
+function rotuloPeriodo(
+  periodo:
+    PeriodoSelecionado
+) {
+  return periodo ===
+    "geral"
+    ? "Geral"
+    : `${periodo}d`;
 }
 
 function limitarPercentual(
@@ -134,19 +171,28 @@ export default async function DashboardColaboradoresPage({
   );
 
   const inicioPeriodo =
-    new Date(agora);
+    typeof periodoDias ===
+    "number"
+      ? new Date(agora)
+      : null;
 
-  inicioPeriodo.setDate(
-    inicioPeriodo.getDate() -
-      periodoDias
-  );
+  if (
+    inicioPeriodo &&
+    typeof periodoDias ===
+      "number"
+  ) {
+    inicioPeriodo.setDate(
+      inicioPeriodo.getDate() -
+        periodoDias
+    );
 
-  inicioPeriodo.setHours(
-    0,
-    0,
-    0,
-    0
-  );
+    inicioPeriodo.setHours(
+      0,
+      0,
+      0,
+      0
+    );
+  }
 
   const colaboradores =
     await prisma.user.findMany({
@@ -746,19 +792,19 @@ export default async function DashboardColaboradoresPage({
             </div>
 
             <p className="mt-1.5 text-[12px] leading-5 text-slate-500">
-              Conclusões de OS, prazo e MTTR usam exclusivamente a data e os horários preenchidos no relatório técnico.
+              Conclusões de OS, prazo e MTTR usam exclusivamente a data e os horários preenchidos no relatório técnico. Em Geral, considera todo o histórico disponível.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             {PERIODOS_DISPONIVEIS.map(
-              (dias) => {
+              (periodo) => {
                 const query =
                   new URLSearchParams();
 
                 query.set(
                   "periodo",
-                  String(dias)
+                  String(periodo)
                 );
 
                 if (
@@ -772,11 +818,22 @@ export default async function DashboardColaboradoresPage({
 
                 const ativo =
                   periodoDias ===
-                  dias;
+                  periodo;
+
+                const label =
+                  periodo ===
+                    "geral"
+                    ? "Geral"
+                    : periodo ===
+                        7
+                      ? "Semanal"
+                      : `${periodo} dias`;
 
                 return (
                   <Link
-                    key={dias}
+                    key={String(
+                      periodo
+                    )}
                     href={`/admin/dashboard-colaboradores?${query.toString()}`}
                     className={[
                       "inline-flex h-10 min-w-[62px] items-center justify-center rounded-xl border px-3 text-[12px] font-semibold transition",
@@ -787,9 +844,7 @@ export default async function DashboardColaboradoresPage({
                       " "
                     )}
                   >
-                    {dias === 7
-                      ? "Semanal"
-                      : `${dias} dias`}
+                    {label}
                   </Link>
                 );
               }
@@ -846,7 +901,7 @@ export default async function DashboardColaboradoresPage({
           />
 
           <KpiEquipe
-            titulo={`Concluídas ${periodoDias}d`}
+            titulo={`Concluídas ${rotuloPeriodo(periodoDias)}`}
             valor={String(
               concluidasPeriodoEquipe
             )}
@@ -1030,7 +1085,7 @@ function ColaboradorCard({
   periodoDias,
 }: {
   item: any;
-  periodoDias: number;
+  periodoDias: PeriodoSelecionado;
 }) {
   const {
     colaborador,
@@ -1145,7 +1200,7 @@ function ColaboradorCard({
         />
 
         <KpiIndividual
-          label={`No prazo ${periodoDias}d`}
+          label={`No prazo ${rotuloPeriodo(periodoDias)}`}
           value={
             cumprimentoPrazo ===
             null
@@ -1160,7 +1215,7 @@ function ColaboradorCard({
         />
 
         <KpiIndividual
-          label={`MTTR ${periodoDias}d`}
+          label={`MTTR ${rotuloPeriodo(periodoDias)}`}
           value={formatarDuracaoMinutos(
             mttrMinutos
           )}
@@ -1178,7 +1233,7 @@ function ColaboradorCard({
         />
 
         <KpiIndividual
-          label={`Concluídas ${periodoDias}d`}
+          label={`Concluídas ${rotuloPeriodo(periodoDias)}`}
           value={String(
             concluidasPeriodo
           )}
@@ -1382,7 +1437,7 @@ function ColaboradorCard({
               />
 
               <MiniPreventiva
-                label={`Concl. ${periodoDias}d`}
+                label={`Concl. ${rotuloPeriodo(periodoDias)}`}
                 value={
                   preventivasConcluidasPeriodo
                 }
