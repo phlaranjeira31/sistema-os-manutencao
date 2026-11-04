@@ -20,13 +20,13 @@ import {
   Wrench,
 } from "lucide-react";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
   Legend,
-  Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -59,6 +59,7 @@ type Relatorio = {
   prioridade: string;
   registroFinal: string;
   temRelatorio: boolean;
+  dataRelatorio: string | null;
   updatedAt: string;
   dataConclusao: string | null;
   setor: Setor | null;
@@ -138,23 +139,36 @@ const tooltipStyle = {
 function formatarData(value: string | null) {
   if (!value) return "-";
 
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(value));
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date(value));
 }
 
 function formatarDataInput(value: string) {
   if (!value) return "Todas";
 
-  return new Intl.DateTimeFormat("pt-BR").format(
-    new Date(`${value}T00:00:00`)
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+  }).format(
+    new Date(`${value}T12:00:00-03:00`)
   );
 }
 
 function chaveMes(value: string) {
-  const data = new Date(value);
+  const partes =
+    new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+    }).formatToParts(new Date(value));
 
-  return `${data.getUTCFullYear()}-${String(
-    data.getUTCMonth() + 1
-  ).padStart(2, "0")}`;
+  const ano =
+    partes.find((parte) => parte.type === "year")?.value ?? "";
+
+  const mes =
+    partes.find((parte) => parte.type === "month")?.value ?? "";
+
+  return `${ano}-${mes}`;
 }
 
 function formatarMes(chave: string) {
@@ -206,11 +220,15 @@ export default function DashboardRelatorios({
 
   const relatoriosFiltrados = useMemo(() => {
     const inicio = filtrosAplicados.dataInicio
-      ? new Date(`${filtrosAplicados.dataInicio}T00:00:00`)
+      ? new Date(
+          `${filtrosAplicados.dataInicio}T00:00:00-03:00`
+        )
       : null;
 
     const fim = filtrosAplicados.dataFim
-      ? new Date(`${filtrosAplicados.dataFim}T23:59:59`)
+      ? new Date(
+          `${filtrosAplicados.dataFim}T23:59:59-03:00`
+        )
       : null;
 
     const busca = filtrosAplicados.busca
@@ -218,15 +236,29 @@ export default function DashboardRelatorios({
       .toLocaleLowerCase("pt-BR");
 
     return relatorios.filter((relatorio) => {
+      /*
+       * Período oficial:
+       * - relatório preenchido -> data/hora de término do relatório técnico;
+       * - pendência sem relatório -> dataConclusao apenas para organizar a pendência.
+       *
+       * updatedAt NÃO é referência temporal de negócio.
+       */
       const dataBase =
         relatorio.temRelatorio
-          ? relatorio.updatedAt
-          : relatorio.dataConclusao ?? relatorio.updatedAt;
+          ? relatorio.dataRelatorio
+          : relatorio.dataConclusao;
 
-      const dataRelatorio = new Date(dataBase);
+      if ((inicio || fim) && !dataBase) {
+        return false;
+      }
 
-      if (inicio && dataRelatorio < inicio) return false;
-      if (fim && dataRelatorio > fim) return false;
+      if (dataBase) {
+        const dataReferencia =
+          new Date(dataBase);
+
+        if (inicio && dataReferencia < inicio) return false;
+        if (fim && dataReferencia > fim) return false;
+      }
 
       if (
         filtrosAplicados.colaborador &&
@@ -385,6 +417,69 @@ export default function DashboardRelatorios({
   }, [relatoriosComDocumentoFiltrados]);
 
   const dadosEvolucao = useMemo(() => {
+    /*
+     * EVOLUÇÃO MENSAL DOS RELATÓRIOS
+     *
+     * Fonte exclusiva: dataRelatorio, extraída da Data/Hora de término
+     * preenchida no registroFinal. A data em que o documento foi salvo
+     * ou editado (updatedAt) não participa deste gráfico.
+     */
+    const referenciaFim =
+      filtrosAplicados.dataFim
+        ? new Date(
+            `${filtrosAplicados.dataFim}T12:00:00-03:00`
+          )
+        : new Date(geradoEm);
+
+    let referenciaInicio =
+      filtrosAplicados.dataInicio
+        ? new Date(
+            `${filtrosAplicados.dataInicio}T12:00:00-03:00`
+          )
+        : new Date(
+            referenciaFim.getFullYear(),
+            referenciaFim.getMonth() - 11,
+            1,
+            12,
+            0,
+            0
+          );
+
+    referenciaInicio = new Date(
+      referenciaInicio.getFullYear(),
+      referenciaInicio.getMonth(),
+      1,
+      12,
+      0,
+      0
+    );
+
+    const fimMes = new Date(
+      referenciaFim.getFullYear(),
+      referenciaFim.getMonth(),
+      1,
+      12,
+      0,
+      0
+    );
+
+    /*
+     * Proteção visual: mesmo em um período muito longo, o gráfico
+     * mostra no máximo 24 meses para manter leitura profissional.
+     */
+    const limite24Meses = new Date(
+      fimMes.getFullYear(),
+      fimMes.getMonth() - 23,
+      1,
+      12,
+      0,
+      0
+    );
+
+    if (referenciaInicio < limite24Meses) {
+      referenciaInicio = limite24Meses;
+    }
+
     const mapa = new Map<
       string,
       {
@@ -393,25 +488,110 @@ export default function DashboardRelatorios({
       }
     >();
 
-    relatoriosComDocumentoFiltrados.forEach((relatorio) => {
-      const chave = chaveMes(relatorio.updatedAt);
+    const cursor = new Date(
+      referenciaInicio
+    );
 
-      const atual = mapa.get(chave) ?? {
+    while (cursor <= fimMes) {
+      const chave = `${cursor.getFullYear()}-${String(
+        cursor.getMonth() + 1
+      ).padStart(2, "0")}`;
+
+      mapa.set(chave, {
         chave,
         quantidade: 0,
-      };
+      });
 
-      atual.quantidade += 1;
-      mapa.set(chave, atual);
-    });
+      cursor.setMonth(
+        cursor.getMonth() + 1
+      );
+    }
 
-    return Array.from(mapa.values())
-      .sort((a, b) => a.chave.localeCompare(b.chave))
-      .map((item) => ({
-        mes: formatarMes(item.chave),
-        quantidade: item.quantidade,
-      }));
-  }, [relatoriosComDocumentoFiltrados]);
+    relatoriosComDocumentoFiltrados.forEach(
+      (relatorio) => {
+        if (!relatorio.dataRelatorio) {
+          return;
+        }
+
+        const chave =
+          chaveMes(
+            relatorio.dataRelatorio
+          );
+
+        const atual =
+          mapa.get(chave);
+
+        if (!atual) {
+          return;
+        }
+
+        atual.quantidade += 1;
+      }
+    );
+
+    return Array.from(
+      mapa.values()
+    ).map((item) => ({
+      mes:
+        formatarMes(
+          item.chave
+        ),
+      quantidade:
+        item.quantidade,
+    }));
+  }, [
+    filtrosAplicados.dataFim,
+    filtrosAplicados.dataInicio,
+    geradoEm,
+    relatoriosComDocumentoFiltrados,
+  ]);
+
+  const resumoEvolucao = useMemo(() => {
+    const total =
+      dadosEvolucao.reduce(
+        (soma, item) =>
+          soma +
+          item.quantidade,
+        0
+      );
+
+    const mesesComDados =
+      dadosEvolucao.filter(
+        (item) =>
+          item.quantidade > 0
+      );
+
+    const media =
+      mesesComDados.length > 0
+        ? Math.round(
+            (total /
+              mesesComDados.length) *
+              10
+          ) / 10
+        : 0;
+
+    const pico =
+      dadosEvolucao.reduce(
+        (
+          melhor,
+          item
+        ) =>
+          item.quantidade >
+          melhor.quantidade
+            ? item
+            : melhor,
+        {
+          mes: "-",
+          quantidade: 0,
+        }
+      );
+
+    return {
+      total,
+      media,
+      pico,
+    };
+  }, [dadosEvolucao]);
 
   const dadosStatus = useMemo(() => {
     return Object.keys(STATUS_LABELS).map((status) => ({
@@ -436,14 +616,42 @@ export default function DashboardRelatorios({
   const metricas = useMemo(() => {
     const dataReferencia = new Date(geradoEm);
 
-    const totalMesAtual = relatoriosComDocumentoFiltrados.filter((relatorio) => {
-      const data = new Date(relatorio.updatedAt);
+    const totalMesAtual =
+      relatoriosComDocumentoFiltrados.filter(
+        (relatorio) => {
+          if (!relatorio.dataRelatorio) {
+            return false;
+          }
 
-      return (
-        data.getMonth() === dataReferencia.getMonth() &&
-        data.getFullYear() === dataReferencia.getFullYear()
-      );
-    }).length;
+          const data =
+            new Date(
+              relatorio.dataRelatorio
+            );
+
+          const chaveData =
+            chaveMes(
+              data.toISOString()
+            );
+
+          const chaveReferencia =
+            chaveMes(
+              dataReferencia.toISOString()
+            );
+
+          return (
+            chaveData ===
+            chaveReferencia
+          );
+        }
+      ).length;
+
+    const datasValidas =
+      relatoriosComDocumentoFiltrados.filter(
+        (relatorio) =>
+          Boolean(
+            relatorio.dataRelatorio
+          )
+      ).length;
 
     const colaboradoresUnicos = new Set(
       relatoriosComDocumentoFiltrados.flatMap((relatorio) =>
@@ -469,6 +677,7 @@ export default function DashboardRelatorios({
       colaboradoresUnicos,
       setoresUnicos,
       maquinasUnicas,
+      datasValidas,
       semRelatorio: semRelatorioFiltrados.length,
     };
   }, [
@@ -688,8 +897,8 @@ export default function DashboardRelatorios({
           ? "Preenchido"
           : "Pendente",
         "Data de conclusão": formatarData(relatorio.dataConclusao),
-        "Data do relatório": relatorio.temRelatorio
-          ? formatarData(relatorio.updatedAt)
+        "Data real do relatório": relatorio.temRelatorio
+          ? formatarData(relatorio.dataRelatorio)
           : "-",
         Relatório: relatorio.temRelatorio
           ? relatorio.registroFinal
@@ -792,7 +1001,7 @@ export default function DashboardRelatorios({
               </h2>
 
               <p className="text-sm text-slate-400">
-                Os indicadores e gráficos serão recalculados.
+                O período usa a data/hora de término preenchida no relatório técnico.
               </p>
             </div>
           </div>
@@ -1020,7 +1229,7 @@ export default function DashboardRelatorios({
           </div>
         </section>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <CardMetrica
             titulo="Total de relatórios"
             valor={metricas.total}
@@ -1031,7 +1240,14 @@ export default function DashboardRelatorios({
           <CardMetrica
             titulo="Relatórios neste mês"
             valor={metricas.totalMesAtual}
-            descricao="Registros no mês atual"
+            descricao="Pela data real do relatório"
+            icon={<CalendarDays size={23} />}
+          />
+
+          <CardMetrica
+            titulo="Data técnica válida"
+            valor={`${metricas.datasValidas}/${metricas.total}`}
+            descricao="Documentos com término identificável"
             icon={<CalendarDays size={23} />}
           />
 
@@ -1178,47 +1394,172 @@ export default function DashboardRelatorios({
         ) : (
           <>
             <CardGrafico
-              titulo="Evolução mensal dos relatórios"
-              descricao="Quantidade de relatórios registrados em cada mês."
+              titulo="Evolução real dos relatórios"
+              descricao="Quantidade de serviços por mês, usando exclusivamente a data/hora de término preenchida no relatório técnico."
               icon={<TrendingUp size={21} />}
             >
-              <ResponsiveContainer width="100%" height={370}>
-                <LineChart data={dadosEvolucao}>
-                  <CartesianGrid
-                    stroke="rgba(255,255,255,0.08)"
-                    vertical={false}
-                  />
+              <div className="mb-4 grid gap-3 sm:grid-cols-3">
+                <ResumoGrafico
+                  label="No período"
+                  value={resumoEvolucao.total}
+                  helper="relatórios com data válida"
+                  tone="cyan"
+                />
 
-                  <XAxis
-                    dataKey="mes"
-                    tick={{ fill: "#94a3b8", fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
+                <ResumoGrafico
+                  label="Média mensal"
+                  value={resumoEvolucao.media}
+                  helper="considerando meses com dados"
+                  tone="blue"
+                />
 
-                  <YAxis
-                    allowDecimals={false}
-                    tick={{ fill: "#94a3b8", fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
+                <ResumoGrafico
+                  label="Pico"
+                  value={resumoEvolucao.pico.quantidade}
+                  helper={
+                    resumoEvolucao.pico.quantidade > 0
+                      ? resumoEvolucao.pico.mes
+                      : "sem movimento"
+                  }
+                  tone="green"
+                />
+              </div>
 
-                  <Tooltip contentStyle={tooltipStyle} />
-
-                  <Line
-                    type="monotone"
-                    dataKey="quantidade"
-                    name="Relatórios"
-                    stroke="#22d3ee"
-                    strokeWidth={4}
-                    dot={{
-                      r: 5,
-                      fill: "#22d3ee",
+              <div className="h-[360px] overflow-hidden rounded-2xl border border-white/[0.06] bg-[linear-gradient(180deg,rgba(34,211,238,.025),rgba(2,6,23,.20))] p-2 sm:h-[410px]">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                >
+                  <AreaChart
+                    data={dadosEvolucao}
+                    margin={{
+                      top: 18,
+                      right: 18,
+                      left: 0,
+                      bottom: 4,
                     }}
-                    activeDot={{ r: 8 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+                  >
+                    <defs>
+                      <linearGradient
+                        id="relatoriosArea"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="0%"
+                          stopColor="#22d3ee"
+                          stopOpacity={0.30}
+                        />
+
+                        <stop
+                          offset="72%"
+                          stopColor="#22d3ee"
+                          stopOpacity={0.035}
+                        />
+
+                        <stop
+                          offset="100%"
+                          stopColor="#22d3ee"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+
+                    <CartesianGrid
+                      stroke="rgba(148,163,184,.10)"
+                      strokeDasharray="4 6"
+                      vertical={false}
+                    />
+
+                    <XAxis
+                      dataKey="mes"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{
+                        fill: "#94a3b8",
+                        fontSize: 12,
+                        fontWeight: 700,
+                      }}
+                      tickMargin={12}
+                    />
+
+                    <YAxis
+                      allowDecimals={false}
+                      axisLine={false}
+                      tickLine={false}
+                      width={42}
+                      tick={{
+                        fill: "#64748b",
+                        fontSize: 11,
+                        fontWeight: 700,
+                      }}
+                      domain={[
+                        0,
+                        (dataMax: number) =>
+                          Math.max(
+                            4,
+                            Math.ceil(
+                              dataMax * 1.12
+                            )
+                          ),
+                      ]}
+                    />
+
+                    <Tooltip
+                      contentStyle={{
+                        ...tooltipStyle,
+                        backgroundColor:
+                          "rgba(5,11,24,.96)",
+                      }}
+                      labelStyle={{
+                        color: "#cbd5e1",
+                        fontWeight: 800,
+                        marginBottom: 4,
+                      }}
+                      formatter={(value) => [
+                        `${value} relatório(s)`,
+                        "Data real do relatório",
+                      ]}
+                    />
+
+                    <Area
+                      type="monotone"
+                      dataKey="quantidade"
+                      name="Relatórios"
+                      stroke="#22d3ee"
+                      strokeWidth={4}
+                      fill="url(#relatoriosArea)"
+                      dot={{
+                        r: 4,
+                        fill: "#07101f",
+                        stroke: "#22d3ee",
+                        strokeWidth: 2.5,
+                      }}
+                      activeDot={{
+                        r: 7,
+                        fill: "#22d3ee",
+                        stroke: "#cffafe",
+                        strokeWidth: 2,
+                      }}
+                      isAnimationActive
+                      animationDuration={700}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.025] px-3 py-2.5">
+                <CalendarDays
+                  size={15}
+                  className="shrink-0 text-cyan-300"
+                />
+
+                <p className="text-xs leading-5 text-slate-500">
+                  Uma OS salva ou encerrada administrativamente neste mês será contabilizada em outro mês se a data de término do relatório técnico indicar isso.
+                </p>
+              </div>
             </CardGrafico>
 
             <section className="grid gap-6 xl:grid-cols-2">
@@ -1531,7 +1872,7 @@ export default function DashboardRelatorios({
                 </th>
 
                 <th className="px-4 py-4 text-left text-xs font-black uppercase">
-                  Data
+                  Data do relatório
                 </th>
 
                 <th className="px-4 py-4 text-left text-xs font-black uppercase">
@@ -1571,7 +1912,7 @@ export default function DashboardRelatorios({
                   <td className="px-4 py-4 text-sm text-slate-300">
                     {formatarData(
                       relatorio.temRelatorio
-                        ? relatorio.updatedAt
+                        ? relatorio.dataRelatorio
                         : relatorio.dataConclusao
                     )}
                   </td>
@@ -1670,7 +2011,7 @@ function CardMetrica({
   icon: ReactNode;
 }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-[#080d1f] p-5 shadow-xl shadow-black/20">
+    <div className="rounded-[22px] border border-white/[0.07] bg-[#070c1b] p-5 shadow-[0_10px_30px_rgba(0,0,0,.16)]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-bold text-slate-400">
@@ -1694,6 +2035,45 @@ function CardMetrica({
   );
 }
 
+function ResumoGrafico({
+  label,
+  value,
+  helper,
+  tone,
+}: {
+  label: string;
+  value: number | string;
+  helper: string;
+  tone: "cyan" | "blue" | "green";
+}) {
+  const classes = {
+    cyan:
+      "border-cyan-400/12 bg-cyan-400/[0.035] text-cyan-300",
+    blue:
+      "border-blue-400/12 bg-blue-400/[0.035] text-blue-300",
+    green:
+      "border-emerald-400/12 bg-emerald-400/[0.035] text-emerald-300",
+  };
+
+  return (
+    <div
+      className={`rounded-xl border px-4 py-3 ${classes[tone]}`}
+    >
+      <p className="text-[10px] font-black uppercase tracking-[0.09em] opacity-75">
+        {label}
+      </p>
+
+      <p className="mt-1 text-2xl font-black tracking-[-0.04em] text-white">
+        {value}
+      </p>
+
+      <p className="mt-1 text-[10px] text-slate-600">
+        {helper}
+      </p>
+    </div>
+  );
+}
+
 function CardGrafico({
   titulo,
   descricao,
@@ -1706,7 +2086,7 @@ function CardGrafico({
   children: ReactNode;
 }) {
   return (
-    <section className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl shadow-black/25 sm:p-6">
+    <section className="min-w-0 rounded-[24px] border border-white/[0.07] bg-[#070c1b] p-4 shadow-[0_12px_35px_rgba(0,0,0,.18)] sm:p-6">
       <div className="mb-6 flex items-center gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-300">
           {icon}
