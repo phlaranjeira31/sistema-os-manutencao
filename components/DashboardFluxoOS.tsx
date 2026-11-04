@@ -59,13 +59,13 @@ function FluxoTooltip({
 
   return (
     <div className="min-w-[150px] rounded-xl border border-white/[0.10] bg-[#050b18]/95 p-3 shadow-2xl backdrop-blur-xl">
-      <p className="text-[10px] font-black uppercase tracking-[0.11em] text-slate-400">
+      <p className="text-[11px] font-black uppercase tracking-[0.11em] text-slate-400">
         {label}
       </p>
 
       <div className="mt-2.5 space-y-2">
         <div className="flex items-center justify-between gap-5">
-          <span className="flex items-center gap-2 text-[10px] font-bold text-cyan-300">
+          <span className="flex items-center gap-2 text-[11px] font-bold text-cyan-300">
             <span className="h-2 w-2 rounded-full bg-cyan-400" />
             Criadas
           </span>
@@ -76,7 +76,7 @@ function FluxoTooltip({
         </div>
 
         <div className="flex items-center justify-between gap-5">
-          <span className="flex items-center gap-2 text-[10px] font-bold text-emerald-300">
+          <span className="flex items-center gap-2 text-[11px] font-bold text-emerald-300">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
             Concluídas (relatório)
           </span>
@@ -118,16 +118,16 @@ function MiniResumo({
       className={`flex min-w-0 flex-col justify-center rounded-xl border px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-3 ${tones[tone]}`}
     >
       <div>
-        <p className="text-[8px] font-black uppercase tracking-[0.09em] opacity-70">
+        <p className="text-[9px] font-black uppercase tracking-[0.09em] opacity-70">
           {label}
         </p>
 
-        <p className="mt-0.5 text-[8px] font-semibold text-slate-600">
+        <p className="mt-0.5 text-[9px] font-semibold text-slate-500">
           mês atual
         </p>
       </div>
 
-      <p className="mt-1 text-base font-black tracking-[-0.04em] text-white sm:mt-0 sm:text-lg">
+      <p className="mt-1 text-base font-black tracking-[-0.04em] text-white sm:mt-0 sm:text-xl">
         {signed && value > 0
           ? "+"
           : ""}
@@ -155,12 +155,12 @@ export default function DashboardFluxoOS({
     <div className="grid min-h-[310px] grid-rows-[240px_auto] gap-2 sm:min-h-[350px] sm:grid-rows-[280px_auto] lg:h-full lg:min-h-0 lg:grid-rows-[minmax(0,1fr)_46px]">
       <div className="relative min-h-[240px] overflow-hidden rounded-xl border border-white/[0.04] bg-[linear-gradient(180deg,rgba(34,211,238,.025),rgba(2,6,23,.08))] px-1 pt-1 sm:min-h-[280px] lg:min-h-0">
         <div className="pointer-events-none absolute left-3 top-2 z-10 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.08em] text-cyan-300">
+          <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.08em] text-cyan-300">
             <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,.6)]" />
             Criadas
           </span>
 
-          <span className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.08em] text-emerald-300">
+          <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.08em] text-emerald-300">
             <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.5)]" />
             Concluídas
           </span>
@@ -219,7 +219,7 @@ export default function DashboardFluxoOS({
               tickLine={false}
               tick={{
                 fill: "#64748b",
-                fontSize: 9,
+                fontSize: 10,
                 fontWeight: 700,
               }}
               tickMargin={9}
@@ -232,7 +232,7 @@ export default function DashboardFluxoOS({
               width={36}
               tick={{
                 fill: "#475569",
-                fontSize: 8,
+                fontSize: 9,
                 fontWeight: 700,
               }}
               domain={[

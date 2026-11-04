@@ -39,7 +39,7 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`group relative flex h-9 items-center gap-2.5 rounded-xl border px-2.5 text-[12px] font-semibold transition-all ${
+      className={`group relative flex h-9 items-center gap-2.5 rounded-xl border px-2.5 text-[13px] font-semibold transition-all ${
         active
           ? "border-cyan-400/20 bg-[linear-gradient(90deg,rgba(34,211,238,.12),rgba(34,211,238,.035))] text-cyan-100 shadow-[0_0_22px_rgba(34,211,238,.06)]"
           : "border-transparent text-slate-400 hover:border-white/[0.06] hover:bg-white/[0.03] hover:text-slate-100"
@@ -75,7 +75,7 @@ function NavGroup({
 }) {
   return (
     <div>
-      <p className="mb-1.5 px-3 text-[8px] font-black uppercase tracking-[0.18em] text-slate-700">
+      <p className="mb-1.5 px-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-700">
         {title}
       </p>
 

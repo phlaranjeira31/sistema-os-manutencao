@@ -389,7 +389,7 @@ export default async function AdminPage() {
     totalExternas,
     concluidasExternas,
     ordensHistorico,
-    atividadesRecentes,
+    ordensRecentes,
     proximasPreventivas,
   ] = await Promise.all([
     prisma.ordemServico.count({
@@ -539,8 +539,15 @@ export default async function AdminPage() {
           empresaSequoiaId,
       },
 
+      /*
+       * OS RECENTES
+       *
+       * Este bloco representa as últimas ordens ABERTAS/CRIADAS
+       * no sistema. Por isso a referência é createdAt, e não
+       * updatedAt. Uma OS antiga editada hoje não sobe para o topo.
+       */
       orderBy: {
-        updatedAt: "desc",
+        createdAt: "desc",
       },
 
       take: 3,
@@ -551,7 +558,7 @@ export default async function AdminPage() {
         titulo: true,
         descricao: true,
         status: true,
-        updatedAt: true,
+        createdAt: true,
       },
     }),
 
@@ -690,11 +697,11 @@ export default async function AdminPage() {
                 </div>
 
                 <div className="min-w-0">
-                  <h1 className="truncate text-[17px] font-black tracking-[-0.025em] text-white">
+                  <h1 className="truncate text-[18px] font-black tracking-[-0.025em] text-white">
                     Sistema de OS
                   </h1>
 
-                  <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-500">
+                  <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500">
                     Manutenção industrial • Sequoia
                   </p>
                 </div>
@@ -709,16 +716,16 @@ export default async function AdminPage() {
           <footer className="shrink-0 border-t border-white/[0.06] px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-700">
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-600">
                   Desenvolvido por
                 </p>
 
-                <p className="mt-0.5 truncate text-[11px] font-bold text-slate-400">
+                <p className="mt-0.5 truncate text-[12px] font-bold text-slate-400">
                   Pedro H. Laranjeira
                 </p>
               </div>
 
-              <span className="shrink-0 rounded-full border border-cyan-400/10 bg-cyan-400/[0.04] px-2 py-1 text-[8px] font-black text-cyan-400/80">
+              <span className="shrink-0 rounded-full border border-cyan-400/10 bg-cyan-400/[0.04] px-2 py-1 text-[9px] font-black text-cyan-400/80">
                 v1.0.0
               </span>
             </div>
@@ -748,7 +755,7 @@ export default async function AdminPage() {
 
                 <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:h-full lg:gap-5">
                   <div className="min-w-0">
-                    <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300">
+                    <p className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-cyan-300">
                       <Activity size={14} />
                       Centro de controle
                     </p>
@@ -757,14 +764,14 @@ export default async function AdminPage() {
                       Controle de Ordens de Serviço
                     </h1>
 
-                    <p className="mt-2 max-w-3xl text-[11px] leading-5 text-slate-300 sm:mt-1 xl:text-xs">
+                    <p className="mt-2 max-w-3xl text-[12px] leading-5 text-slate-300 sm:mt-1 xl:text-[13px]">
                       Visão executiva das manutenções, prioridades, eficiência e fluxo operacional da Sequoia.
                     </p>
                   </div>
 
                   <div className="flex w-full shrink-0 items-center gap-2.5 sm:w-auto">
                     <div className="hidden min-w-[105px] rounded-xl border border-blue-400/10 bg-blue-400/[0.04] px-3 py-2 xl:block">
-                      <p className="text-[8px] font-black uppercase tracking-[0.1em] text-slate-500">
+                      <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-500">
                         OS abertas
                       </p>
 
@@ -774,7 +781,7 @@ export default async function AdminPage() {
                     </div>
 
                     <div className="hidden min-w-[105px] rounded-xl border border-emerald-400/10 bg-emerald-400/[0.04] px-3 py-2 xl:block">
-                      <p className="text-[8px] font-black uppercase tracking-[0.1em] text-slate-500">
+                      <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-500">
                         Eficiência
                       </p>
 
@@ -787,7 +794,7 @@ export default async function AdminPage() {
                       href={
                         hrefOrdensSequoia()
                       }
-                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-5 text-[11px] font-black text-slate-950 transition hover:bg-cyan-50 sm:w-auto"
+                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-5 text-[12px] font-black text-slate-950 transition hover:bg-cyan-50 sm:w-auto"
                     >
                       Ver ordens
                       <ArrowRight
@@ -897,11 +904,11 @@ export default async function AdminPage() {
                         size="large"
                       />
 
-                      <p className="mt-1 text-[9px] font-black uppercase tracking-[0.09em] text-cyan-300">
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.09em] text-cyan-300">
                         Eficiência total
                       </p>
 
-                      <p className="mt-0.5 text-[8px] text-slate-600">
+                      <p className="mt-0.5 text-[9px] text-slate-500">
                         {concluidas}/
                         {
                           totalOSConsideradas
@@ -954,7 +961,7 @@ export default async function AdminPage() {
                     />
                   }
                   right={
-                    <span className="hidden rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-slate-500 2xl:inline-flex">
+                    <span className="hidden rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-slate-500 2xl:inline-flex">
                       Tendência mensal
                     </span>
                   }
@@ -1042,8 +1049,8 @@ export default async function AdminPage() {
               ================================================== */}
               <section className="grid min-h-0 gap-3 xl:grid-cols-[1.08fr_0.92fr]">
                 <Panel
-                  title="Atividades recentes"
-                  subtitle="Últimas movimentações das ordens"
+                  title="OS recentes"
+                  subtitle="Últimas ordens abertas no sistema"
                   icon={
                     <Clock3 size={17} />
                   }
@@ -1052,7 +1059,7 @@ export default async function AdminPage() {
                       href={
                         hrefOrdensSequoia()
                       }
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.025] px-2.5 py-1.5 text-[8px] font-black text-slate-500 transition hover:text-cyan-300"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.025] px-2.5 py-1.5 text-[9px] font-black text-slate-400 transition hover:text-cyan-300"
                     >
                       Ver todas
                       <ArrowRight
@@ -1062,9 +1069,9 @@ export default async function AdminPage() {
                   }
                 >
                   <div className="grid h-full min-h-0 grid-rows-3 gap-1.5">
-                    {atividadesRecentes.map(
+                    {ordensRecentes.map(
                       (os) => (
-                        <RecentActivity
+                        <RecentOrder
                           key={os.id}
                           numero={
                             os.numero
@@ -1076,8 +1083,8 @@ export default async function AdminPage() {
                           status={
                             os.status
                           }
-                          updatedAt={
-                            os.updatedAt
+                          createdAt={
+                            os.createdAt
                           }
                           href={`/admin/os/${os.id}`}
                         />
@@ -1097,7 +1104,7 @@ export default async function AdminPage() {
                   right={
                     <Link
                       href="/admin/os/preventivas"
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.025] px-2.5 py-1.5 text-[8px] font-black text-slate-500 transition hover:text-cyan-300"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.025] px-2.5 py-1.5 text-[9px] font-black text-slate-400 transition hover:text-cyan-300"
                     >
                       Ver cronograma
                       <ArrowRight
@@ -1147,11 +1154,11 @@ export default async function AdminPage() {
                           className="mx-auto text-emerald-400"
                         />
 
-                        <p className="mt-1.5 text-[11px] font-black text-slate-300">
+                        <p className="mt-1.5 text-[12px] font-black text-slate-300">
                           Agenda preventiva livre
                         </p>
 
-                        <p className="mt-1 text-[8px] text-slate-600">
+                        <p className="mt-1 text-[9px] text-slate-500">
                           Nenhuma execução nos próximos 7 dias.
                         </p>
                       </div>
@@ -1191,11 +1198,11 @@ function Panel({
           </div>
 
           <div className="min-w-0">
-            <h2 className="truncate text-[15px] font-black tracking-[-0.02em] text-white lg:text-[14px]">
+            <h2 className="truncate text-[16px] font-black tracking-[-0.02em] text-white">
               {title}
             </h2>
 
-            <p className="mt-0.5 truncate text-[9px] text-slate-600 lg:text-[8px]">
+            <p className="mt-0.5 truncate text-[10px] text-slate-500">
               {subtitle}
             </p>
           </div>
@@ -1284,25 +1291,25 @@ function StatusKpi({
           </div>
 
           <p
-            className={`min-w-0 text-[10px] font-black leading-tight sm:truncate sm:text-[11px] ${current.text}`}
+            className={`min-w-0 text-[11px] font-black leading-tight sm:truncate sm:text-[12px] ${current.text}`}
           >
             {label}
           </p>
         </div>
 
         <span
-          className={`hidden rounded-full bg-white/[0.07] px-2 py-0.5 text-[9px] font-black sm:inline-flex ${current.text}`}
+          className={`hidden rounded-full bg-white/[0.07] px-2 py-0.5 text-[10px] font-black sm:inline-flex ${current.text}`}
         >
           {percentage}%
         </span>
       </div>
 
       <div className="mt-1.5 flex items-end gap-2">
-        <p className="text-[26px] font-black leading-none tracking-[-0.045em] text-white">
+        <p className="text-[28px] font-black leading-none tracking-[-0.045em] text-white">
           {value}
         </p>
 
-        <p className="pb-0.5 text-[8px] font-semibold text-slate-600">
+        <p className="pb-0.5 text-[9px] font-semibold text-slate-500">
           ordens
         </p>
       </div>
@@ -1361,8 +1368,8 @@ function EfficiencyRing({
         <span
           className={
             size === "large"
-              ? "text-[24px] font-black tracking-[-0.05em] text-white"
-              : "text-[9px] font-black text-white"
+              ? "text-[26px] font-black tracking-[-0.05em] text-white"
+              : "text-[10px] font-black text-white"
           }
         >
           {percentual}%
@@ -1397,12 +1404,12 @@ function EfficiencyCompact({
 
       <div className="min-w-0">
         <p
-          className={`truncate text-[9px] font-black ${className}`}
+          className={`truncate text-[10px] font-black ${className}`}
         >
           {title}
         </p>
 
-        <p className="mt-0.5 text-[8px] text-slate-600">
+        <p className="mt-0.5 text-[9px] text-slate-500">
           {concluidas}/{total} OS
         </p>
       </div>
@@ -1442,7 +1449,7 @@ function PriorityKpi({
       className={`group flex min-h-0 flex-col justify-center rounded-xl border px-3 py-2 transition hover:-translate-y-0.5 ${tones[tone]}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[9px] font-black">
+        <p className="text-[10px] font-black">
           {label}
         </p>
 
@@ -1453,11 +1460,11 @@ function PriorityKpi({
       </div>
 
       <div className="mt-1 flex items-end gap-1.5">
-        <p className="text-[23px] font-black leading-none tracking-[-0.04em]">
+        <p className="text-[25px] font-black leading-none tracking-[-0.04em]">
           {value}
         </p>
 
-        <span className="pb-0.5 text-[8px] font-black text-slate-600">
+        <span className="pb-0.5 text-[9px] font-black text-slate-500">
           OS
         </span>
       </div>
@@ -1465,17 +1472,17 @@ function PriorityKpi({
   );
 }
 
-function RecentActivity({
+function RecentOrder({
   numero,
   titulo,
   status,
-  updatedAt,
+  createdAt,
   href,
 }: {
   numero: number;
   titulo: string;
   status: string;
-  updatedAt: Date;
+  createdAt: Date;
   href: string;
 }) {
   const config: Record<
@@ -1527,16 +1534,16 @@ function RecentActivity({
         OS #{numero}
       </p>
 
-      <p className="min-w-0 flex-1 truncate text-[8px] text-slate-500">
+      <p className="min-w-0 flex-1 truncate text-[10px] text-slate-400">
         {statusLabel(status)} •{" "}
         {titulo}
       </p>
 
       <span
-        className={`shrink-0 rounded-full px-2 py-0.5 text-[7px] font-black ${current.badge}`}
+        className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black ${current.badge}`}
       >
         {tempoRelativo(
-          updatedAt
+          createdAt
         )}
       </span>
     </Link>
@@ -1570,24 +1577,24 @@ function PreventiveRow({
 
   return (
     <div className="flex min-h-[42px] items-center gap-2.5 rounded-xl border border-white/[0.055] bg-[#030817] px-3 py-2 lg:min-h-0 lg:py-1.5">
-      <div className="flex min-w-[52px] shrink-0 items-center justify-center rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] px-2 py-1 text-[8px] font-black text-cyan-300">
+      <div className="flex min-w-[52px] shrink-0 items-center justify-center rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] px-2 py-1 text-[9px] font-black text-cyan-300">
         {rotuloDataCurta(
           date
         )}
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[9px] font-black text-white">
+        <p className="truncate text-[11px] font-black text-white">
           {title}
         </p>
 
-        <p className="mt-0.5 truncate text-[8px] text-slate-600">
+        <p className="mt-0.5 truncate text-[9px] text-slate-500">
           {machine}
         </p>
       </div>
 
       <span
-        className={`shrink-0 rounded-full px-2 py-0.5 text-[7px] font-black ${
+        className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black ${
           tones[
             priority
           ] ??
