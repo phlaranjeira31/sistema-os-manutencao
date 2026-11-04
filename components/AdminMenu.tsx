@@ -7,6 +7,7 @@ import {
   CalendarClock,
   ClipboardList,
   FileDown,
+  Factory,
   LayoutDashboard,
   Map as MapIcon,
   Pencil,
@@ -88,6 +89,13 @@ export default function AdminMenu() {
             label="OS Preventiva"
             href="/admin/os/preventivas"
             active={pathname === "/admin/os/preventivas"}
+          />
+
+          <MenuItem
+            icon={<Factory size={19} />}
+            label="Máquinas"
+            href="/admin/maquinas"
+            active={pathname.startsWith("/admin/maquinas")}
           />
 
           <MenuItem
