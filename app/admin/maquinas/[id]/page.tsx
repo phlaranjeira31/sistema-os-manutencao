@@ -16,6 +16,11 @@ import {
   XCircle,
 } from "lucide-react";
 import { prisma } from "@/src/lib/prisma";
+import {
+  formatarDuracaoMinutos,
+  obterDataTerminoRelatorio,
+  obterDuracaoRelatorioMinutos,
+} from "@/src/lib/kpiColaborador";
 import BotaoPDFMaquina from "@/components/BotaoPDFMaquina";
 import BotaoExcelMaquina from "./BotaoExcelMaquina";
 import GraficosMaquina from "./GraficosMaquina";
@@ -71,20 +76,6 @@ function prioridadeLabel(prioridade: string) {
   return labels[prioridade] ?? prioridade;
 }
 
-function diferencaEmHoras(
-  inicio: Date | string,
-  fim: Date | string | null | undefined
-) {
-  if (!fim) return 0;
-
-  const inicioMs = new Date(inicio).getTime();
-  const fimMs = new Date(fim).getTime();
-
-  if (Number.isNaN(inicioMs) || Number.isNaN(fimMs)) return 0;
-
-  return Math.max(0, (fimMs - inicioMs) / (1000 * 60 * 60));
-}
-
 function formatarHoras(valor: number) {
   if (!Number.isFinite(valor) || valor <= 0) return "0h";
 
@@ -95,69 +86,6 @@ function formatarHoras(valor: number) {
   if (minutos === 0) return `${horas}h`;
 
   return `${horas}h ${minutos}min`;
-}
-
-function obterDuracaoExecucaoMinutos(os: {
-  duracaoExecucaoMinutos: number | null;
-  registroFinal: string | null;
-}) {
-  if (
-    typeof os.duracaoExecucaoMinutos === "number" &&
-    os.duracaoExecucaoMinutos > 0
-  ) {
-    return os.duracaoExecucaoMinutos;
-  }
-
-  const relatorio = os.registroFinal ?? "";
-
-  const dataInicio =
-    relatorio.match(
-      /Data de início:\s*\n?\s*(\d{4}-\d{2}-\d{2})/i
-    )?.[1] ?? "";
-
-  const horaInicio =
-    relatorio.match(
-      /Hora de início:\s*\n?\s*([0-2]\d:[0-5]\d)/i
-    )?.[1] ?? "";
-
-  const dataTermino =
-    relatorio.match(
-      /Data de término:\s*\n?\s*(\d{4}-\d{2}-\d{2})/i
-    )?.[1] ?? "";
-
-  const horaTermino =
-    relatorio.match(
-      /Hora de término:\s*\n?\s*([0-2]\d:[0-5]\d)/i
-    )?.[1] ?? "";
-
-  if (
-    !dataInicio ||
-    !horaInicio ||
-    !dataTermino ||
-    !horaTermino
-  ) {
-    return null;
-  }
-
-  const inicio = new Date(
-    `${dataInicio}T${horaInicio}:00-03:00`
-  );
-
-  const fim = new Date(
-    `${dataTermino}T${horaTermino}:00-03:00`
-  );
-
-  if (
-    Number.isNaN(inicio.getTime()) ||
-    Number.isNaN(fim.getTime()) ||
-    fim.getTime() <= inicio.getTime()
-  ) {
-    return null;
-  }
-
-  return Math.round(
-    (fim.getTime() - inicio.getTime()) / 60000
-  );
 }
 
 function dateToInput(date: Date) {
@@ -263,41 +191,137 @@ export default async function DashboardMaquinaPage({
     (os) => os.status === "CONCLUIDA"
   );
 
-  const totalHorasConclusao = ordensConcluidas.reduce(
-    (acumulado, os) =>
-      acumulado +
-      diferencaEmHoras(
-        os.dataInicio ?? os.createdAt,
-        os.dataConclusao ?? os.updatedAt
-      ),
-    0
-  );
+  /*
+   * ==========================================================
+   * 1. TEMPO MÉDIO EM MANUTENÇÃO
+   * ==========================================================
+   *
+   * Mede somente o tempo em que o manutentor esteve atendendo
+   * a máquina:
+   *
+   * Data/Hora de início do relatório
+   *                até
+   * Data/Hora de término do relatório
+   *
+   * Exemplo:
+   * 08:00 -> 09:00 = 1h de manutenção
+   * ==========================================================
+   */
+  const duracoesManutencaoMinutos =
+    ordensConcluidas
+      .map((os) =>
+        obterDuracaoRelatorioMinutos(
+          os.registroFinal
+        )
+      )
+      .filter(
+        (duracao): duracao is number =>
+          typeof duracao === "number" &&
+          duracao > 0
+      );
 
-  const tempoMedioHoras =
-    ordensConcluidas.length > 0
-      ? totalHorasConclusao / ordensConcluidas.length
-      : 0;
-
-  const duracoesExecucaoReal = ordens
-    .map((os) => obterDuracaoExecucaoMinutos(os))
-    .filter(
-      (duracao): duracao is number =>
-        typeof duracao === "number" && duracao > 0
-    );
-
-  const totalMinutosExecucaoReal =
-    duracoesExecucaoReal.reduce(
+  const totalMinutosManutencao =
+    duracoesManutencaoMinutos.reduce(
       (acumulado, duracao) =>
         acumulado + duracao,
       0
     );
 
-  const tempoMedioExecucaoRealHoras =
-    duracoesExecucaoReal.length > 0
-      ? totalMinutosExecucaoReal /
-        duracoesExecucaoReal.length /
-        60
+  const tempoMedioManutencaoMinutos =
+    duracoesManutencaoMinutos.length > 0
+      ? Math.round(
+          totalMinutosManutencao /
+            duracoesManutencaoMinutos.length
+        )
       : 0;
+
+  /*
+   * ==========================================================
+   * 2. TEMPO MÉDIO TOTAL
+   * ==========================================================
+   *
+   * Mede o tempo total de atendimento da OS:
+   *
+   * createdAt (abertura da OS)
+   *                até
+   * Data/Hora real de término informada no relatório
+   *
+   * NÃO utiliza dataConclusao nem updatedAt, pois esses campos
+   * representam a baixa administrativa no sistema e podem ser
+   * preenchidos dias depois do serviço ter sido executado.
+   *
+   * Exemplo:
+   * OS aberta:              01/11/2026 08:00
+   * Serviço concluído:      01/11/2026 10:00 (relatório)
+   * Baixa no sistema:       04/11/2026
+   *
+   * Tempo médio total dessa OS = 2h, e não 3 dias.
+   * ==========================================================
+   */
+  const duracoesTotaisMinutos =
+    ordensConcluidas
+      .map((os) => {
+        const terminoReal =
+          obterDataTerminoRelatorio(
+            os.registroFinal
+          );
+
+        if (!terminoReal) {
+          return null;
+        }
+
+        const abertura =
+          new Date(
+            os.createdAt
+          );
+
+        if (
+          Number.isNaN(
+            abertura.getTime()
+          )
+        ) {
+          return null;
+        }
+
+        const diferenca =
+          Math.round(
+            (terminoReal.getTime() -
+              abertura.getTime()) /
+              60000
+          );
+
+        return diferenca > 0
+          ? diferenca
+          : null;
+      })
+      .filter(
+        (duracao): duracao is number =>
+          typeof duracao === "number" &&
+          duracao > 0
+      );
+
+  const totalMinutosTotais =
+    duracoesTotaisMinutos.reduce(
+      (acumulado, duracao) =>
+        acumulado + duracao,
+      0
+    );
+
+  const tempoMedioTotalMinutos =
+    duracoesTotaisMinutos.length > 0
+      ? Math.round(
+          totalMinutosTotais /
+            duracoesTotaisMinutos.length
+        )
+      : 0;
+
+  /*
+   * O PDF e o Excel atuais recebem o tempo médio em horas.
+   * Esse valor agora representa corretamente o TEMPO MÉDIO TOTAL:
+   * abertura da OS -> término real informado no relatório.
+   */
+  const tempoMedioHoras =
+    tempoMedioTotalMinutos / 60;
 
   const agora = new Date();
   const inicioMesAtual = new Date(
@@ -417,8 +441,6 @@ export default async function DashboardMaquinaPage({
       (os) => new Date(os.createdAt).getDay() === dia.indice
     ).length,
   }));
-
-  const ultimaOS = ordens[0] ?? null;
 
   const dadosExcel = ordens.map((os) => ({
     numero: os.numero,
@@ -692,14 +714,14 @@ export default async function DashboardMaquinaPage({
 
           <ResumoCard
             titulo="Tempo médio total"
-            valor={formatarHoras(tempoMedioHoras)}
-            descricao="Da abertura à conclusão"
+            valor={formatarDuracaoMinutos(
+              tempoMedioTotalMinutos
+            )}
+            descricao="Da abertura até o término real"
             detalhe={
-              ultimaOS
-                ? `Última OS: #${ultimaOS.numero} em ${formatDate(
-                    ultimaOS.createdAt
-                  )}`
-                : "Nenhuma OS registrada"
+              duracoesTotaisMinutos.length > 0
+                ? `Baseado em ${duracoesTotaisMinutos.length} OS com término válido no relatório`
+                : "Nenhuma OS concluída com término válido no relatório"
             }
             icon={<Clock3 size={21} />}
             estilo="cyan"
@@ -707,14 +729,14 @@ export default async function DashboardMaquinaPage({
 
           <ResumoCard
             titulo="Tempo médio em manutenção"
-            valor={formatarHoras(
-              tempoMedioExecucaoRealHoras
+            valor={formatarDuracaoMinutos(
+              tempoMedioManutencaoMinutos
             )}
-            descricao="Tempo real informado no relatório"
+            descricao="Tempo efetivo de atendimento"
             detalhe={
-              duracoesExecucaoReal.length > 0
-                ? `Baseado em ${duracoesExecucaoReal.length} relatório(s) válido(s)`
-                : "Nenhum relatório com duração válida"
+              duracoesManutencaoMinutos.length > 0
+                ? `Baseado em ${duracoesManutencaoMinutos.length} relatório(s) com início e término válidos`
+                : "Nenhum relatório com início e término válidos"
             }
             icon={<Timer size={21} />}
             estilo="green"
