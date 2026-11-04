@@ -1,28 +1,42 @@
+import type { ReactNode } from "react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import {
+  Activity,
+  AlertTriangle,
+  ArrowRight,
   BarChart3,
   Building2,
+  CalendarClock,
+  CheckCircle2,
   ClipboardList,
+  Factory,
   Gauge,
-  LayoutDashboard,
-  Plus,
-  Users,
-  ArrowRight,
-  Activity,
+  Layers3,
+  PlayCircle,
+  ShieldCheck,
   TrendingUp,
+  Users,
+  Wrench,
+  XCircle,
 } from "lucide-react";
-import Link from "next/link";
+
 import { authOptions } from "@/src/lib/auth";
 import HeaderUsuario from "@/components/HeaderUsuario";
 import AdminMenu from "@/components/AdminMenu";
 import AssistenteSistema from "@/components/AssistenteSistema";
 import { prisma } from "@/src/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session) redirect("/login");
+  if (!session) {
+    redirect("/login");
+  }
 
   const empresaSequoia = await prisma.empresa.findFirst({
     where: {
@@ -43,15 +57,11 @@ export default async function AdminPage() {
    * SERVIÇOS EXTERNOS
    * ============================================================
    *
-   * Atualmente são considerados serviços externos:
+   * Mantemos a mesma regra já utilizada pela Home:
    *
    * - EMPREITEIRA
    * - Zeze Serralheiro
-   *
-   * Uma OS atribuída a qualquer um desses usuários será
-   * contabilizada como serviço externo no indicador de eficiência.
    */
-
   const usuariosServicoExterno = await prisma.user.findMany({
     where: {
       OR: [
@@ -74,10 +84,9 @@ export default async function AdminPage() {
     },
   });
 
-  const idsServicoExterno =
-    usuariosServicoExterno.map(
-      (usuario) => usuario.id
-    );
+  const idsServicoExterno = usuariosServicoExterno.map(
+    (usuario) => usuario.id
+  );
 
   const hrefOrdensSequoia = (
     filtros?: Record<string, string>
@@ -85,16 +94,20 @@ export default async function AdminPage() {
     const parametros = new URLSearchParams();
 
     if (empresaSequoiaId) {
-      parametros.set("empresaId", empresaSequoiaId);
+      parametros.set(
+        "empresaId",
+        empresaSequoiaId
+      );
     }
 
-    Object.entries(filtros ?? {}).forEach(
-      ([chave, valor]) => {
-        parametros.set(chave, valor);
-      }
-    );
+    Object.entries(
+      filtros ?? {}
+    ).forEach(([chave, valor]) => {
+      parametros.set(chave, valor);
+    });
 
-    const consulta = parametros.toString();
+    const consulta =
+      parametros.toString();
 
     return consulta
       ? `/admin/os?${consulta}`
@@ -115,65 +128,76 @@ export default async function AdminPage() {
     setores,
     totalExternas,
     concluidasExternas,
+    maquinasAtivas,
+    planosPreventivosAtivos,
   ] = await Promise.all([
     prisma.ordemServico.count({
       where: {
-        empresaId: empresaSequoiaId,
+        empresaId:
+          empresaSequoiaId,
       },
     }),
 
     prisma.ordemServico.count({
       where: {
-        empresaId: empresaSequoiaId,
+        empresaId:
+          empresaSequoiaId,
         status: "NAO_INICIADA",
       },
     }),
 
     prisma.ordemServico.count({
       where: {
-        empresaId: empresaSequoiaId,
+        empresaId:
+          empresaSequoiaId,
         status: "EM_ANDAMENTO",
       },
     }),
 
     prisma.ordemServico.count({
       where: {
-        empresaId: empresaSequoiaId,
+        empresaId:
+          empresaSequoiaId,
         status: "CONCLUIDA",
       },
     }),
 
     prisma.ordemServico.count({
       where: {
-        empresaId: empresaSequoiaId,
+        empresaId:
+          empresaSequoiaId,
         status: "CANCELADA",
       },
     }),
 
     prisma.ordemServico.count({
       where: {
-        empresaId: empresaSequoiaId,
+        empresaId:
+          empresaSequoiaId,
         prioridade: "BAIXA",
       },
     }),
 
     prisma.ordemServico.count({
       where: {
-        empresaId: empresaSequoiaId,
+        empresaId:
+          empresaSequoiaId,
         prioridade: "MEDIA",
       },
     }),
 
     prisma.ordemServico.count({
       where: {
-        empresaId: empresaSequoiaId,
+        empresaId:
+          empresaSequoiaId,
         prioridade: "ALTA",
       },
     }),
 
     prisma.ordemServico.count({
       where: {
-        empresaId: empresaSequoiaId,
+        empresaId:
+          empresaSequoiaId,
         prioridade: "URGENTE",
       },
     }),
@@ -182,24 +206,24 @@ export default async function AdminPage() {
       where: {
         ativo: true,
         perfil: "COLABORADOR",
-        empresaOrigemId: empresaSequoiaId,
+        empresaOrigemId:
+          empresaSequoiaId,
       },
     }),
 
     prisma.setor.count({
       where: {
         ativo: true,
-        empresaId: empresaSequoiaId,
+        empresaId:
+          empresaSequoiaId,
       },
     }),
 
-    /*
-     * Total de OS consideradas serviços externos na eficiência.
-     * OS canceladas não entram no cálculo.
-     */
     prisma.ordemServico.count({
       where: {
-        empresaId: empresaSequoiaId,
+        empresaId:
+          empresaSequoiaId,
+
         status: {
           not: "CANCELADA",
         },
@@ -214,12 +238,10 @@ export default async function AdminPage() {
       },
     }),
 
-    /*
-     * Total de OS externas concluídas.
-     */
     prisma.ordemServico.count({
       where: {
-        empresaId: empresaSequoiaId,
+        empresaId:
+          empresaSequoiaId,
         status: "CONCLUIDA",
 
         responsaveis: {
@@ -231,50 +253,87 @@ export default async function AdminPage() {
         },
       },
     }),
+
+    prisma.maquina.count({
+      where: {
+        ativo: true,
+        setor: {
+          is: {
+            empresaId:
+              empresaSequoiaId,
+          },
+        },
+      },
+    }),
+
+    prisma.planoPreventivo.count({
+      where: {
+        empresaId:
+          empresaSequoiaId,
+        ativo: true,
+      },
+    }),
   ]);
 
   const totalOSConsideradas =
-    totalOS - canceladas;
+    Math.max(
+      0,
+      totalOS - canceladas
+    );
+
+  const abertas =
+    naoIniciadas + emAndamento;
 
   const eficienciaPercentual =
     totalOSConsideradas > 0
       ? Math.round(
-          (concluidas / totalOSConsideradas) * 100
+          (concluidas /
+            totalOSConsideradas) *
+            100
         )
       : 0;
 
-  /*
-   * ============================================================
-   * EFICIÊNCIA INTERNA X EXTERNA
-   * ============================================================
-   */
-
   const totalInternas =
-    totalOSConsideradas - totalExternas;
+    Math.max(
+      0,
+      totalOSConsideradas -
+        totalExternas
+    );
 
   const concluidasInternas =
-    concluidas - concluidasExternas;
+    Math.max(
+      0,
+      concluidas -
+        concluidasExternas
+    );
 
   const eficienciaInterna =
     totalInternas > 0
       ? Math.round(
-          (concluidasInternas / totalInternas) * 100
+          (concluidasInternas /
+            totalInternas) *
+            100
         )
       : 0;
 
   const eficienciaExterna =
     totalExternas > 0
       ? Math.round(
-          (concluidasExternas / totalExternas) * 100
+          (concluidasExternas /
+            totalExternas) *
+            100
         )
       : 0;
 
   return (
     <main className="h-screen overflow-hidden bg-[#020617] text-white">
       <div className="flex h-full min-w-0">
-        <aside className="hidden h-full w-72 shrink-0 flex-col border-r border-white/10 bg-[#020617] text-white lg:flex">
-          <div className="shrink-0 p-6">
-            <h1 className="text-2xl font-extrabold">
+        {/* ======================================================
+            SIDEBAR
+        ======================================================= */}
+        <aside className="hidden h-full w-72 shrink-0 flex-col border-r border-white/[0.08] bg-[#020617] text-white lg:flex">
+          <div className="shrink-0 px-6 pb-5 pt-6">
+            <h1 className="text-2xl font-extrabold tracking-[-0.03em]">
               Sistema de OS
             </h1>
 
@@ -287,8 +346,8 @@ export default async function AdminPage() {
             <AdminMenu />
           </div>
 
-          <footer className="shrink-0 border-t border-white/10 bg-[#020617] px-6 py-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <footer className="shrink-0 border-t border-white/[0.08] bg-[#020617] px-6 py-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">
               Desenvolvido por
             </p>
 
@@ -302,251 +361,463 @@ export default async function AdminPage() {
           </footer>
         </aside>
 
+        {/* ======================================================
+            CONTEÚDO
+        ======================================================= */}
         <section className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
           <HeaderUsuario />
 
-          <div className="px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mb-8 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-[#020617] via-[#0f172a] to-[#020617] p-6 text-white shadow-[0_0_40px_rgba(59,130,246,0.14)] md:p-8">
-              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-cyan-300">
-                    <Activity size={16} />
-                    Visão geral
-                  </p>
+          <div className="mx-auto w-full max-w-[1700px] px-4 py-5 sm:px-6 lg:px-8">
+            {/* ==================================================
+                HERO / EXECUTIVE OVERVIEW
+            ================================================== */}
+            <section className="relative overflow-hidden rounded-[28px] border border-white/[0.08] bg-[linear-gradient(135deg,#07101f_0%,#081526_54%,#06101f_100%)] shadow-[0_18px_60px_rgba(0,0,0,0.24)]">
+              <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/[0.08] blur-3xl" />
+              <div className="pointer-events-none absolute bottom-0 left-[38%] h-32 w-80 rounded-full bg-blue-500/[0.05] blur-3xl" />
 
-                  <h1 className="mt-3 break-words text-2xl font-extrabold sm:text-3xl">
-                    Controle de Ordens de Serviço
-                  </h1>
-
-                  <p className="mt-2 max-w-2xl break-words text-sm text-slate-300 sm:text-base">
-                    Painel BI para acompanhar chamados,
-                    prioridades e andamento das manutenções.
-                  </p>
-                </div>
-
-                <Link
-                  href={hrefOrdensSequoia()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/30 bg-white px-5 py-3 text-sm font-bold text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.16)] transition hover:bg-cyan-50 sm:w-fit"
-                >
-                  Ver ordens
-                  <ArrowRight size={17} />
-                </Link>
-              </div>
-            </div>
-
-            <div className="grid min-w-0 gap-5 xl:grid-cols-3">
-              <div className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-xl sm:p-6 xl:col-span-2">
-                <div className="flex items-center justify-between gap-4">
+              <div className="relative p-5 sm:p-6 lg:p-7">
+                <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
                   <div className="min-w-0">
-                    <h3 className="break-words text-lg font-bold text-white">
-                      Painel BI por status
-                    </h3>
+                    <p className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.15em] text-cyan-300">
+                      <Activity size={15} />
+                      Visão operacional
+                    </p>
 
-                    <p className="mt-1 break-words text-sm text-slate-400">
-                      Distribuição visual das ordens por etapa.
+                    <h1 className="mt-3 text-3xl font-black tracking-[-0.045em] text-white sm:text-[34px]">
+                      Controle de Ordens de Serviço
+                    </h1>
+
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                      Acompanhe o fluxo de manutenção, prioridades, capacidade operacional e eficiência da equipe em uma única visão.
                     </p>
                   </div>
 
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white shadow-[0_0_24px_rgba(34,211,238,0.12)]">
-                    <BarChart3 size={20} />
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Link
+                      href="/admin/maquinas"
+                      className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/[0.09] bg-white/[0.04] px-5 text-sm font-black text-slate-200 transition hover:border-cyan-400/30 hover:bg-cyan-400/[0.07] hover:text-cyan-200"
+                    >
+                      <Factory size={17} />
+                      Máquinas
+                    </Link>
+
+                    <Link
+                      href={hrefOrdensSequoia()}
+                      className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-cyan-50"
+                    >
+                      Ver ordens
+                      <ArrowRight size={17} />
+                    </Link>
                   </div>
                 </div>
 
-                <div className="mt-6 grid min-w-0 gap-4 md:grid-cols-2">
-                  <BIStatusCard
+                <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  <ExecutiveMetric
+                    label="Total de OS"
+                    value={totalOS}
+                    helper="Base histórica"
+                    icon={
+                      <ClipboardList
+                        size={17}
+                      />
+                    }
+                    tone="cyan"
+                  />
+
+                  <ExecutiveMetric
+                    label="OS abertas"
+                    value={abertas}
+                    helper="Fila operacional"
+                    icon={
+                      <Activity
+                        size={17}
+                      />
+                    }
+                    tone="blue"
+                  />
+
+                  <ExecutiveMetric
+                    label="Concluídas"
+                    value={concluidas}
+                    helper={`${eficienciaPercentual}% de eficiência`}
+                    icon={
+                      <CheckCircle2
+                        size={17}
+                      />
+                    }
+                    tone="green"
+                  />
+
+                  <ExecutiveMetric
+                    label="Urgentes"
+                    value={urgente}
+                    helper="Nível máximo"
+                    icon={
+                      <AlertTriangle
+                        size={17}
+                      />
+                    }
+                    tone="red"
+                  />
+
+                  <ExecutiveMetric
+                    label="Máquinas ativas"
+                    value={maquinasAtivas}
+                    helper={`${planosPreventivosAtivos} planos preventivos`}
+                    icon={
+                      <Factory size={17} />
+                    }
+                    tone="violet"
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* ==================================================
+                STATUS + EFICIÊNCIA
+            ================================================== */}
+            <section className="mt-5 grid min-w-0 gap-5 xl:grid-cols-[1.65fr_1fr]">
+              {/* STATUS */}
+              <DashboardPanel
+                eyebrow="Fluxo operacional"
+                title="Status das ordens"
+                description="Distribuição atual das OS por etapa do processo."
+                icon={
+                  <BarChart3 size={20} />
+                }
+              >
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  <StatusCard
                     label="Não iniciadas"
                     value={naoIniciadas}
                     total={totalOS}
                     href={hrefOrdensSequoia({
                       status: "NAO_INICIADA",
                     })}
-                    color="red"
+                    tone="red"
+                    icon={
+                      <AlertTriangle
+                        size={18}
+                      />
+                    }
                   />
 
-                  <BIStatusCard
+                  <StatusCard
                     label="Em andamento"
                     value={emAndamento}
                     total={totalOS}
                     href={hrefOrdensSequoia({
                       status: "EM_ANDAMENTO",
                     })}
-                    color="blue"
+                    tone="blue"
+                    icon={
+                      <PlayCircle
+                        size={18}
+                      />
+                    }
                   />
 
-                  <BIStatusCard
+                  <StatusCard
                     label="Concluídas"
                     value={concluidas}
                     total={totalOS}
                     href={hrefOrdensSequoia({
                       status: "CONCLUIDA",
                     })}
-                    color="green"
+                    tone="green"
+                    icon={
+                      <CheckCircle2
+                        size={18}
+                      />
+                    }
                   />
 
-                  <BIStatusCard
+                  <StatusCard
                     label="Canceladas"
                     value={canceladas}
                     total={totalOS}
                     href={hrefOrdensSequoia({
                       status: "CANCELADA",
                     })}
-                    color="slate"
+                    tone="slate"
+                    icon={
+                      <XCircle size={18} />
+                    }
                   />
                 </div>
-              </div>
+              </DashboardPanel>
 
-              {/* =================================================
-                  EFICIÊNCIA GERAL
-              ================================================== */}
+              {/* EFICIÊNCIA */}
+              <DashboardPanel
+                eyebrow="Performance"
+                title="Eficiência operacional"
+                description="Conclusão geral, equipe interna e serviços externos."
+                icon={<Gauge size={20} />}
+              >
+                <div className="mt-5 rounded-2xl border border-white/[0.07] bg-[#030817] p-4">
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                    <div className="shrink-0">
+                      <EfficiencyRingLarge
+                        percentual={
+                          eficienciaPercentual
+                        }
+                      />
+                    </div>
 
-              <div className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-xl sm:p-6">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <h3 className="break-words text-lg font-bold text-white">
-                      Eficiência geral
-                    </h3>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-cyan-300">
+                        Eficiência total
+                      </p>
 
-                    <p className="mt-1 break-words text-sm text-slate-400">
-                      Eficiência interna e serviços externos.
-                    </p>
-                  </div>
+                      <p className="mt-1 text-2xl font-black tracking-[-0.03em] text-white">
+                        {concluidas}/
+                        {
+                          totalOSConsideradas
+                        }{" "}
+                        OS
+                      </p>
 
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white shadow-[0_0_24px_rgba(34,211,238,0.12)]">
-                    <Gauge size={20} />
+                      <p className="mt-2 text-xs leading-5 text-slate-500">
+                        OS canceladas não entram no cálculo da eficiência.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                {/* EFICIÊNCIA TOTAL */}
-
-                <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-[#020617] px-4 py-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Eficiência total
-                    </p>
-
-                    <p className="mt-1 text-xs text-slate-400">
-                      {concluidas}/{totalOSConsideradas} ordens concluídas
-                    </p>
-                  </div>
-
-                  <p className="shrink-0 text-2xl font-extrabold text-white">
-                    {eficienciaPercentual}%
-                  </p>
-                </div>
-
-                {/* INTERNA X EXTERNA */}
-
-                <div className="mt-6 grid grid-cols-2 gap-4">
-                  <EfficiencyRing
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <EfficiencyMini
                     titulo="Equipe interna"
-                    percentual={eficienciaInterna}
-                    concluidas={concluidasInternas}
+                    percentual={
+                      eficienciaInterna
+                    }
+                    concluidas={
+                      concluidasInternas
+                    }
                     total={totalInternas}
                     cor="#22c55e"
-                    textoClasse="text-green-400"
+                    classe="text-emerald-300"
                   />
 
-                  <EfficiencyRing
+                  <EfficiencyMini
                     titulo="Serviço externo"
-                    percentual={eficienciaExterna}
-                    concluidas={concluidasExternas}
+                    percentual={
+                      eficienciaExterna
+                    }
+                    concluidas={
+                      concluidasExternas
+                    }
                     total={totalExternas}
                     cor="#f59e0b"
-                    textoClasse="text-amber-400"
+                    classe="text-amber-300"
                   />
                 </div>
 
-                <div className="mt-5 rounded-xl border border-amber-400/10 bg-amber-500/[0.04] px-3 py-2.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300/70">
-                    Serviços externos
+                <div className="mt-3 rounded-2xl border border-amber-400/10 bg-amber-500/[0.035] px-4 py-3">
+                  <p className="text-[9px] font-black uppercase tracking-[0.12em] text-amber-300/80">
+                    Classificação externa
                   </p>
 
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="mt-1 text-xs font-semibold text-slate-400">
                     EMPREITEIRA • Zeze Serralheiro
                   </p>
                 </div>
-              </div>
-            </div>
+              </DashboardPanel>
+            </section>
 
-            <div className="mt-5 grid min-w-0 gap-5 lg:grid-cols-3">
-              <div className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-xl sm:p-6 lg:col-span-2">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <h3 className="break-words text-lg font-bold text-white">
-                      Prioridades
-                    </h3>
-
-                    <p className="mt-1 break-words text-sm text-slate-400">
-                      Distribuição das OS por nível de urgência.
-                    </p>
-                  </div>
-
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white shadow-[0_0_24px_rgba(34,211,238,0.12)]">
-                    <TrendingUp size={20} />
-                  </div>
-                </div>
-
-                <div className="mt-6 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <PriorityBox
+            {/* ==================================================
+                PRIORIDADES + OPERAÇÃO
+            ================================================== */}
+            <section className="mt-5 grid min-w-0 gap-5 xl:grid-cols-[1.5fr_1fr]">
+              {/* PRIORIDADES */}
+              <DashboardPanel
+                eyebrow="Criticidade"
+                title="Prioridades"
+                description="Distribuição das OS pelo nível de urgência."
+                icon={
+                  <TrendingUp size={20} />
+                }
+              >
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <PriorityCard
                     label="Baixa"
                     value={baixa}
-                    color="green"
                     href={hrefOrdensSequoia({
                       prioridade: "BAIXA",
                     })}
+                    tone="green"
                   />
 
-                  <PriorityBox
+                  <PriorityCard
                     label="Média"
                     value={media}
-                    color="yellow"
                     href={hrefOrdensSequoia({
                       prioridade: "MEDIA",
                     })}
+                    tone="yellow"
                   />
 
-                  <PriorityBox
+                  <PriorityCard
                     label="Alta"
                     value={alta}
-                    color="orange"
                     href={hrefOrdensSequoia({
                       prioridade: "ALTA",
                     })}
+                    tone="orange"
                   />
 
-                  <PriorityBox
+                  <PriorityCard
                     label="Urgente"
                     value={urgente}
-                    color="red"
                     href={hrefOrdensSequoia({
                       prioridade: "URGENTE",
                     })}
+                    tone="red"
                   />
                 </div>
-              </div>
 
-              <div className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-xl sm:p-6">
-                <h3 className="text-lg font-bold text-white">
-                  Cadastros
-                </h3>
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-4">
+                  <span className="text-[10px] font-black uppercase tracking-[0.11em] text-slate-600">
+                    Total classificado
+                  </span>
 
-                <div className="mt-5 space-y-4">
-                  <MiniCard
-                    title="Colaboradores ativos"
+                  <span className="rounded-full border border-white/[0.08] bg-white/[0.025] px-3 py-1.5 text-xs font-black text-slate-300">
+                    {baixa +
+                      media +
+                      alta +
+                      urgente}{" "}
+                    OS
+                  </span>
+                </div>
+              </DashboardPanel>
+
+              {/* OPERAÇÃO */}
+              <DashboardPanel
+                eyebrow="Navegação"
+                title="Operação & cadastros"
+                description="Acesso rápido aos módulos mais utilizados."
+                icon={
+                  <Layers3 size={20} />
+                }
+              >
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <OperationCard
+                    title="Máquinas"
+                    value={
+                      maquinasAtivas
+                    }
+                    helper="Ativos monitorados"
+                    href="/admin/maquinas"
+                    icon={
+                      <Factory size={18} />
+                    }
+                    tone="cyan"
+                  />
+
+                  <OperationCard
+                    title="Preventivas"
+                    value={
+                      planosPreventivosAtivos
+                    }
+                    helper="Planos ativos"
+                    href="/admin/os/preventivas"
+                    icon={
+                      <CalendarClock
+                        size={18}
+                      />
+                    }
+                    tone="violet"
+                  />
+
+                  <OperationCard
+                    title="Colaboradores"
                     value={colaboradores}
-                    icon={<Users />}
+                    helper="Usuários ativos"
                     href="/admin/colaboradores"
+                    icon={
+                      <Users size={18} />
+                    }
+                    tone="blue"
                   />
 
-                  <MiniCard
-                    title="Setores cadastrados"
+                  <OperationCard
+                    title="Setores"
                     value={setores}
-                    icon={<Building2 />}
+                    helper="Áreas cadastradas"
                     href="/admin/setores"
+                    icon={
+                      <Building2
+                        size={18}
+                      />
+                    }
+                    tone="slate"
+                  />
+                </div>
+              </DashboardPanel>
+            </section>
+
+            {/* ==================================================
+                AÇÕES RÁPIDAS
+            ================================================== */}
+            <section className="mt-5 rounded-[24px] border border-white/[0.07] bg-[#070c1b] p-4 shadow-[0_10px_35px_rgba(0,0,0,0.18)] sm:p-5">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+                <div className="flex min-w-[190px] items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/[0.05] text-cyan-300">
+                    <Wrench size={18} />
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-black text-white">
+                      Ações rápidas
+                    </p>
+
+                    <p className="text-[11px] text-slate-600">
+                      Rotinas principais
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <QuickAction
+                    href="/admin/os/nova"
+                    label="Nova OS"
+                    icon={
+                      <ClipboardList
+                        size={17}
+                      />
+                    }
+                    primary
+                  />
+
+                  <QuickAction
+                    href="/admin/maquinas"
+                    label="Máquinas"
+                    icon={
+                      <Factory size={17} />
+                    }
+                  />
+
+                  <QuickAction
+                    href="/admin/os/preventivas"
+                    label="Preventivas"
+                    icon={
+                      <ShieldCheck
+                        size={17}
+                      />
+                    }
+                  />
+
+                  <QuickAction
+                    href="/admin/os/indicadores"
+                    label="Indicadores"
+                    icon={
+                      <BarChart3
+                        size={17}
+                      />
+                    }
                   />
                 </div>
               </div>
-            </div>
+            </section>
           </div>
         </section>
       </div>
@@ -556,116 +827,239 @@ export default async function AdminPage() {
   );
 }
 
-function MenuItem({
+function DashboardPanel({
+  eyebrow,
+  title,
+  description,
   icon,
-  label,
-  active,
-  href,
+  children,
 }: {
-  icon: React.ReactNode;
-  label: string;
-  active?: boolean;
-  href?: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  icon: ReactNode;
+  children: ReactNode;
 }) {
-  const content = (
-    <div
-      className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
-        active
-          ? "border border-cyan-400/30 bg-cyan-400/10 text-cyan-200 shadow-[0_0_24px_rgba(34,211,238,0.12)]"
-          : "text-slate-400 hover:bg-white/5 hover:text-white"
-      }`}
-    >
-      {icon}
-      {label}
+  return (
+    <div className="min-w-0 rounded-[24px] border border-white/[0.07] bg-[#070c1b] p-5 shadow-[0_10px_35px_rgba(0,0,0,0.18)] sm:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-cyan-300/80">
+            {eyebrow}
+          </p>
+
+          <h2 className="mt-1.5 text-xl font-black tracking-[-0.025em] text-white">
+            {title}
+          </h2>
+
+          <p className="mt-1 text-sm leading-5 text-slate-500">
+            {description}
+          </p>
+        </div>
+
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/[0.07] bg-[#020617] text-slate-300">
+          {icon}
+        </div>
+      </div>
+
+      {children}
     </div>
   );
-
-  if (href) return <Link href={href}>{content}</Link>;
-  return content;
 }
 
-function BIStatusCard({
+function ExecutiveMetric({
+  label,
+  value,
+  helper,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: number;
+  helper: string;
+  icon: ReactNode;
+  tone:
+    | "cyan"
+    | "blue"
+    | "green"
+    | "red"
+    | "violet";
+}) {
+  const tones = {
+    cyan: {
+      box: "border-cyan-400/15 bg-cyan-400/[0.045]",
+      icon: "text-cyan-300",
+    },
+    blue: {
+      box: "border-blue-400/15 bg-blue-400/[0.045]",
+      icon: "text-blue-300",
+    },
+    green: {
+      box: "border-emerald-400/15 bg-emerald-400/[0.045]",
+      icon: "text-emerald-300",
+    },
+    red: {
+      box: "border-red-400/15 bg-red-400/[0.045]",
+      icon: "text-red-300",
+    },
+    violet: {
+      box: "border-violet-400/15 bg-violet-400/[0.045]",
+      icon: "text-violet-300",
+    },
+  };
+
+  const current =
+    tones[tone];
+
+  return (
+    <div
+      className={`rounded-2xl border p-3.5 ${current.box}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-500">
+            {label}
+          </p>
+
+          <p className="mt-1.5 text-[26px] font-black leading-none tracking-[-0.04em] text-white">
+            {value}
+          </p>
+
+          <p className="mt-1.5 text-[10px] font-medium text-slate-600">
+            {helper}
+          </p>
+        </div>
+
+        <div
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-black/10 ${current.icon}`}
+        >
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusCard({
   label,
   value,
   total,
   href,
-  color,
+  tone,
+  icon,
 }: {
   label: string;
   value: number;
   total: number;
   href: string;
-  color: "red" | "blue" | "green" | "slate";
+  tone:
+    | "red"
+    | "blue"
+    | "green"
+    | "slate";
+  icon: ReactNode;
 }) {
   const percentage =
     total > 0
-      ? Math.round((value / total) * 100)
+      ? Math.round(
+          (value / total) * 100
+        )
       : 0;
 
-  const colors = {
+  const tones = {
     red: {
-      bg: "bg-red-500/10",
-      border: "border-red-400/20",
+      box: "border-red-400/15 bg-red-500/[0.055]",
       text: "text-red-300",
       bar: "bg-red-400",
+      chip: "bg-red-400/10",
     },
 
     blue: {
-      bg: "bg-blue-500/10",
-      border: "border-blue-400/20",
+      box: "border-blue-400/15 bg-blue-500/[0.055]",
       text: "text-blue-300",
       bar: "bg-blue-400",
+      chip: "bg-blue-400/10",
     },
 
     green: {
-      bg: "bg-green-500/10",
-      border: "border-green-400/20",
-      text: "text-green-300",
-      bar: "bg-green-400",
+      box: "border-emerald-400/15 bg-emerald-500/[0.055]",
+      text: "text-emerald-300",
+      bar: "bg-emerald-400",
+      chip: "bg-emerald-400/10",
     },
 
     slate: {
-      bg: "bg-slate-500/10",
-      border: "border-slate-400/20",
+      box: "border-slate-400/15 bg-slate-500/[0.055]",
       text: "text-slate-300",
       bar: "bg-slate-400",
+      chip: "bg-slate-400/10",
     },
   };
 
-  const current = colors[color];
+  const current =
+    tones[tone];
 
   return (
     <Link
       href={href}
-      className={`block min-w-0 rounded-2xl border ${current.border} ${current.bg} p-5 transition hover:-translate-y-0.5 hover:shadow-[0_0_24px_rgba(34,211,238,0.10)]`}
+      className={`group rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:border-cyan-400/20 ${current.box}`}
     >
-      <div className="flex items-center justify-between gap-3">
-        <span
-          className={`min-w-0 break-words text-sm font-bold ${current.text}`}
-        >
-          {label}
-        </span>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`flex h-9 w-9 items-center justify-center rounded-xl ${current.chip} ${current.text}`}
+          >
+            {icon}
+          </div>
+
+          <div>
+            <p
+              className={`text-sm font-black ${current.text}`}
+            >
+              {label}
+            </p>
+
+            <p className="mt-0.5 text-[10px] text-slate-600">
+              {percentage}% do total
+            </p>
+          </div>
+        </div>
+
+        <ArrowRight
+          size={15}
+          className="mt-1 text-slate-700 transition group-hover:translate-x-0.5 group-hover:text-cyan-300"
+        />
+      </div>
+
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-3xl font-black tracking-[-0.04em] text-white">
+            {value}
+          </p>
+
+          <p className="text-[10px] font-semibold text-slate-600">
+            ordens
+          </p>
+        </div>
 
         <span
-          className={`shrink-0 rounded-full bg-white/10 px-3 py-1 text-xs font-black ${current.text}`}
+          className={`rounded-full px-2.5 py-1 text-[10px] font-black ${current.chip} ${current.text}`}
         >
           {percentage}%
         </span>
       </div>
 
-      <p className="mt-5 text-4xl font-extrabold text-white">
-        {value}
-      </p>
-
-      <p className="text-xs font-semibold text-slate-400">
-        ordens
-      </p>
-
-      <div className="mt-5 h-3 overflow-hidden rounded-full bg-white/10">
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
         <div
           className={`h-full rounded-full ${current.bar}`}
           style={{
-            width: `${percentage}%`,
+            width: `${Math.min(
+              100,
+              Math.max(
+                0,
+                percentage
+              )
+            )}%`,
           }}
         />
       </div>
@@ -673,128 +1067,231 @@ function BIStatusCard({
   );
 }
 
-/*
- * ============================================================
- * EFICIÊNCIA INTERNA / EXTERNA
- * ============================================================
- */
+function EfficiencyRingLarge({
+  percentual,
+}: {
+  percentual: number;
+}) {
+  return (
+    <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-slate-900">
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{
+          background: `conic-gradient(#22d3ee ${percentual}%, #162033 0)`,
+        }}
+      />
 
-function EfficiencyRing({
+      <div className="relative flex h-[94px] w-[94px] flex-col items-center justify-center rounded-full bg-[#020617] shadow-[inset_0_0_24px_rgba(34,211,238,0.04)]">
+        <span className="text-[30px] font-black leading-none tracking-[-0.05em] text-white">
+          {percentual}%
+        </span>
+
+        <span className="mt-1 text-[9px] font-black uppercase tracking-[0.1em] text-cyan-300">
+          eficiência
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function EfficiencyMini({
   titulo,
   percentual,
   concluidas,
   total,
   cor,
-  textoClasse,
+  classe,
 }: {
   titulo: string;
   percentual: number;
   concluidas: number;
   total: number;
   cor: string;
-  textoClasse: string;
+  classe: string;
 }) {
   return (
-    <div className="min-w-0 text-center">
-      <div className="relative mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-slate-900">
-        <div
-          className="absolute inset-0 rounded-full"
-          style={{
-            background: `conic-gradient(${cor} ${percentual}%, #1e293b 0)`,
-          }}
-        />
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3">
+      <div className="flex items-center gap-3">
+        <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-900">
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: `conic-gradient(${cor} ${percentual}%, #162033 0)`,
+            }}
+          />
 
-        <div className="relative flex h-20 w-20 flex-col items-center justify-center rounded-full bg-[#020617]">
-          <span className="text-xl font-extrabold text-white">
-            {percentual}%
-          </span>
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[#020617]">
+            <span className="text-[11px] font-black text-white">
+              {percentual}%
+            </span>
+          </div>
+        </div>
 
-          <span
-            className={`text-[9px] font-bold ${textoClasse}`}
+        <div className="min-w-0">
+          <p
+            className={`text-xs font-black ${classe}`}
           >
-            concluídas
-          </span>
+            {titulo}
+          </p>
+
+          <p className="mt-1 text-[10px] text-slate-600">
+            {concluidas}/{total} OS
+          </p>
         </div>
       </div>
-
-      <p className="mt-3 break-words text-xs font-extrabold text-white">
-        {titulo}
-      </p>
-
-      <p className="mt-1 text-[10px] text-slate-500">
-        {concluidas}/{total} OS
-      </p>
     </div>
   );
 }
 
-function PriorityBox({
+function PriorityCard({
   label,
   value,
-  color,
   href,
+  tone,
 }: {
   label: string;
   value: number;
-  color: "green" | "yellow" | "orange" | "red";
   href: string;
+  tone:
+    | "green"
+    | "yellow"
+    | "orange"
+    | "red";
 }) {
-  const colors = {
+  const tones = {
     green:
-      "border-green-400/20 bg-green-500/10 text-green-300",
-
+      "border-emerald-400/15 bg-emerald-500/[0.055] text-emerald-300",
     yellow:
-      "border-yellow-400/20 bg-yellow-500/10 text-yellow-300",
-
+      "border-yellow-400/15 bg-yellow-500/[0.055] text-yellow-300",
     orange:
-      "border-orange-400/20 bg-orange-500/10 text-orange-300",
-
+      "border-orange-400/15 bg-orange-500/[0.055] text-orange-300",
     red:
-      "border-red-400/20 bg-red-500/10 text-red-300",
+      "border-red-400/15 bg-red-500/[0.055] text-red-300",
   };
 
   return (
     <Link
       href={href}
-      className={`min-w-0 rounded-2xl border p-5 transition hover:-translate-y-0.5 hover:shadow-[0_0_24px_rgba(34,211,238,0.10)] ${colors[color]}`}
+      className={`group rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:border-white/20 ${tones[tone]}`}
     >
-      <p className="break-words text-sm font-bold">
-        {label}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-black">
+          {label}
+        </p>
+
+        <ArrowRight
+          size={14}
+          className="opacity-30 transition group-hover:translate-x-0.5 group-hover:opacity-100"
+        />
+      </div>
+
+      <p className="mt-3 text-3xl font-black tracking-[-0.04em]">
+        {value}
       </p>
 
-      <p className="mt-3 text-3xl font-extrabold">
-        {value}
+      <p className="mt-1 text-[10px] font-semibold text-slate-600">
+        ordens classificadas
       </p>
     </Link>
   );
 }
 
-function MiniCard({
+function OperationCard({
   title,
   value,
-  icon,
+  helper,
   href,
+  icon,
+  tone,
 }: {
   title: string;
   value: number;
-  icon: React.ReactNode;
+  helper: string;
   href: string;
+  icon: ReactNode;
+  tone:
+    | "cyan"
+    | "violet"
+    | "blue"
+    | "slate";
+}) {
+  const tones = {
+    cyan: {
+      box: "hover:border-cyan-400/20",
+      icon: "border-cyan-400/15 bg-cyan-400/[0.05] text-cyan-300",
+    },
+    violet: {
+      box: "hover:border-violet-400/20",
+      icon: "border-violet-400/15 bg-violet-400/[0.05] text-violet-300",
+    },
+    blue: {
+      box: "hover:border-blue-400/20",
+      icon: "border-blue-400/15 bg-blue-400/[0.05] text-blue-300",
+    },
+    slate: {
+      box: "hover:border-slate-300/20",
+      icon: "border-white/[0.08] bg-white/[0.03] text-slate-300",
+    },
+  };
+
+  const current =
+    tones[tone];
+
+  return (
+    <Link
+      href={href}
+      className={`group rounded-2xl border border-white/[0.06] bg-[#030817] p-4 transition hover:-translate-y-0.5 ${current.box}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-xl border ${current.icon}`}
+        >
+          {icon}
+        </div>
+
+        <ArrowRight
+          size={15}
+          className="mt-1 text-slate-700 transition group-hover:translate-x-0.5 group-hover:text-cyan-300"
+        />
+      </div>
+
+      <p className="mt-4 text-[10px] font-black uppercase tracking-[0.1em] text-slate-600">
+        {title}
+      </p>
+
+      <p className="mt-1 text-2xl font-black tracking-[-0.04em] text-white">
+        {value}
+      </p>
+
+      <p className="mt-1 text-[10px] text-slate-600">
+        {helper}
+      </p>
+    </Link>
+  );
+}
+
+function QuickAction({
+  href,
+  label,
+  icon,
+  primary = false,
+}: {
+  href: string;
+  label: string;
+  icon: ReactNode;
+  primary?: boolean;
 }) {
   return (
-    <div className="flex min-w-0 items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 p-4">
-      <div className="min-w-0">
-        <p className="break-words text-sm text-slate-400">
-          {title}
-        </p>
-
-        <p className="text-2xl font-extrabold text-white">
-          {value}
-        </p>
-      </div>
-
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-white">
-        {icon}
-      </div>
-    </div>
+    <Link
+      href={href}
+      className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-xs font-black transition ${
+        primary
+          ? "border-cyan-300 bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+          : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:border-cyan-400/25 hover:bg-cyan-400/[0.05] hover:text-cyan-200"
+      }`}
+    >
+      {icon}
+      {label}
+    </Link>
   );
 }
