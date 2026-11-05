@@ -887,9 +887,16 @@ export default function BotaoExcelIndicadoresOS({
           !ehServicoExterno(os.responsavel)
       ).length;
 
+      const baseTaxaConclusao =
+        Math.max(
+          0,
+          totalOS -
+            totalCanceladas
+        );
+
       const taxaConclusao = percentual(
         totalConcluidas,
-        totalOS
+        baseTaxaConclusao
       );
 
       const setores =
@@ -1430,7 +1437,11 @@ export default function BotaoExcelIndicadoresOS({
 
           const eficiencia = percentual(
             setor.concluidas,
-            setor.total
+            Math.max(
+              0,
+              setor.total -
+                setor.canceladas
+            )
           );
 
           const valores = [
@@ -1555,7 +1566,11 @@ export default function BotaoExcelIndicadoresOS({
 
             const eficiencia = percentual(
               colaborador.concluidas,
-              colaborador.total
+              Math.max(
+                0,
+                colaborador.total -
+                  colaborador.canceladas
+              )
             );
 
             const valores = [
@@ -2124,7 +2139,11 @@ export default function BotaoExcelIndicadoresOS({
         setores.map((setor, indice) => {
           const eficiencia = percentual(
             setor.concluidas,
-            setor.total
+            Math.max(
+              0,
+              setor.total -
+                setor.canceladas
+            )
           );
 
           return [
@@ -2284,7 +2303,11 @@ export default function BotaoExcelIndicadoresOS({
 
             const eficiencia = percentual(
               colaborador.concluidas,
-              colaborador.total
+              Math.max(
+                0,
+                colaborador.total -
+                  colaborador.canceladas
+              )
             );
 
             return [
@@ -2474,7 +2497,11 @@ export default function BotaoExcelIndicadoresOS({
               const eficiencia =
                 percentual(
                   maquina.concluidas,
-                  maquina.total
+                  Math.max(
+                    0,
+                    maquina.total -
+                      maquina.canceladas
+                  )
                 );
 
               return [

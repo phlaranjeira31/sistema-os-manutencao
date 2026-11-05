@@ -1,16 +1,22 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type {
+  ReactNode,
+} from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Activity,
-  AlertTriangle,
   BarChart3,
   Building2,
   CalendarDays,
   CheckCircle2,
   Clock3,
   Download,
+  FileCheck2,
   Filter,
   Gauge,
   PieChart as PieChartIcon,
@@ -20,13 +26,13 @@ import {
   Wrench,
 } from "lucide-react";
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
+  ComposedChart,
   Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -62,6 +68,13 @@ type OrdemServico = {
   updatedAt: string;
   dataPrevista: string | null;
   dataConclusao: string | null;
+
+  /*
+   * Data/hora real do término informada no relatório técnico.
+   * É a única data usada para conclusão em evolução e tempo médio.
+   */
+  dataConclusaoRelatorio: string | null;
+
   setor: Setor | null;
   maquina: Maquina | null;
   responsaveis: Colaborador[];
@@ -123,14 +136,20 @@ const PRIORIDADE_OPTIONS = [
   },
 ];
 
-const CORES_STATUS: Record<string, string> = {
-  NAO_INICIADA: "#f97316",
+const CORES_STATUS: Record<
+  string,
+  string
+> = {
+  NAO_INICIADA: "#f59e0b",
   EM_ANDAMENTO: "#3b82f6",
   CONCLUIDA: "#10b981",
   CANCELADA: "#64748b",
 };
 
-const CORES_PRIORIDADE: Record<string, string> = {
+const CORES_PRIORIDADE: Record<
+  string,
+  string
+> = {
   BAIXA: "#22c55e",
   MEDIA: "#eab308",
   ALTA: "#f97316",
@@ -138,68 +157,208 @@ const CORES_PRIORIDADE: Record<string, string> = {
 };
 
 const tooltipStyle = {
-  backgroundColor: "#080d1f",
-  border: "1px solid rgba(255,255,255,0.12)",
+  backgroundColor:
+    "rgba(5,11,24,.97)",
+  border:
+    "1px solid rgba(148,163,184,.16)",
   borderRadius: "14px",
   color: "#ffffff",
-  boxShadow: "0 18px 45px rgba(0,0,0,0.35)",
+  boxShadow:
+    "0 18px 45px rgba(0,0,0,0.35)",
 };
 
-function statusLabel(status: string) {
+function statusLabel(
+  status: string
+) {
   return (
-    STATUS_OPTIONS.find((item) => item.value === status)?.label ??
-    status
+    STATUS_OPTIONS.find(
+      (item) =>
+        item.value ===
+        status
+    )?.label ?? status
   );
 }
 
-function prioridadeLabel(prioridade: string) {
+function prioridadeLabel(
+  prioridade: string
+) {
   return (
     PRIORIDADE_OPTIONS.find(
-      (item) => item.value === prioridade
-    )?.label ?? prioridade
+      (item) =>
+        item.value ===
+        prioridade
+    )?.label ??
+    prioridade
   );
 }
 
-function formatarDataInput(value: string) {
-  if (!value) return "Todas";
+function formatarDataInput(
+  value: string
+) {
+  if (!value) {
+    return "Todas";
+  }
 
-  return new Intl.DateTimeFormat("pt-BR").format(
-    new Date(`${value}T00:00:00`)
+  return new Intl.DateTimeFormat(
+    "pt-BR",
+    {
+      timeZone:
+        "America/Sao_Paulo",
+    }
+  ).format(
+    new Date(
+      `${value}T12:00:00-03:00`
+    )
   );
 }
 
-function formatarMes(chave: string) {
-  const [ano, mes] = chave.split("-").map(Number);
+function chaveMes(
+  value: string
+) {
+  const partes =
+    new Intl.DateTimeFormat(
+      "pt-BR",
+      {
+        timeZone:
+          "America/Sao_Paulo",
+        year: "numeric",
+        month: "2-digit",
+      }
+    ).formatToParts(
+      new Date(value)
+    );
 
-  return new Intl.DateTimeFormat("pt-BR", {
-    month: "short",
-    year: "2-digit",
-    timeZone: "UTC",
-  })
-    .format(new Date(Date.UTC(ano, mes - 1, 1)))
+  const ano =
+    partes.find(
+      (parte) =>
+        parte.type ===
+        "year"
+    )?.value ?? "";
+
+  const mes =
+    partes.find(
+      (parte) =>
+        parte.type ===
+        "month"
+    )?.value ?? "";
+
+  return `${ano}-${mes}`;
+}
+
+function formatarMes(
+  chave: string
+) {
+  const [ano, mes] =
+    chave
+      .split("-")
+      .map(Number);
+
+  return new Intl.DateTimeFormat(
+    "pt-BR",
+    {
+      month: "short",
+      year: "2-digit",
+      timeZone: "UTC",
+    }
+  )
+    .format(
+      new Date(
+        Date.UTC(
+          ano,
+          mes - 1,
+          1
+        )
+      )
+    )
     .replace(".", "");
 }
 
-function chaveMes(value: string) {
-  const date = new Date(value);
-
-  return `${date.getFullYear()}-${String(
-    date.getMonth() + 1
-  ).padStart(2, "0")}`;
-}
-
-function formatarDuracaoMedia(ms: number) {
-  if (!ms || ms <= 0) return "0h";
-
-  const horas = ms / (1000 * 60 * 60);
-
-  if (horas < 24) {
-    return `${horas.toFixed(1).replace(".", ",")}h`;
+function formatarDuracaoMedia(
+  ms: number
+) {
+  if (
+    !Number.isFinite(ms) ||
+    ms <= 0
+  ) {
+    return "—";
   }
 
-  const dias = horas / 24;
+  const minutos =
+    Math.round(
+      ms / 60000
+    );
 
-  return `${dias.toFixed(1).replace(".", ",")} dias`;
+  if (minutos < 60) {
+    return `${minutos}min`;
+  }
+
+  const horas =
+    Math.floor(
+      minutos / 60
+    );
+
+  const minutosRestantes =
+    minutos % 60;
+
+  if (horas < 24) {
+    return minutosRestantes > 0
+      ? `${horas}h ${minutosRestantes}min`
+      : `${horas}h`;
+  }
+
+  const dias =
+    Math.floor(
+      horas / 24
+    );
+
+  const horasRestantes =
+    horas % 24;
+
+  return horasRestantes > 0
+    ? `${dias}d ${horasRestantes}h`
+    : `${dias}d`;
+}
+
+function percentual(
+  numerador: number,
+  denominador: number
+) {
+  if (
+    denominador <= 0
+  ) {
+    return 0;
+  }
+
+  return Math.round(
+    (numerador /
+      denominador) *
+      100
+  );
+}
+
+function dentroPeriodo(
+  value: string,
+  inicio: Date | null,
+  fim: Date | null
+) {
+  const data =
+    new Date(value);
+
+  if (
+    inicio &&
+    data < inicio
+  ) {
+    return false;
+  }
+
+  if (
+    fim &&
+    data > fim
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 export default function DashboardGraficosOS({
@@ -209,451 +368,837 @@ export default function DashboardGraficosOS({
   maquinas,
   filtrosIniciais,
 }: Props) {
-  const relatorioRef = useRef<HTMLDivElement>(null);
+  const [
+    gerandoPDF,
+    setGerandoPDF,
+  ] = useState(false);
 
-  const [gerandoPDF, setGerandoPDF] = useState(false);
-  const [filtrosEdicao, setFiltrosEdicao] =
-    useState<Filtros>(filtrosIniciais);
-  const [filtrosAplicados, setFiltrosAplicados] =
-    useState<Filtros>(filtrosIniciais);
-
-  const maquinasDisponiveis = useMemo(() => {
-    if (!filtrosEdicao.setor) {
-      return maquinas;
-    }
-
-    return maquinas.filter(
-      (maquina) => maquina.setorId === filtrosEdicao.setor
+  const [
+    filtrosEdicao,
+    setFiltrosEdicao,
+  ] =
+    useState<Filtros>(
+      filtrosIniciais
     );
-  }, [maquinas, filtrosEdicao.setor]);
+
+  const [
+    filtrosAplicados,
+    setFiltrosAplicados,
+  ] =
+    useState<Filtros>(
+      filtrosIniciais
+    );
+
+  const maquinasDisponiveis =
+    useMemo(() => {
+      if (
+        !filtrosEdicao.setor
+      ) {
+        return maquinas;
+      }
+
+      return maquinas.filter(
+        (maquina) =>
+          maquina.setorId ===
+          filtrosEdicao.setor
+      );
+    }, [
+      maquinas,
+      filtrosEdicao.setor,
+    ]);
 
   useEffect(() => {
     if (
       filtrosEdicao.maquina &&
       !maquinasDisponiveis.some(
-        (maquina) => maquina.id === filtrosEdicao.maquina
+        (maquina) =>
+          maquina.id ===
+          filtrosEdicao.maquina
       )
     ) {
-      setFiltrosEdicao((anterior) => ({
-        ...anterior,
-        maquina: "",
-      }));
+      setFiltrosEdicao(
+        (anterior) => ({
+          ...anterior,
+          maquina: "",
+        })
+      );
     }
-  }, [filtrosEdicao.maquina, maquinasDisponiveis]);
-
-  const ordensFiltradas = useMemo(() => {
-    const inicio = filtrosAplicados.dataInicio
-      ? new Date(`${filtrosAplicados.dataInicio}T00:00:00`)
-      : null;
-
-    const fim = filtrosAplicados.dataFim
-      ? new Date(`${filtrosAplicados.dataFim}T23:59:59`)
-      : null;
-
-    return ordens.filter((os) => {
-      const criadaEm = new Date(os.createdAt);
-
-      if (inicio && criadaEm < inicio) return false;
-      if (fim && criadaEm > fim) return false;
-
-      if (
-        filtrosAplicados.status &&
-        os.status !== filtrosAplicados.status
-      ) {
-        return false;
-      }
-
-      if (
-        filtrosAplicados.prioridade &&
-        os.prioridade !== filtrosAplicados.prioridade
-      ) {
-        return false;
-      }
-
-      if (
-        filtrosAplicados.setor &&
-        os.setor?.id !== filtrosAplicados.setor
-      ) {
-        return false;
-      }
-
-      if (
-        filtrosAplicados.maquina &&
-        os.maquina?.id !== filtrosAplicados.maquina
-      ) {
-        return false;
-      }
-
-      if (
-        filtrosAplicados.colaborador &&
-        !os.responsaveis.some(
-          (responsavel) =>
-            responsavel.id === filtrosAplicados.colaborador
-        )
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [ordens, filtrosAplicados]);
-
-  const metricas = useMemo(() => {
-    const total = ordensFiltradas.length;
-
-    const concluidas = ordensFiltradas.filter(
-      (os) => os.status === "CONCLUIDA"
-    ).length;
-
-    const pendentes = ordensFiltradas.filter(
-      (os) =>
-        os.status === "NAO_INICIADA" ||
-        os.status === "EM_ANDAMENTO"
-    ).length;
-
-    const canceladas = ordensFiltradas.filter(
-      (os) => os.status === "CANCELADA"
-    ).length;
-
-    const agora = new Date();
-
-    const atrasadas = ordensFiltradas.filter((os) => {
-      if (
-        os.status === "CONCLUIDA" ||
-        os.status === "CANCELADA" ||
-        !os.dataPrevista
-      ) {
-        return false;
-      }
-
-      return new Date(os.dataPrevista) < agora;
-    }).length;
-
-    const concluidasComTempo = ordensFiltradas
-      .filter((os) => os.status === "CONCLUIDA")
-      .map((os) => {
-        const inicio = new Date(os.createdAt).getTime();
-
-        const fim = new Date(
-          os.dataConclusao ?? os.updatedAt
-        ).getTime();
-
-        return Math.max(fim - inicio, 0);
-      })
-      .filter((tempo) => tempo > 0);
-
-    const tempoMedio =
-      concluidasComTempo.length > 0
-        ? concluidasComTempo.reduce(
-            (totalTempo, tempo) => totalTempo + tempo,
-            0
-          ) / concluidasComTempo.length
-        : 0;
-
-    return {
-      total,
-      concluidas,
-      pendentes,
-      canceladas,
-      atrasadas,
-      taxaConclusao:
-        total > 0 ? Math.round((concluidas / total) * 100) : 0,
-      tempoMedio,
-    };
-  }, [ordensFiltradas]);
-
-  const dadosStatus = useMemo(
-    () =>
-      STATUS_OPTIONS.map((status) => ({
-        nome: status.label,
-        valor: ordensFiltradas.filter(
-          (os) => os.status === status.value
-        ).length,
-        cor: CORES_STATUS[status.value],
-      })),
-    [ordensFiltradas]
-  );
-
-  const dadosPrioridades = useMemo(
-    () =>
-      PRIORIDADE_OPTIONS.map((prioridade) => ({
-        nome: prioridade.label,
-        quantidade: ordensFiltradas.filter(
-          (os) => os.prioridade === prioridade.value
-        ).length,
-        cor: CORES_PRIORIDADE[prioridade.value],
-      })),
-    [ordensFiltradas]
-  );
-
-  const dadosSetores = useMemo(() => {
-    const mapa = new Map<
-      string,
-      {
-        setor: string;
-        concluidas: number;
-        pendentes: number;
-        canceladas: number;
-        total: number;
-      }
-    >();
-
-    ordensFiltradas.forEach((os) => {
-      const nome = os.setor?.nome ?? "Sem setor";
-
-      const atual = mapa.get(nome) ?? {
-        setor: nome,
-        concluidas: 0,
-        pendentes: 0,
-        canceladas: 0,
-        total: 0,
-      };
-
-      atual.total += 1;
-
-      if (os.status === "CONCLUIDA") {
-        atual.concluidas += 1;
-      } else if (os.status === "CANCELADA") {
-        atual.canceladas += 1;
-      } else {
-        atual.pendentes += 1;
-      }
-
-      mapa.set(nome, atual);
-    });
-
-    return Array.from(mapa.values()).sort(
-      (a, b) => b.total - a.total
-    );
-  }, [ordensFiltradas]);
-
-  const dadosEvolucao = useMemo(() => {
-    const mapa = new Map<
-      string,
-      {
-        chave: string;
-        criadas: number;
-        concluidas: number;
-      }
-    >();
-
-    ordensFiltradas.forEach((os) => {
-      const chaveCriacao = chaveMes(os.createdAt);
-
-      const criacao = mapa.get(chaveCriacao) ?? {
-        chave: chaveCriacao,
-        criadas: 0,
-        concluidas: 0,
-      };
-
-      criacao.criadas += 1;
-      mapa.set(chaveCriacao, criacao);
-
-      if (os.status === "CONCLUIDA") {
-        const chaveConclusao = chaveMes(
-          os.dataConclusao ?? os.updatedAt
-        );
-
-        const conclusao = mapa.get(chaveConclusao) ?? {
-          chave: chaveConclusao,
-          criadas: 0,
-          concluidas: 0,
-        };
-
-        conclusao.concluidas += 1;
-        mapa.set(chaveConclusao, conclusao);
-      }
-    });
-
-    return Array.from(mapa.values())
-      .sort((a, b) => a.chave.localeCompare(b.chave))
-      .map((item) => ({
-        mes: formatarMes(item.chave),
-        criadas: item.criadas,
-        concluidas: item.concluidas,
-      }));
-  }, [ordensFiltradas]);
-
-  const dadosColaboradores = useMemo(() => {
-    const mapa = new Map<
-      string,
-      {
-        colaborador: string;
-        atribuidas: number;
-        concluidas: number;
-        pendentes: number;
-      }
-    >();
-
-    ordensFiltradas.forEach((os) => {
-      os.responsaveis.forEach((responsavel) => {
-        const atual = mapa.get(responsavel.id) ?? {
-          colaborador: responsavel.nome,
-          atribuidas: 0,
-          concluidas: 0,
-          pendentes: 0,
-        };
-
-        atual.atribuidas += 1;
-
-        if (os.status === "CONCLUIDA") {
-          atual.concluidas += 1;
-        } else if (os.status !== "CANCELADA") {
-          atual.pendentes += 1;
-        }
-
-        mapa.set(responsavel.id, atual);
-      });
-    });
-
-    return Array.from(mapa.values())
-      .sort((a, b) => b.atribuidas - a.atribuidas)
-      .slice(0, 12);
-  }, [ordensFiltradas]);
-
-  const dadosMaquinas = useMemo(() => {
-    const mapa = new Map<
-      string,
-      {
-        maquina: string;
-        ocorrencias: number;
-        concluidas: number;
-      }
-    >();
-
-    ordensFiltradas.forEach((os) => {
-      if (!os.maquina) return;
-
-      const atual = mapa.get(os.maquina.id) ?? {
-        maquina: os.maquina.nome,
-        ocorrencias: 0,
-        concluidas: 0,
-      };
-
-      atual.ocorrencias += 1;
-
-      if (os.status === "CONCLUIDA") {
-        atual.concluidas += 1;
-      }
-
-      mapa.set(os.maquina.id, atual);
-    });
-
-    return Array.from(mapa.values())
-      .sort((a, b) => b.ocorrencias - a.ocorrencias)
-      .slice(0, 10);
-  }, [ordensFiltradas]);
-
-  const dadosPrazos = useMemo(() => {
-    const agora = new Date();
-
-    let concluidasNoPrazo = 0;
-    let concluidasAtrasadas = 0;
-    let abertasNoPrazo = 0;
-    let abertasAtrasadas = 0;
-    let semPrazo = 0;
-
-    ordensFiltradas.forEach((os) => {
-      if (!os.dataPrevista) {
-        semPrazo += 1;
-        return;
-      }
-
-      const prevista = new Date(os.dataPrevista);
-
-      if (os.status === "CONCLUIDA") {
-        const conclusao = new Date(
-          os.dataConclusao ?? os.updatedAt
-        );
-
-        if (conclusao <= prevista) {
-          concluidasNoPrazo += 1;
-        } else {
-          concluidasAtrasadas += 1;
-        }
-
-        return;
-      }
-
-      if (os.status === "CANCELADA") {
-        return;
-      }
-
-      if (agora > prevista) {
-        abertasAtrasadas += 1;
-      } else {
-        abertasNoPrazo += 1;
-      }
-    });
-
-    return [
-      {
-        nome: "Concluídas no prazo",
-        quantidade: concluidasNoPrazo,
-      },
-      {
-        nome: "Concluídas atrasadas",
-        quantidade: concluidasAtrasadas,
-      },
-      {
-        nome: "Abertas no prazo",
-        quantidade: abertasNoPrazo,
-      },
-      {
-        nome: "Abertas atrasadas",
-        quantidade: abertasAtrasadas,
-      },
-      {
-        nome: "Sem prazo",
-        quantidade: semPrazo,
-      },
-    ];
-  }, [ordensFiltradas]);
-
-  const resumoFiltros = useMemo(() => {
-    const setor =
-      setores.find(
-        (item) => item.id === filtrosAplicados.setor
-      )?.nome ?? "Todos";
-
-    const colaborador =
-      colaboradores.find(
-        (item) => item.id === filtrosAplicados.colaborador
-      )?.nome ?? "Todos";
-
-    const maquina =
-      maquinas.find(
-        (item) => item.id === filtrosAplicados.maquina
-      )?.nome ?? "Todas";
-
-    return {
-      periodo: `${formatarDataInput(
-        filtrosAplicados.dataInicio
-      )} até ${formatarDataInput(filtrosAplicados.dataFim)}`,
-      setor,
-      colaborador,
-      maquina,
-      status: filtrosAplicados.status
-        ? statusLabel(filtrosAplicados.status)
-        : "Todos",
-      prioridade: filtrosAplicados.prioridade
-        ? prioridadeLabel(filtrosAplicados.prioridade)
-        : "Todas",
-    };
   }, [
-    colaboradores,
-    filtrosAplicados,
-    maquinas,
-    setores,
+    filtrosEdicao.maquina,
+    maquinasDisponiveis,
   ]);
 
-  function aplicarFiltros(event: React.FormEvent) {
+  /*
+   * O período do filtro permanece sendo o período de ABERTURA da OS.
+   * As métricas de conclusão usam a data do relatório técnico.
+   */
+  const ordensFiltradas =
+    useMemo(() => {
+      const inicio =
+        filtrosAplicados.dataInicio
+          ? new Date(
+              `${filtrosAplicados.dataInicio}T00:00:00-03:00`
+            )
+          : null;
+
+      const fim =
+        filtrosAplicados.dataFim
+          ? new Date(
+              `${filtrosAplicados.dataFim}T23:59:59-03:00`
+            )
+          : null;
+
+      return ordens.filter(
+        (os) => {
+          if (
+            !dentroPeriodo(
+              os.createdAt,
+              inicio,
+              fim
+            )
+          ) {
+            return false;
+          }
+
+          if (
+            filtrosAplicados.status &&
+            os.status !==
+              filtrosAplicados.status
+          ) {
+            return false;
+          }
+
+          if (
+            filtrosAplicados.prioridade &&
+            os.prioridade !==
+              filtrosAplicados.prioridade
+          ) {
+            return false;
+          }
+
+          if (
+            filtrosAplicados.setor &&
+            os.setor?.id !==
+              filtrosAplicados.setor
+          ) {
+            return false;
+          }
+
+          if (
+            filtrosAplicados.maquina &&
+            os.maquina?.id !==
+              filtrosAplicados.maquina
+          ) {
+            return false;
+          }
+
+          if (
+            filtrosAplicados.colaborador &&
+            !os.responsaveis.some(
+              (responsavel) =>
+                responsavel.id ===
+                filtrosAplicados.colaborador
+            )
+          ) {
+            return false;
+          }
+
+          return true;
+        }
+      );
+    }, [
+      ordens,
+      filtrosAplicados,
+    ]);
+
+  const metricas =
+    useMemo(() => {
+      const total =
+        ordensFiltradas.length;
+
+      const concluidas =
+        ordensFiltradas.filter(
+          (os) =>
+            os.status ===
+            "CONCLUIDA"
+        ).length;
+
+      const pendentes =
+        ordensFiltradas.filter(
+          (os) =>
+            os.status ===
+              "NAO_INICIADA" ||
+            os.status ===
+              "EM_ANDAMENTO"
+        ).length;
+
+      const canceladas =
+        ordensFiltradas.filter(
+          (os) =>
+            os.status ===
+            "CANCELADA"
+        ).length;
+
+      /*
+       * Canceladas nunca entram no denominador da taxa de conclusão.
+       */
+      const baseTaxa =
+        Math.max(
+          0,
+          total -
+            canceladas
+        );
+
+      const concluidasComRelatorio =
+        ordensFiltradas.filter(
+          (os) =>
+            os.status ===
+              "CONCLUIDA" &&
+            Boolean(
+              os.dataConclusaoRelatorio
+            )
+        );
+
+      /*
+       * Tempo médio TOTAL:
+       * abertura da OS -> término real informado no relatório.
+       *
+       * Não usa dataConclusao nem updatedAt.
+       */
+      const temposTotais =
+        concluidasComRelatorio
+          .map((os) => {
+            const inicio =
+              new Date(
+                os.createdAt
+              ).getTime();
+
+            const fim =
+              new Date(
+                os.dataConclusaoRelatorio!
+              ).getTime();
+
+            const tempo =
+              fim -
+              inicio;
+
+            return tempo > 0
+              ? tempo
+              : null;
+          })
+          .filter(
+            (
+              value
+            ): value is number =>
+              value !== null
+          );
+
+      const tempoMedio =
+        temposTotais.length >
+        0
+          ? temposTotais.reduce(
+              (
+                soma,
+                tempo
+              ) =>
+                soma +
+                tempo,
+              0
+            ) /
+            temposTotais.length
+          : 0;
+
+      return {
+        total,
+        concluidas,
+        pendentes,
+        canceladas,
+        baseTaxa,
+        taxaConclusao:
+          percentual(
+            concluidas,
+            baseTaxa
+          ),
+        concluidasComRelatorio:
+          concluidasComRelatorio.length,
+        coberturaRelatorio:
+          percentual(
+            concluidasComRelatorio.length,
+            concluidas
+          ),
+        tempoMedio,
+        amostraTempo:
+          temposTotais.length,
+      };
+    }, [ordensFiltradas]);
+
+  const dadosStatus =
+    useMemo(
+      () =>
+        STATUS_OPTIONS.map(
+          (status) => ({
+            nome:
+              status.label,
+            valor:
+              ordensFiltradas.filter(
+                (os) =>
+                  os.status ===
+                  status.value
+              ).length,
+            cor:
+              CORES_STATUS[
+                status.value
+              ],
+          })
+        ),
+      [ordensFiltradas]
+    );
+
+  const dadosPrioridades =
+    useMemo(
+      () =>
+        PRIORIDADE_OPTIONS.map(
+          (
+            prioridade
+          ) => ({
+            nome:
+              prioridade.label,
+            quantidade:
+              ordensFiltradas.filter(
+                (os) =>
+                  os.prioridade ===
+                  prioridade.value
+              ).length,
+            cor:
+              CORES_PRIORIDADE[
+                prioridade.value
+              ],
+          })
+        ),
+      [ordensFiltradas]
+    );
+
+  const dadosEvolucao =
+    useMemo(() => {
+      const mapa =
+        new Map<
+          string,
+          {
+            chave: string;
+            criadas: number;
+            concluidas: number;
+          }
+        >();
+
+      ordensFiltradas.forEach(
+        (os) => {
+          const chaveCriacao =
+            chaveMes(
+              os.createdAt
+            );
+
+          const criacao =
+            mapa.get(
+              chaveCriacao
+            ) ?? {
+              chave:
+                chaveCriacao,
+              criadas: 0,
+              concluidas: 0,
+            };
+
+          criacao.criadas +=
+            1;
+
+          mapa.set(
+            chaveCriacao,
+            criacao
+          );
+
+          /*
+           * Concluídas entram no mês da data REAL do relatório.
+           * Sem data de relatório válida, não entram na série temporal.
+           */
+          if (
+            os.status ===
+              "CONCLUIDA" &&
+            os.dataConclusaoRelatorio
+          ) {
+            const chaveConclusao =
+              chaveMes(
+                os.dataConclusaoRelatorio
+              );
+
+            const conclusao =
+              mapa.get(
+                chaveConclusao
+              ) ?? {
+                chave:
+                  chaveConclusao,
+                criadas: 0,
+                concluidas: 0,
+              };
+
+            conclusao.concluidas +=
+              1;
+
+            mapa.set(
+              chaveConclusao,
+              conclusao
+            );
+          }
+        }
+      );
+
+      const chaves =
+        Array.from(
+          mapa.keys()
+        ).sort();
+
+      if (
+        chaves.length ===
+        0
+      ) {
+        return [];
+      }
+
+      /*
+       * Garante meses contínuos e limita aos 12 mais recentes.
+       */
+      const primeira =
+        chaves[0];
+
+      const ultima =
+        chaves[
+          chaves.length - 1
+        ];
+
+      const [
+        primeiroAno,
+        primeiroMes,
+      ] =
+        primeira
+          .split("-")
+          .map(Number);
+
+      const [
+        ultimoAno,
+        ultimoMes,
+      ] =
+        ultima
+          .split("-")
+          .map(Number);
+
+      const meses: string[] =
+        [];
+
+      const cursor =
+        new Date(
+          primeiroAno,
+          primeiroMes - 1,
+          1,
+          12
+        );
+
+      const fim =
+        new Date(
+          ultimoAno,
+          ultimoMes - 1,
+          1,
+          12
+        );
+
+      while (
+        cursor <= fim
+      ) {
+        meses.push(
+          `${cursor.getFullYear()}-${String(
+            cursor.getMonth() +
+              1
+          ).padStart(
+            2,
+            "0"
+          )}`
+        );
+
+        cursor.setMonth(
+          cursor.getMonth() +
+            1
+        );
+      }
+
+      return meses
+        .slice(-12)
+        .map((chave) => {
+          const item =
+            mapa.get(
+              chave
+            );
+
+          return {
+            mes:
+              formatarMes(
+                chave
+              ),
+            criadas:
+              item?.criadas ??
+              0,
+            concluidas:
+              item?.concluidas ??
+              0,
+          };
+        });
+    }, [ordensFiltradas]);
+
+  const resumoEvolucao =
+    useMemo(() => {
+      const criadas =
+        dadosEvolucao.reduce(
+          (total, item) =>
+            total +
+            item.criadas,
+          0
+        );
+
+      const concluidas =
+        dadosEvolucao.reduce(
+          (total, item) =>
+            total +
+            item.concluidas,
+          0
+        );
+
+      return {
+        criadas,
+        concluidas,
+        saldo:
+          concluidas -
+          criadas,
+      };
+    }, [dadosEvolucao]);
+
+  const dadosSetores =
+    useMemo(() => {
+      const mapa =
+        new Map<
+          string,
+          {
+            setor: string;
+            concluidas: number;
+            pendentes: number;
+            canceladas: number;
+            total: number;
+            baseValida: number;
+          }
+        >();
+
+      ordensFiltradas.forEach(
+        (os) => {
+          const id =
+            os.setor?.id ??
+            "SEM_SETOR";
+
+          const atual =
+            mapa.get(id) ?? {
+              setor:
+                os.setor?.nome ??
+                "Sem setor",
+              concluidas: 0,
+              pendentes: 0,
+              canceladas: 0,
+              total: 0,
+              baseValida: 0,
+            };
+
+          atual.total += 1;
+
+          if (
+            os.status ===
+            "CONCLUIDA"
+          ) {
+            atual.concluidas +=
+              1;
+            atual.baseValida +=
+              1;
+          } else if (
+            os.status ===
+            "CANCELADA"
+          ) {
+            atual.canceladas +=
+              1;
+          } else {
+            atual.pendentes +=
+              1;
+            atual.baseValida +=
+              1;
+          }
+
+          mapa.set(
+            id,
+            atual
+          );
+        }
+      );
+
+      return Array.from(
+        mapa.values()
+      )
+        .map((item) => ({
+          ...item,
+          eficiencia:
+            percentual(
+              item.concluidas,
+              item.baseValida
+            ),
+        }))
+        .sort(
+          (a, b) =>
+            b.total -
+            a.total
+        )
+        .slice(
+          0,
+          14
+        );
+    }, [ordensFiltradas]);
+
+  const dadosColaboradores =
+    useMemo(() => {
+      const mapa =
+        new Map<
+          string,
+          {
+            colaborador: string;
+            atribuidas: number;
+            concluidas: number;
+            pendentes: number;
+            canceladas: number;
+            baseValida: number;
+          }
+        >();
+
+      ordensFiltradas.forEach(
+        (os) => {
+          os.responsaveis.forEach(
+            (
+              responsavel
+            ) => {
+              const atual =
+                mapa.get(
+                  responsavel.id
+                ) ?? {
+                  colaborador:
+                    responsavel.nome,
+                  atribuidas: 0,
+                  concluidas: 0,
+                  pendentes: 0,
+                  canceladas: 0,
+                  baseValida: 0,
+                };
+
+              atual.atribuidas +=
+                1;
+
+              if (
+                os.status ===
+                "CONCLUIDA"
+              ) {
+                atual.concluidas +=
+                  1;
+                atual.baseValida +=
+                  1;
+              } else if (
+                os.status ===
+                "CANCELADA"
+              ) {
+                atual.canceladas +=
+                  1;
+              } else {
+                atual.pendentes +=
+                  1;
+                atual.baseValida +=
+                  1;
+              }
+
+              mapa.set(
+                responsavel.id,
+                atual
+              );
+            }
+          );
+        }
+      );
+
+      return Array.from(
+        mapa.values()
+      )
+        .map((item) => ({
+          ...item,
+          eficiencia:
+            percentual(
+              item.concluidas,
+              item.baseValida
+            ),
+        }))
+        .sort(
+          (a, b) =>
+            b.atribuidas -
+            a.atribuidas
+        )
+        .slice(
+          0,
+          12
+        );
+    }, [ordensFiltradas]);
+
+  const dadosMaquinas =
+    useMemo(() => {
+      const mapa =
+        new Map<
+          string,
+          {
+            maquina: string;
+            ocorrencias: number;
+            concluidas: number;
+            canceladas: number;
+            baseValida: number;
+          }
+        >();
+
+      ordensFiltradas.forEach(
+        (os) => {
+          if (!os.maquina) {
+            return;
+          }
+
+          const atual =
+            mapa.get(
+              os.maquina.id
+            ) ?? {
+              maquina:
+                os.maquina.nome,
+              ocorrencias: 0,
+              concluidas: 0,
+              canceladas: 0,
+              baseValida: 0,
+            };
+
+          atual.ocorrencias +=
+            1;
+
+          if (
+            os.status ===
+            "CONCLUIDA"
+          ) {
+            atual.concluidas +=
+              1;
+            atual.baseValida +=
+              1;
+          } else if (
+            os.status ===
+            "CANCELADA"
+          ) {
+            atual.canceladas +=
+              1;
+          } else {
+            atual.baseValida +=
+              1;
+          }
+
+          mapa.set(
+            os.maquina.id,
+            atual
+          );
+        }
+      );
+
+      return Array.from(
+        mapa.values()
+      )
+        .map((item) => ({
+          ...item,
+          eficiencia:
+            percentual(
+              item.concluidas,
+              item.baseValida
+            ),
+        }))
+        .sort(
+          (a, b) =>
+            b.ocorrencias -
+            a.ocorrencias
+        )
+        .slice(
+          0,
+          10
+        );
+    }, [ordensFiltradas]);
+
+  const resumoFiltros =
+    useMemo(() => {
+      const setor =
+        setores.find(
+          (item) =>
+            item.id ===
+            filtrosAplicados.setor
+        )?.nome ?? "Todos";
+
+      const colaborador =
+        colaboradores.find(
+          (item) =>
+            item.id ===
+            filtrosAplicados.colaborador
+        )?.nome ?? "Todos";
+
+      const maquina =
+        maquinas.find(
+          (item) =>
+            item.id ===
+            filtrosAplicados.maquina
+        )?.nome ?? "Todas";
+
+      return {
+        periodo:
+          `${formatarDataInput(
+            filtrosAplicados.dataInicio
+          )} até ${formatarDataInput(
+            filtrosAplicados.dataFim
+          )}`,
+        setor,
+        colaborador,
+        maquina,
+        status:
+          filtrosAplicados.status
+            ? statusLabel(
+                filtrosAplicados.status
+              )
+            : "Todos",
+        prioridade:
+          filtrosAplicados.prioridade
+            ? prioridadeLabel(
+                filtrosAplicados.prioridade
+              )
+            : "Todas",
+      };
+    }, [
+      colaboradores,
+      filtrosAplicados,
+      maquinas,
+      setores,
+    ]);
+
+  function aplicarFiltros(
+    event: React.FormEvent
+  ) {
     event.preventDefault();
-    setFiltrosAplicados({ ...filtrosEdicao });
+
+    setFiltrosAplicados({
+      ...filtrosEdicao,
+    });
   }
 
   function limparFiltros() {
-    const filtrosVazios: Filtros = {
+    const vazios: Filtros = {
       dataInicio: "",
       dataFim: "",
       status: "",
@@ -663,646 +1208,1039 @@ export default function DashboardGraficosOS({
       maquina: "",
     };
 
-    setFiltrosEdicao(filtrosVazios);
-    setFiltrosAplicados(filtrosVazios);
+    setFiltrosEdicao(
+      vazios
+    );
+
+    setFiltrosAplicados(
+      vazios
+    );
   }
 
   async function gerarPDF() {
-    if (gerandoPDF) return;
+    if (gerandoPDF) {
+      return;
+    }
 
     try {
       setGerandoPDF(true);
 
-      const [{ jsPDF }, { default: autoTable }] = await Promise.all([
-        import("jspdf"),
-        import("jspdf-autotable"),
-      ]);
+      const [
+        { jsPDF },
+        { default: autoTable },
+      ] =
+        await Promise.all([
+          import("jspdf"),
+          import(
+            "jspdf-autotable"
+          ),
+        ]);
 
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      });
+      const pdf =
+        new jsPDF({
+          orientation:
+            "landscape",
+          unit: "mm",
+          format: "a4",
+        });
 
-      const larguraPagina = pdf.internal.pageSize.getWidth();
-      const alturaPagina = pdf.internal.pageSize.getHeight();
+      const pageWidth =
+        pdf.internal.pageSize.getWidth();
+
+      const pageHeight =
+        pdf.internal.pageSize.getHeight();
+
       const margem = 12;
-      const larguraUtil = larguraPagina - margem * 2;
+      const util =
+        pageWidth -
+        margem * 2;
 
-      const CORES_PDF = {
-        fundo: [5, 8, 22] as [number, number, number],
-        painel: [8, 13, 31] as [number, number, number],
-        painel2: [11, 18, 38] as [number, number, number],
-        borda: [30, 41, 59] as [number, number, number],
-        branco: [255, 255, 255] as [number, number, number],
-        texto: [226, 232, 240] as [number, number, number],
-        textoFraco: [148, 163, 184] as [number, number, number],
-        textoMuitoFraco: [100, 116, 139] as [number, number, number],
-        ciano: [34, 211, 238] as [number, number, number],
-        verde: [16, 185, 129] as [number, number, number],
-        azul: [59, 130, 246] as [number, number, number],
-        laranja: [249, 115, 22] as [number, number, number],
-        vermelho: [239, 68, 68] as [number, number, number],
-        violeta: [139, 92, 246] as [number, number, number],
-        cinza: [100, 116, 139] as [number, number, number],
-      };
+      const navy: [
+        number,
+        number,
+        number
+      ] = [7, 18, 34];
 
-      function hexParaRgb(hex: string): [number, number, number] {
-        const limpo = hex.replace("#", "");
-        const numero = Number.parseInt(limpo, 16);
+      const cyan: [
+        number,
+        number,
+        number
+      ] = [6, 182, 212];
 
-        return [
-          (numero >> 16) & 255,
-          (numero >> 8) & 255,
-          numero & 255,
-        ];
-      }
+      const green: [
+        number,
+        number,
+        number
+      ] = [16, 150, 105];
 
-      async function carregarLogo(): Promise<string | null> {
-        try {
-          const resposta = await fetch("/logo.sequoia.png");
-          if (!resposta.ok) return null;
+      const blue: [
+        number,
+        number,
+        number
+      ] = [59, 130, 246];
 
-          const blob = await resposta.blob();
+      const orange: [
+        number,
+        number,
+        number
+      ] = [249, 115, 22];
 
-          return await new Promise<string | null>((resolve) => {
-            const reader = new FileReader();
+      const violet: [
+        number,
+        number,
+        number
+      ] = [139, 92, 246];
 
-            reader.onloadend = () => {
-              resolve(
-                typeof reader.result === "string"
-                  ? reader.result
-                  : null
+      const red: [
+        number,
+        number,
+        number
+      ] = [239, 68, 68];
+
+      const slate: [
+        number,
+        number,
+        number
+      ] = [71, 85, 105];
+
+      const light: [
+        number,
+        number,
+        number
+      ] = [246, 248, 251];
+
+      const border: [
+        number,
+        number,
+        number
+      ] = [220, 226, 234];
+
+      const text: [
+        number,
+        number,
+        number
+      ] = [28, 39, 54];
+
+      const loadLogo =
+        async () => {
+          try {
+            const response =
+              await fetch(
+                "/logo.sequoia.png"
               );
-            };
 
-            reader.onerror = () => resolve(null);
-            reader.readAsDataURL(blob);
-          });
-        } catch {
-          return null;
-        }
-      }
+            if (
+              !response.ok
+            ) {
+              return null;
+            }
 
-      const logoBase64 = await carregarLogo();
+            const blob =
+              await response.blob();
 
-      function fundoPagina() {
-        pdf.setFillColor(...CORES_PDF.fundo);
-        pdf.rect(0, 0, larguraPagina, alturaPagina, "F");
-      }
+            return await new Promise<
+              string | null
+            >((resolve) => {
+              const reader =
+                new FileReader();
 
-      function cabecalho(
+              reader.onloadend =
+                () => {
+                  resolve(
+                    typeof reader.result ===
+                      "string"
+                      ? reader.result
+                      : null
+                  );
+                };
+
+              reader.readAsDataURL(
+                blob
+              );
+            });
+          } catch {
+            return null;
+          }
+        };
+
+      const logo =
+        await loadLogo();
+
+      const header = (
         titulo: string,
         subtitulo: string,
-        numeroPagina: number
-      ) {
-        fundoPagina();
+        pagina: number
+      ) => {
+        pdf.setFillColor(
+          ...navy
+        );
 
-        pdf.setFillColor(...CORES_PDF.painel2);
         pdf.roundedRect(
           margem,
-          9,
-          larguraUtil,
-          28,
+          10,
+          util,
+          27,
           4,
           4,
           "F"
         );
 
-        pdf.setDrawColor(...CORES_PDF.borda);
-        pdf.roundedRect(
-          margem,
-          9,
-          larguraUtil,
-          28,
-          4,
-          4,
-          "S"
-        );
-
-        if (logoBase64) {
-          try {
-            pdf.addImage(
-              logoBase64,
-              "PNG",
-              margem + 4,
-              14,
-              24,
-              16
-            );
-          } catch {
-            // Mantém o relatório funcionando mesmo se a logo falhar.
-          }
+        if (logo) {
+          pdf.addImage(
+            logo,
+            "PNG",
+            margem + 5,
+            13,
+            20,
+            20
+          );
         }
 
-        const inicioTexto = logoBase64 ? margem + 34 : margem + 5;
+        pdf.setFont(
+          "helvetica",
+          "bold"
+        );
 
-        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(16);
+
+        pdf.setTextColor(
+          255,
+          255,
+          255
+        );
+
+        pdf.text(
+          titulo,
+          margem + 31,
+          20
+        );
+
+        pdf.setFont(
+          "helvetica",
+          "normal"
+        );
+
+        pdf.setFontSize(8.5);
+
+        pdf.setTextColor(
+          190,
+          208,
+          224
+        );
+
+        pdf.text(
+          subtitulo,
+          margem + 31,
+          27
+        );
+
         pdf.setFontSize(7.5);
-        pdf.setTextColor(...CORES_PDF.ciano);
-        pdf.text(
-          "SISTEMA DE MANUTENÇÃO • SEQUOIA",
-          inicioTexto,
-          17
-        );
-
-        pdf.setFontSize(17);
-        pdf.setTextColor(...CORES_PDF.branco);
-        pdf.text(titulo, inicioTexto, 25);
-
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(7.5);
-        pdf.setTextColor(...CORES_PDF.textoFraco);
-        pdf.text(subtitulo, inicioTexto, 31.5);
-
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(7.5);
-        pdf.setTextColor(...CORES_PDF.textoFraco);
-        pdf.text(
-          `PÁGINA ${numeroPagina}`,
-          larguraPagina - margem - 5,
-          17,
-          { align: "right" }
-        );
-
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(7);
-        pdf.setTextColor(...CORES_PDF.textoMuitoFraco);
-        pdf.text(
-          new Date().toLocaleString("pt-BR"),
-          larguraPagina - margem - 5,
-          24,
-          { align: "right" }
-        );
-      }
-
-      function rodape() {
-        pdf.setDrawColor(...CORES_PDF.borda);
-        pdf.line(
-          margem,
-          alturaPagina - 10,
-          larguraPagina - margem,
-          alturaPagina - 10
-        );
-
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(7);
-        pdf.setTextColor(...CORES_PDF.textoMuitoFraco);
 
         pdf.text(
-          "Sistema de OS - Sequoia",
-          margem,
-          alturaPagina - 5
+          `Página ${pagina}`,
+          pageWidth -
+            margem -
+            5,
+          27,
+          {
+            align: "right",
+          }
         );
+      };
 
-        pdf.text(
-          "Relatório gerencial de indicadores de manutenção",
-          larguraPagina / 2,
-          alturaPagina - 5,
-          { align: "center" }
-        );
-
-        pdf.text(
-          "Desenvolvido por Pedro H. Laranjeira",
-          larguraPagina - margem,
-          alturaPagina - 5,
-          { align: "right" }
-        );
-      }
-
-      function tituloSecao(
-        titulo: string,
-        subtitulo: string,
-        x: number,
-        y: number,
-        largura: number
-      ) {
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(10.5);
-        pdf.setTextColor(...CORES_PDF.branco);
-        pdf.text(titulo, x, y);
-
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(7);
-        pdf.setTextColor(...CORES_PDF.textoFraco);
-        pdf.text(subtitulo, x, y + 5);
-
-        pdf.setDrawColor(...CORES_PDF.borda);
-        pdf.line(x, y + 8, x + largura, y + 8);
-      }
-
-      function chipFiltro(
-        x: number,
-        y: number,
-        largura: number,
-        label: string,
-        valor: string
-      ) {
-        pdf.setFillColor(...CORES_PDF.painel);
-        pdf.roundedRect(x, y, largura, 14, 3, 3, "F");
-
-        pdf.setDrawColor(...CORES_PDF.borda);
-        pdf.roundedRect(x, y, largura, 14, 3, 3, "S");
-
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(5.8);
-        pdf.setTextColor(...CORES_PDF.textoMuitoFraco);
-        pdf.text(label.toUpperCase(), x + 3, y + 4.3);
-
-        pdf.setFontSize(7.2);
-        pdf.setTextColor(...CORES_PDF.branco);
-
-        const linhas = pdf.splitTextToSize(valor || "-", largura - 6);
-        pdf.text(String(linhas[0] ?? "-"), x + 3, y + 9.7);
-      }
-
-      function cardMetricaPDF(
-        x: number,
-        y: number,
-        largura: number,
-        titulo: string,
-        valor: string,
-        descricao: string,
-        cor: [number, number, number]
-      ) {
-        pdf.setFillColor(...CORES_PDF.painel);
-        pdf.roundedRect(x, y, largura, 27, 4, 4, "F");
-
-        pdf.setDrawColor(...CORES_PDF.borda);
-        pdf.roundedRect(x, y, largura, 27, 4, 4, "S");
-
-        pdf.setFillColor(...cor);
-        pdf.roundedRect(x + 4, y + 4, 2.2, 19, 1, 1, "F");
-
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(7);
-        pdf.setTextColor(...CORES_PDF.textoFraco);
-        pdf.text(titulo, x + 10, y + 7);
-
-        pdf.setFontSize(15.5);
-        pdf.setTextColor(...CORES_PDF.branco);
-        pdf.text(valor, x + 10, y + 16.5);
-
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(6.3);
-        pdf.setTextColor(...CORES_PDF.textoMuitoFraco);
-        pdf.text(descricao, x + 10, y + 22.2);
-      }
-
-      function barrasHorizontais(
-        itens: Array<{
-          label: string;
-          valor: number;
-          cor: [number, number, number];
-        }>,
-        x: number,
-        y: number,
-        largura: number,
-        altura: number
-      ) {
-        pdf.setFillColor(...CORES_PDF.painel);
-        pdf.roundedRect(x, y, largura, altura, 4, 4, "F");
-        pdf.setDrawColor(...CORES_PDF.borda);
-        pdf.roundedRect(x, y, largura, altura, 4, 4, "S");
-
-        const maior = Math.max(...itens.map((item) => item.valor), 1);
-        const alturaLinha = (altura - 11) / Math.max(itens.length, 1);
-
-        itens.forEach((item, indice) => {
-          const linhaY = y + 7 + indice * alturaLinha;
-          const larguraBarra = Math.max(
-            0,
-            ((largura - 58) * item.valor) / maior
+      const footer =
+        () => {
+          pdf.setDrawColor(
+            ...border
           );
 
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(6.8);
-          pdf.setTextColor(...CORES_PDF.texto);
-          pdf.text(item.label, x + 4, linhaY + 3.2);
+          pdf.line(
+            margem,
+            pageHeight - 12,
+            pageWidth -
+              margem,
+            pageHeight - 12
+          );
 
-          pdf.setFillColor(20, 29, 49);
+          pdf.setFontSize(
+            7
+          );
+
+          pdf.setTextColor(
+            ...slate
+          );
+
+          pdf.text(
+            "Sistema de OS • Sequoia • Indicadores técnicos",
+            margem,
+            pageHeight - 7
+          );
+
+          pdf.text(
+            "Conclusões e tempo médio baseados no relatório técnico",
+            pageWidth -
+              margem,
+            pageHeight - 7,
+            {
+              align: "right",
+            }
+          );
+        };
+
+      const metricCard =
+        (
+          x: number,
+          y: number,
+          width: number,
+          label: string,
+          value: string,
+          helper: string,
+          accent: [
+            number,
+            number,
+            number
+          ]
+        ) => {
+          pdf.setFillColor(
+            ...light
+          );
+
+          pdf.setDrawColor(
+            ...border
+          );
+
           pdf.roundedRect(
-            x + 44,
-            linhaY,
-            largura - 55,
-            4.3,
-            2,
-            2,
+            x,
+            y,
+            width,
+            24,
+            3,
+            3,
+            "FD"
+          );
+
+          pdf.setFont(
+            "helvetica",
+            "bold"
+          );
+
+          pdf.setFontSize(7);
+
+          pdf.setTextColor(
+            ...accent
+          );
+
+          pdf.text(
+            label.toUpperCase(),
+            x + 4,
+            y + 6
+          );
+
+          pdf.setFontSize(15);
+
+          pdf.setTextColor(
+            ...text
+          );
+
+          pdf.text(
+            value,
+            x + 4,
+            y + 14
+          );
+
+          pdf.setFont(
+            "helvetica",
+            "normal"
+          );
+
+          pdf.setFontSize(6.5);
+
+          pdf.setTextColor(
+            ...slate
+          );
+
+          pdf.text(
+            pdf.splitTextToSize(
+              helper,
+              width - 8
+            ),
+            x + 4,
+            y + 20
+          );
+        };
+
+      const drawLineChart =
+        (
+          x: number,
+          y: number,
+          width: number,
+          height: number
+        ) => {
+          pdf.setFillColor(
+            ...light
+          );
+
+          pdf.setDrawColor(
+            ...border
+          );
+
+          pdf.roundedRect(
+            x,
+            y,
+            width,
+            height,
+            3,
+            3,
+            "FD"
+          );
+
+          if (
+            dadosEvolucao.length ===
+            0
+          ) {
+            pdf.setTextColor(
+              ...slate
+            );
+
+            pdf.setFontSize(
+              8
+            );
+
+            pdf.text(
+              "Sem dados de evolução.",
+              x + 6,
+              y + 12
+            );
+
+            return;
+          }
+
+          const padL = 8;
+          const padR = 5;
+          const padT = 8;
+          const padB = 12;
+
+          const graphW =
+            width -
+            padL -
+            padR;
+
+          const graphH =
+            height -
+            padT -
+            padB;
+
+          const max =
+            Math.max(
+              1,
+              ...dadosEvolucao.flatMap(
+                (item) => [
+                  item.criadas,
+                  item.concluidas,
+                ]
+              )
+            );
+
+          for (
+            let i = 0;
+            i <= 3;
+            i += 1
+          ) {
+            const gy =
+              y +
+              padT +
+              (graphH /
+                3) *
+                i;
+
+            pdf.setDrawColor(
+              225,
+              230,
+              236
+            );
+
+            pdf.line(
+              x + padL,
+              gy,
+              x +
+                padL +
+                graphW,
+              gy
+            );
+          }
+
+          const points = (
+            key:
+              | "criadas"
+              | "concluidas"
+          ) =>
+            dadosEvolucao.map(
+              (
+                item,
+                index
+              ) => ({
+                x:
+                  x +
+                  padL +
+                  (index /
+                    Math.max(
+                      1,
+                      dadosEvolucao.length -
+                        1
+                    )) *
+                    graphW,
+                y:
+                  y +
+                  padT +
+                  graphH -
+                  (item[key] /
+                    max) *
+                    graphH,
+              })
+            );
+
+          const drawSeries = (
+            series: {
+              x: number;
+              y: number;
+            }[],
+            color: [
+              number,
+              number,
+              number
+            ]
+          ) => {
+            pdf.setDrawColor(
+              ...color
+            );
+
+            pdf.setLineWidth(
+              0.8
+            );
+
+            for (
+              let i = 1;
+              i <
+              series.length;
+              i += 1
+            ) {
+              pdf.line(
+                series[
+                  i - 1
+                ].x,
+                series[
+                  i - 1
+                ].y,
+                series[i].x,
+                series[i].y
+              );
+            }
+
+            series.forEach(
+              (point) => {
+                pdf.setFillColor(
+                  ...color
+                );
+
+                pdf.circle(
+                  point.x,
+                  point.y,
+                  1.4,
+                  "F"
+                );
+              }
+            );
+          };
+
+          drawSeries(
+            points("criadas"),
+            cyan
+          );
+
+          drawSeries(
+            points(
+              "concluidas"
+            ),
+            green
+          );
+
+          pdf.setFontSize(
+            6.5
+          );
+
+          pdf.setTextColor(
+            ...slate
+          );
+
+          dadosEvolucao.forEach(
+            (
+              item,
+              index
+            ) => {
+              if (
+                dadosEvolucao.length >
+                  8 &&
+                index % 2 !==
+                  0 &&
+                index !==
+                  dadosEvolucao.length -
+                    1
+              ) {
+                return;
+              }
+
+              const px =
+                x +
+                padL +
+                (index /
+                  Math.max(
+                    1,
+                    dadosEvolucao.length -
+                      1
+                  )) *
+                  graphW;
+
+              pdf.text(
+                item.mes,
+                px,
+                y +
+                  height -
+                  4,
+                {
+                  align:
+                    "center",
+                }
+              );
+            }
+          );
+
+          pdf.setFillColor(
+            ...cyan
+          );
+
+          pdf.circle(
+            x +
+              width -
+              52,
+            y + 5,
+            1.4,
             "F"
           );
 
-          if (item.valor > 0) {
-            pdf.setFillColor(...item.cor);
-            pdf.roundedRect(
-              x + 44,
-              linhaY,
-              larguraBarra,
-              4.3,
-              2,
-              2,
-              "F"
-            );
-          }
-
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(7);
-          pdf.setTextColor(...item.cor);
-          pdf.text(
-            String(item.valor),
-            x + largura - 5,
-            linhaY + 3.2,
-            { align: "right" }
+          pdf.setTextColor(
+            ...text
           );
-        });
-      }
 
-      function graficoLinha(
-        x: number,
-        y: number,
-        largura: number,
-        altura: number
-      ) {
-        pdf.setFillColor(...CORES_PDF.painel);
-        pdf.roundedRect(x, y, largura, altura, 4, 4, "F");
-        pdf.setDrawColor(...CORES_PDF.borda);
-        pdf.roundedRect(x, y, largura, altura, 4, 4, "S");
-
-        if (dadosEvolucao.length === 0) {
-          pdf.setFont("helvetica", "normal");
-          pdf.setFontSize(8);
-          pdf.setTextColor(...CORES_PDF.textoFraco);
           pdf.text(
-            "Sem dados para evolução no período.",
-            x + largura / 2,
-            y + altura / 2,
-            { align: "center" }
+            "Criadas",
+            x +
+              width -
+              48,
+            y + 6
           );
-          return;
-        }
 
-        const padLeft = 12;
-        const padRight = 7;
-        const padTop = 9;
-        const padBottom = 16;
-        const chartX = x + padLeft;
-        const chartY = y + padTop;
-        const chartW = largura - padLeft - padRight;
-        const chartH = altura - padTop - padBottom;
+          pdf.setFillColor(
+            ...green
+          );
 
-        const maxValor = Math.max(
-          ...dadosEvolucao.flatMap((item) => [
-            item.criadas,
-            item.concluidas,
-          ]),
-          1
-        );
+          pdf.circle(
+            x +
+              width -
+              25,
+            y + 5,
+            1.4,
+            "F"
+          );
 
-        pdf.setDrawColor(39, 50, 72);
-        pdf.setLineWidth(0.2);
+          pdf.text(
+            "Concluídas",
+            x +
+              width -
+              21,
+            y + 6
+          );
+        };
 
-        for (let i = 0; i <= 4; i += 1) {
-          const gridY = chartY + (chartH / 4) * i;
-          pdf.line(chartX, gridY, chartX + chartW, gridY);
-
-          const valor = Math.round(maxValor - (maxValor / 4) * i);
-          pdf.setFont("helvetica", "normal");
-          pdf.setFontSize(5.8);
-          pdf.setTextColor(...CORES_PDF.textoMuitoFraco);
-          pdf.text(String(valor), chartX - 2, gridY + 1.8, {
-            align: "right",
-          });
-        }
-
-        const passoX =
-          dadosEvolucao.length > 1
-            ? chartW / (dadosEvolucao.length - 1)
-            : 0;
-
-        const pontosCriadas: Array<[number, number]> = [];
-        const pontosConcluidas: Array<[number, number]> = [];
-
-        dadosEvolucao.forEach((item, indice) => {
-          const px =
-            dadosEvolucao.length > 1
-              ? chartX + passoX * indice
-              : chartX + chartW / 2;
-
-          const pyCriadas =
-            chartY + chartH - (item.criadas / maxValor) * chartH;
-
-          const pyConcluidas =
-            chartY +
-            chartH -
-            (item.concluidas / maxValor) * chartH;
-
-          pontosCriadas.push([px, pyCriadas]);
-          pontosConcluidas.push([px, pyConcluidas]);
-
-          pdf.setFont("helvetica", "normal");
-          pdf.setFontSize(5.5);
-          pdf.setTextColor(...CORES_PDF.textoMuitoFraco);
-          pdf.text(item.mes, px, chartY + chartH + 7, {
-            align: "center",
-          });
-        });
-
-        function desenharSerie(
-          pontos: Array<[number, number]>,
-          cor: [number, number, number]
-        ) {
-          pdf.setDrawColor(...cor);
-          pdf.setLineWidth(0.7);
-
-          for (let i = 1; i < pontos.length; i += 1) {
-            pdf.line(
-              pontos[i - 1][0],
-              pontos[i - 1][1],
-              pontos[i][0],
-              pontos[i][1]
-            );
-          }
-
-          pontos.forEach(([px, py]) => {
-            pdf.setFillColor(...cor);
-            pdf.circle(px, py, 1.1, "F");
-          });
-        }
-
-        desenharSerie(pontosCriadas, CORES_PDF.ciano);
-        desenharSerie(pontosConcluidas, CORES_PDF.verde);
-
-        pdf.setFillColor(...CORES_PDF.ciano);
-        pdf.circle(x + 6, y + altura - 5, 1.2, "F");
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(6.2);
-        pdf.setTextColor(...CORES_PDF.textoFraco);
-        pdf.text("Criadas", x + 9, y + altura - 3.2);
-
-        pdf.setFillColor(...CORES_PDF.verde);
-        pdf.circle(x + 30, y + altura - 5, 1.2, "F");
-        pdf.text("Concluídas", x + 33, y + altura - 3.2);
-      }
-
-      const statusPDF = dadosStatus.map((item) => ({
-        label: item.nome,
-        valor: item.valor,
-        cor: hexParaRgb(item.cor),
-      }));
-
-      const prioridadesPDF = dadosPrioridades.map((item) => ({
-        label: item.nome,
-        valor: item.quantidade,
-        cor: hexParaRgb(item.cor),
-      }));
-
-      // =========================================================
-      // PÁGINA 1 — RESUMO EXECUTIVO
-      // =========================================================
-      cabecalho(
-        "Relatório Executivo de Ordens de Serviço",
-        "Visão consolidada dos principais indicadores operacionais e gerenciais",
+      /*
+       * PÁGINA 1 — RESUMO EXECUTIVO
+       */
+      header(
+        "Indicadores de Ordens de Serviço",
+        "Resumo executivo • canceladas fora das taxas • conclusão pela data real do relatório",
         1
       );
 
-      const chipW = 43;
-      const chipGap = 3.2;
-      const chipY = 43;
+      const chipY = 42;
 
-      [
-        ["Período", resumoFiltros.periodo],
-        ["Setor", resumoFiltros.setor],
-        ["Máquina", resumoFiltros.maquina],
-        ["Colaborador", resumoFiltros.colaborador],
-        ["Status", resumoFiltros.status],
-        ["Prioridade", resumoFiltros.prioridade],
-      ].forEach(([label, valor], indice) => {
-        chipFiltro(
-          margem + indice * (chipW + chipGap),
-          chipY,
-          chipW,
-          label,
-          valor
-        );
-      });
+      const filtros = [
+        [
+          "Período",
+          resumoFiltros.periodo,
+        ],
+        [
+          "Setor",
+          resumoFiltros.setor,
+        ],
+        [
+          "Máquina",
+          resumoFiltros.maquina,
+        ],
+        [
+          "Colaborador",
+          resumoFiltros.colaborador,
+        ],
+        [
+          "Status",
+          resumoFiltros.status,
+        ],
+        [
+          "Prioridade",
+          resumoFiltros.prioridade,
+        ],
+      ];
 
-      const cardGap = 4;
-      const cardW = (larguraUtil - cardGap * 2) / 3;
+      const chipGap = 2.5;
+      const chipW =
+        (util -
+          chipGap * 5) /
+        6;
 
-      cardMetricaPDF(
+      filtros.forEach(
+        (
+          [label, value],
+          index
+        ) => {
+          const x =
+            margem +
+            index *
+              (chipW +
+                chipGap);
+
+          pdf.setFillColor(
+            248,
+            250,
+            252
+          );
+
+          pdf.setDrawColor(
+            ...border
+          );
+
+          pdf.roundedRect(
+            x,
+            chipY,
+            chipW,
+            14,
+            2,
+            2,
+            "FD"
+          );
+
+          pdf.setFont(
+            "helvetica",
+            "bold"
+          );
+
+          pdf.setFontSize(
+            5.8
+          );
+
+          pdf.setTextColor(
+            ...slate
+          );
+
+          pdf.text(
+            String(label).toUpperCase(),
+            x + 3,
+            chipY + 4.5
+          );
+
+          pdf.setFontSize(
+            7.1
+          );
+
+          pdf.setTextColor(
+            ...text
+          );
+
+          pdf.text(
+            pdf.splitTextToSize(
+              String(value),
+              chipW - 6
+            )[0],
+            x + 3,
+            chipY + 10.5
+          );
+        }
+      );
+
+      const cardGap = 3;
+      const cardW =
+        (util -
+          cardGap * 2) /
+        3;
+
+      metricCard(
         margem,
-        64,
+        61,
         cardW,
         "Total de OS",
-        String(metricas.total),
-        "Ordens encontradas",
-        CORES_PDF.ciano
+        String(
+          metricas.total
+        ),
+        "Todas as ordens no filtro",
+        cyan
       );
 
-      cardMetricaPDF(
-        margem + cardW + cardGap,
-        64,
-        cardW,
-        "Concluídas",
-        String(metricas.concluidas),
-        "Serviços finalizados",
-        CORES_PDF.verde
-      );
-
-      cardMetricaPDF(
-        margem + (cardW + cardGap) * 2,
-        64,
-        cardW,
-        "Pendentes",
-        String(metricas.pendentes),
-        "Não iniciadas ou em andamento",
-        CORES_PDF.azul
-      );
-
-      cardMetricaPDF(
-        margem,
-        95,
-        cardW,
-        "OS atrasadas",
-        String(metricas.atrasadas),
-        "Abertas fora do prazo",
-        CORES_PDF.vermelho
-      );
-
-      cardMetricaPDF(
-        margem + cardW + cardGap,
-        95,
+      metricCard(
+        margem +
+          cardW +
+          cardGap,
+        61,
         cardW,
         "Taxa de conclusão",
         `${metricas.taxaConclusao}%`,
-        "Percentual de OS concluídas",
-        CORES_PDF.violeta
+        `${metricas.concluidas}/${metricas.baseTaxa} OS válidas • canceladas excluídas`,
+        violet
       );
 
-      cardMetricaPDF(
-        margem + (cardW + cardGap) * 2,
-        95,
+      metricCard(
+        margem +
+          (cardW +
+            cardGap) *
+            2,
+        61,
         cardW,
-        "Tempo médio",
-        formatarDuracaoMedia(metricas.tempoMedio),
-        "Da criação até a conclusão",
-        CORES_PDF.laranja
+        "Tempo médio total",
+        formatarDuracaoMedia(
+          metricas.tempoMedio
+        ),
+        `Abertura → término real do relatório • ${metricas.amostraTempo} OS`,
+        orange
       );
 
-      tituloSecao(
-        "Distribuição operacional",
-        "Situação atual das ordens e níveis de prioridade",
+      metricCard(
+        margem,
+        89,
+        cardW,
+        "Concluídas",
+        String(
+          metricas.concluidas
+        ),
+        "Serviços finalizados",
+        green
+      );
+
+      metricCard(
+        margem +
+          cardW +
+          cardGap,
+        89,
+        cardW,
+        "Pendentes",
+        String(
+          metricas.pendentes
+        ),
+        "Não iniciadas + em andamento",
+        blue
+      );
+
+      metricCard(
+        margem +
+          (cardW +
+            cardGap) *
+            2,
+        89,
+        cardW,
+        "Cobertura técnica",
+        `${metricas.coberturaRelatorio}%`,
+        `${metricas.concluidasComRelatorio}/${metricas.concluidas} concluídas com data de relatório válida`,
+        cyan
+      );
+
+      pdf.setFont(
+        "helvetica",
+        "bold"
+      );
+
+      pdf.setFontSize(11);
+
+      pdf.setTextColor(
+        ...navy
+      );
+
+      pdf.text(
+        "Evolução real das ordens",
+        margem,
+        124
+      );
+
+      pdf.setFont(
+        "helvetica",
+        "normal"
+      );
+
+      pdf.setFontSize(7);
+
+      pdf.setTextColor(
+        ...slate
+      );
+
+      pdf.text(
+        "Criadas pela abertura da OS • Concluídas pela data/hora de término do relatório técnico",
+        margem,
+        129
+      );
+
+      drawLineChart(
         margem,
         134,
-        larguraUtil
+        util,
+        58
       );
 
-      const graficoGap = 6;
-      const graficoW = (larguraUtil - graficoGap) / 2;
+      footer();
 
-      barrasHorizontais(
-        statusPDF,
-        margem,
-        145,
-        graficoW,
-        48
-      );
-
-      barrasHorizontais(
-        prioridadesPDF,
-        margem + graficoW + graficoGap,
-        145,
-        graficoW,
-        48
-      );
-
-      rodape();
-
-      // =========================================================
-      // PÁGINA 2 — SETORES E EVOLUÇÃO
-      // =========================================================
+      /*
+       * PÁGINA 2 — DISTRIBUIÇÃO E RANKINGS
+       */
       pdf.addPage();
 
-      cabecalho(
-        "Análise Operacional por Setor",
-        "Distribuição de volume, conclusão, pendências e evolução ao longo do período",
+      header(
+        "Distribuição Operacional",
+        "Status, prioridades e rankings com canceladas excluídas dos cálculos de eficiência",
         2
       );
 
-      tituloSecao(
-        "Desempenho por setor",
-        "Ranking dos setores com maior volume de ordens",
+      pdf.setFont(
+        "helvetica",
+        "bold"
+      );
+
+      pdf.setFontSize(10);
+
+      pdf.setTextColor(
+        ...navy
+      );
+
+      pdf.text(
+        "Status",
         margem,
-        48,
-        128
+        47
       );
 
       autoTable(pdf, {
-        startY: 59,
+        startY: 51,
         margin: {
           left: margem,
-          right: larguraPagina - margem - 128,
+          right:
+            pageWidth -
+            margem -
+            70,
         },
-        tableWidth: 128,
+        tableWidth: 70,
+        head: [
+          [
+            "Status",
+            "OS",
+          ],
+        ],
+        body:
+          dadosStatus.map(
+            (item) => [
+              item.nome,
+              String(
+                item.valor
+              ),
+            ]
+          ),
+        theme: "grid",
+        styles: {
+          fontSize: 7.2,
+          cellPadding: 2,
+          textColor: text,
+          fillColor: light,
+          lineColor: border,
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: navy,
+          textColor: [
+            255,
+            255,
+            255,
+          ],
+          fontStyle: "bold",
+        },
+      });
+
+      pdf.text(
+        "Prioridades",
+        88,
+        47
+      );
+
+      autoTable(pdf, {
+        startY: 51,
+        margin: {
+          left: 88,
+          right:
+            pageWidth -
+            88 -
+            70,
+        },
+        tableWidth: 70,
+        head: [
+          [
+            "Prioridade",
+            "OS",
+          ],
+        ],
+        body:
+          dadosPrioridades.map(
+            (item) => [
+              item.nome,
+              String(
+                item.quantidade
+              ),
+            ]
+          ),
+        theme: "grid",
+        styles: {
+          fontSize: 7.2,
+          cellPadding: 2,
+          textColor: text,
+          fillColor: light,
+          lineColor: border,
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: orange,
+          textColor: [
+            255,
+            255,
+            255,
+          ],
+          fontStyle: "bold",
+        },
+      });
+
+      pdf.text(
+        "Setores",
+        164,
+        47
+      );
+
+      autoTable(pdf, {
+        startY: 51,
+        margin: {
+          left: 164,
+          right: margem,
+        },
+        tableWidth:
+          pageWidth -
+          164 -
+          margem,
         head: [
           [
             "Setor",
@@ -1310,1110 +2248,1618 @@ export default function DashboardGraficosOS({
             "Concl.",
             "Pend.",
             "Canc.",
-            "Eficiência",
+            "Ef.",
           ],
         ],
         body:
-          dadosSetores.length > 0
-            ? dadosSetores.slice(0, 12).map((item) => [
+          dadosSetores
+            .slice(0, 10)
+            .map(
+              (item) => [
                 item.setor,
-                String(item.total),
-                String(item.concluidas),
-                String(item.pendentes),
-                String(item.canceladas),
-                item.total > 0
-                  ? `${Math.round(
-                      (item.concluidas / item.total) * 100
-                    )}%`
-                  : "0%",
-              ])
-            : [["Sem dados", "0", "0", "0", "0", "0%"]],
+                String(
+                  item.total
+                ),
+                String(
+                  item.concluidas
+                ),
+                String(
+                  item.pendentes
+                ),
+                String(
+                  item.canceladas
+                ),
+                `${item.eficiencia}%`,
+              ]
+            ),
         theme: "grid",
         styles: {
-          font: "helvetica",
-          fontSize: 6.7,
-          cellPadding: 2.1,
-          textColor: CORES_PDF.texto,
-          fillColor: CORES_PDF.painel,
-          lineColor: CORES_PDF.borda,
-          lineWidth: 0.15,
-          valign: "middle",
+          fontSize: 6.2,
+          cellPadding: 1.7,
+          textColor: text,
+          fillColor: light,
+          lineColor: border,
+          lineWidth: 0.1,
         },
         headStyles: {
-          fillColor: CORES_PDF.ciano,
-          textColor: CORES_PDF.fundo,
+          fillColor: cyan,
+          textColor: navy,
           fontStyle: "bold",
-        },
-        alternateRowStyles: {
-          fillColor: CORES_PDF.painel2,
-        },
-        columnStyles: {
-          0: { cellWidth: 48 },
-          1: { halign: "center" },
-          2: { halign: "center" },
-          3: { halign: "center" },
-          4: { halign: "center" },
-          5: { halign: "center", fontStyle: "bold" },
         },
       });
 
-      tituloSecao(
-        "Evolução das ordens",
-        "Comparativo mensal entre OS criadas e concluídas",
-        153,
-        48,
-        132
-      );
+      const y2 = 105;
 
-      graficoLinha(153, 59, 132, 73);
-
-      tituloSecao(
-        "Cumprimento dos prazos",
-        "Situação das ordens em relação às datas previstas",
-        153,
-        145,
-        132
-      );
-
-      barrasHorizontais(
-        dadosPrazos.map((item, indice) => ({
-          label: item.nome,
-          valor: item.quantidade,
-          cor: [
-            CORES_PDF.verde,
-            CORES_PDF.laranja,
-            CORES_PDF.azul,
-            CORES_PDF.vermelho,
-            CORES_PDF.cinza,
-          ][indice] ?? CORES_PDF.ciano,
-        })),
-        153,
-        156,
-        132,
-        37
-      );
-
-      rodape();
-
-      // =========================================================
-      // PÁGINA 3 — COLABORADORES E MÁQUINAS
-      // =========================================================
-      pdf.addPage();
-
-      cabecalho(
-        "Desempenho de Equipe e Equipamentos",
-        "Visão comparativa de responsáveis e máquinas com maior volume de ocorrências",
-        3
-      );
-
-      tituloSecao(
-        "Desempenho por colaborador",
-        "OS atribuídas, concluídas e pendentes",
+      pdf.text(
+        "Colaboradores",
         margem,
-        48,
-        128
+        y2
       );
 
       autoTable(pdf, {
-        startY: 59,
+        startY: y2 + 4,
         margin: {
           left: margem,
-          right: larguraPagina - margem - 128,
+          right:
+            pageWidth -
+            margem -
+            128,
         },
         tableWidth: 128,
         head: [
           [
             "Colaborador",
-            "Atribuídas",
-            "Concluídas",
-            "Pendentes",
-            "Eficiência",
+            "Atrib.",
+            "Concl.",
+            "Pend.",
+            "Canc.",
+            "Ef.",
           ],
         ],
         body:
-          dadosColaboradores.length > 0
-            ? dadosColaboradores.map((item) => [
+          dadosColaboradores
+            .slice(0, 10)
+            .map(
+              (item) => [
                 item.colaborador,
-                String(item.atribuidas),
-                String(item.concluidas),
-                String(item.pendentes),
-                item.atribuidas > 0
-                  ? `${Math.round(
-                      (item.concluidas / item.atribuidas) * 100
-                    )}%`
-                  : "0%",
-              ])
-            : [["Sem dados", "0", "0", "0", "0%"]],
+                String(
+                  item.atribuidas
+                ),
+                String(
+                  item.concluidas
+                ),
+                String(
+                  item.pendentes
+                ),
+                String(
+                  item.canceladas
+                ),
+                `${item.eficiencia}%`,
+              ]
+            ),
         theme: "grid",
         styles: {
-          font: "helvetica",
-          fontSize: 6.7,
-          cellPadding: 2.1,
-          textColor: CORES_PDF.texto,
-          fillColor: CORES_PDF.painel,
-          lineColor: CORES_PDF.borda,
-          lineWidth: 0.15,
-          valign: "middle",
+          fontSize: 6.4,
+          cellPadding: 1.8,
+          textColor: text,
+          fillColor: light,
+          lineColor: border,
+          lineWidth: 0.1,
         },
         headStyles: {
-          fillColor: CORES_PDF.violeta,
-          textColor: CORES_PDF.branco,
+          fillColor: violet,
+          textColor: [
+            255,
+            255,
+            255,
+          ],
           fontStyle: "bold",
-        },
-        alternateRowStyles: {
-          fillColor: CORES_PDF.painel2,
-        },
-        columnStyles: {
-          0: { cellWidth: 54 },
-          1: { halign: "center" },
-          2: { halign: "center" },
-          3: { halign: "center" },
-          4: { halign: "center", fontStyle: "bold" },
         },
       });
 
-      tituloSecao(
+      pdf.text(
         "Máquinas com mais ocorrências",
-        "Ranking dos equipamentos com maior número de OS",
         153,
-        48,
-        132
+        y2
       );
 
       autoTable(pdf, {
-        startY: 59,
+        startY: y2 + 4,
         margin: {
           left: 153,
           right: margem,
         },
-        tableWidth: 132,
+        tableWidth:
+          pageWidth -
+          153 -
+          margem,
         head: [
           [
-            "Máquina / equipamento",
-            "Ocorrências",
-            "Concluídas",
-            "Eficiência",
+            "Máquina",
+            "OS",
+            "Concl.",
+            "Canc.",
+            "Ef.",
           ],
         ],
         body:
-          dadosMaquinas.length > 0
-            ? dadosMaquinas.map((item) => [
+          dadosMaquinas
+            .slice(0, 10)
+            .map(
+              (item) => [
                 item.maquina,
-                String(item.ocorrencias),
-                String(item.concluidas),
-                item.ocorrencias > 0
-                  ? `${Math.round(
-                      (item.concluidas / item.ocorrencias) * 100
-                    )}%`
-                  : "0%",
-              ])
-            : [["Sem dados", "0", "0", "0%"]],
+                String(
+                  item.ocorrencias
+                ),
+                String(
+                  item.concluidas
+                ),
+                String(
+                  item.canceladas
+                ),
+                `${item.eficiencia}%`,
+              ]
+            ),
         theme: "grid",
         styles: {
-          font: "helvetica",
-          fontSize: 6.7,
-          cellPadding: 2.1,
-          textColor: CORES_PDF.texto,
-          fillColor: CORES_PDF.painel,
-          lineColor: CORES_PDF.borda,
-          lineWidth: 0.15,
-          valign: "middle",
+          fontSize: 6.4,
+          cellPadding: 1.8,
+          textColor: text,
+          fillColor: light,
+          lineColor: border,
+          lineWidth: 0.1,
         },
         headStyles: {
-          fillColor: CORES_PDF.laranja,
-          textColor: CORES_PDF.branco,
+          fillColor: orange,
+          textColor: [
+            255,
+            255,
+            255,
+          ],
           fontStyle: "bold",
         },
-        alternateRowStyles: {
-          fillColor: CORES_PDF.painel2,
-        },
-        columnStyles: {
-          0: { cellWidth: 70 },
-          1: { halign: "center" },
-          2: { halign: "center" },
-          3: { halign: "center", fontStyle: "bold" },
-        },
       });
 
-      const resumoY = 150;
+      footer();
 
-      pdf.setFillColor(...CORES_PDF.painel2);
-      pdf.roundedRect(
-        margem,
-        resumoY,
-        larguraUtil,
-        42,
-        4,
-        4,
-        "F"
+      /*
+       * PÁGINA 3 — METODOLOGIA
+       */
+      pdf.addPage();
+
+      header(
+        "Metodologia dos Indicadores",
+        "Regras adotadas para evitar distorções administrativas nos dados técnicos",
+        3
       );
 
-      pdf.setDrawColor(...CORES_PDF.borda);
-      pdf.roundedRect(
-        margem,
-        resumoY,
-        larguraUtil,
-        42,
-        4,
-        4,
-        "S"
-      );
-
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(9);
-      pdf.setTextColor(...CORES_PDF.ciano);
-      pdf.text("RESUMO EXECUTIVO", margem + 5, resumoY + 8);
-
-      const principalSetor = dadosSetores[0];
-      const principalMaquina = dadosMaquinas[0];
-      const principalColaborador = dadosColaboradores[0];
-
-      const frases = [
-        `Foram analisadas ${metricas.total} OS. ${metricas.concluidas} estão concluídas, ${metricas.pendentes} permanecem pendentes e ${metricas.canceladas} foram canceladas.`,
-        `A taxa geral de conclusão é de ${metricas.taxaConclusao}% e o tempo médio entre criação e conclusão é ${formatarDuracaoMedia(metricas.tempoMedio)}.`,
-        principalSetor
-          ? `O setor com maior volume é ${principalSetor.setor}, com ${principalSetor.total} OS no período.`
-          : "Não há dados suficientes para destacar um setor.",
-        principalMaquina
-          ? `A máquina com maior número de ocorrências é ${principalMaquina.maquina}, com ${principalMaquina.ocorrencias} OS.`
-          : "Não há dados suficientes para destacar uma máquina.",
-        principalColaborador
-          ? `O colaborador com maior volume de atribuições é ${principalColaborador.colaborador}, com ${principalColaborador.atribuidas} OS atribuídas.`
-          : "Não há dados suficientes para destacar um colaborador.",
+      const notas = [
+        [
+          "Conclusões no gráfico",
+          "A conclusão entra no mês da Data/Hora de término preenchida no relatório técnico. dataConclusao e updatedAt não são usados como fallback.",
+        ],
+        [
+          "Tempo médio total",
+          "Média do intervalo entre createdAt da OS e a Data/Hora de término real do relatório. Só entram OS concluídas com data técnica válida.",
+        ],
+        [
+          "Taxa de conclusão",
+          "Concluídas ÷ (Total de OS - Canceladas). Canceladas não reduzem a eficiência.",
+        ],
+        [
+          "Eficiência por setor, colaborador e máquina",
+          "Concluídas ÷ (Concluídas + Pendentes). OS canceladas aparecem para rastreabilidade, mas não entram no denominador.",
+        ],
+        [
+          "Filtro de período",
+          "O período selecionado filtra pela data de abertura da OS. Dentro desse conjunto, as conclusões continuam posicionadas pela data real do relatório.",
+        ],
+        [
+          "Cobertura técnica",
+          "Percentual de OS concluídas que possuem Data/Hora de término reconhecida no relatório técnico.",
+        ],
       ];
 
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(7.3);
-      pdf.setTextColor(...CORES_PDF.texto);
-
-      let textoY = resumoY + 15;
-
-      frases.forEach((frase) => {
-        const linhas = pdf.splitTextToSize(frase, larguraUtil - 12);
-        pdf.text(linhas, margem + 5, textoY);
-        textoY += linhas.length * 4.1 + 1.7;
+      autoTable(pdf, {
+        startY: 48,
+        margin: {
+          left: margem,
+          right: margem,
+        },
+        head: [
+          [
+            "Indicador",
+            "Regra",
+          ],
+        ],
+        body: notas,
+        theme: "grid",
+        styles: {
+          fontSize: 8.5,
+          cellPadding: 4,
+          textColor: text,
+          fillColor: light,
+          lineColor: border,
+          lineWidth: 0.12,
+          valign: "top",
+        },
+        headStyles: {
+          fillColor: navy,
+          textColor: [
+            255,
+            255,
+            255,
+          ],
+          fontStyle: "bold",
+        },
+        columnStyles: {
+          0: {
+            cellWidth: 55,
+            fontStyle: "bold",
+          },
+        },
       });
 
-      rodape();
+      footer();
 
-      const dataArquivo = new Date()
-        .toLocaleDateString("pt-BR")
-        .replaceAll("/", "-");
+      const dataArquivo =
+        new Date()
+          .toLocaleDateString(
+            "pt-BR"
+          )
+          .replaceAll(
+            "/",
+            "-"
+          );
 
-      pdf.save(`dashboard-os-${dataArquivo}.pdf`);
+      pdf.save(
+        `indicadores-os-${dataArquivo}.pdf`
+      );
     } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      alert("Não foi possível gerar o PDF dos gráficos.");
+      console.error(
+        "Erro ao gerar PDF:",
+        error
+      );
+
+      alert(
+        "Não foi possível gerar o PDF dos indicadores."
+      );
     } finally {
-      setGerandoPDF(false);
+      setGerandoPDF(
+        false
+      );
     }
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl shadow-black/30 backdrop-blur sm:p-6">
+    <div className="space-y-5">
+      {/* =====================================================
+          FILTROS
+      ====================================================== */}
+      <section className="rounded-[24px] border border-white/[0.07] bg-[#070c1b] p-4 shadow-[0_12px_35px_rgba(0,0,0,.16)] sm:p-5">
         <form
-          onSubmit={aplicarFiltros}
-          className="space-y-5"
+          onSubmit={
+            aplicarFiltros
+          }
+          className="space-y-4"
         >
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300">
-              <Filter size={21} />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/[0.05] text-cyan-300">
+                <Filter
+                  size={18}
+                />
+              </div>
+
+              <div>
+                <h2 className="text-base font-black text-white">
+                  Filtros do dashboard
+                </h2>
+
+                <p className="mt-0.5 text-xs text-slate-500">
+                  O período filtra pela abertura da OS; conclusões continuam usando a data real do relatório.
+                </p>
+              </div>
             </div>
 
-            <div>
-              <h2 className="text-xl font-black">
-                Filtros do dashboard
-              </h2>
-
-              <p className="text-sm text-slate-400">
-                Os gráficos serão recalculados com os filtros aplicados.
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={
+                gerarPDF
+              }
+              disabled={
+                gerandoPDF
+              }
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.06] px-4 text-xs font-black text-cyan-200 transition hover:bg-cyan-400 hover:text-slate-950 disabled:opacity-50"
+            >
+              <Download
+                size={15}
+              />
+              {gerandoPDF
+                ? "Gerando..."
+                : "Exportar PDF"}
+            </button>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <CampoFiltro
               label="Data inicial"
-              icon={<CalendarDays size={16} />}
+              icon={
+                <CalendarDays
+                  size={15}
+                />
+              }
             >
               <input
                 type="date"
-                value={filtrosEdicao.dataInicio}
-                onChange={(event) =>
-                  setFiltrosEdicao((anterior) => ({
-                    ...anterior,
-                    dataInicio: event.target.value,
-                  }))
+                value={
+                  filtrosEdicao.dataInicio
                 }
-                className={inputClass}
+                onChange={(
+                  event
+                ) =>
+                  setFiltrosEdicao(
+                    (
+                      anterior
+                    ) => ({
+                      ...anterior,
+                      dataInicio:
+                        event
+                          .target
+                          .value,
+                    })
+                  )
+                }
+                className={
+                  inputClass
+                }
               />
             </CampoFiltro>
 
             <CampoFiltro
               label="Data final"
-              icon={<CalendarDays size={16} />}
+              icon={
+                <CalendarDays
+                  size={15}
+                />
+              }
             >
               <input
                 type="date"
-                value={filtrosEdicao.dataFim}
-                onChange={(event) =>
-                  setFiltrosEdicao((anterior) => ({
-                    ...anterior,
-                    dataFim: event.target.value,
-                  }))
+                value={
+                  filtrosEdicao.dataFim
                 }
-                className={inputClass}
+                onChange={(
+                  event
+                ) =>
+                  setFiltrosEdicao(
+                    (
+                      anterior
+                    ) => ({
+                      ...anterior,
+                      dataFim:
+                        event
+                          .target
+                          .value,
+                    })
+                  )
+                }
+                className={
+                  inputClass
+                }
               />
             </CampoFiltro>
 
             <CampoFiltro
               label="Status"
-              icon={<Activity size={16} />}
+              icon={
+                <Activity
+                  size={15}
+                />
+              }
             >
               <select
-                value={filtrosEdicao.status}
-                onChange={(event) =>
-                  setFiltrosEdicao((anterior) => ({
-                    ...anterior,
-                    status: event.target.value,
-                  }))
+                value={
+                  filtrosEdicao.status
                 }
-                className={inputClass}
+                onChange={(
+                  event
+                ) =>
+                  setFiltrosEdicao(
+                    (
+                      anterior
+                    ) => ({
+                      ...anterior,
+                      status:
+                        event
+                          .target
+                          .value,
+                    })
+                  )
+                }
+                className={
+                  inputClass
+                }
               >
-                <option value="">Todos os status</option>
+                <option value="">
+                  Todos
+                </option>
 
-                {STATUS_OPTIONS.map((status) => (
-                  <option
-                    key={status.value}
-                    value={status.value}
-                  >
-                    {status.label}
-                  </option>
-                ))}
+                {STATUS_OPTIONS.map(
+                  (item) => (
+                    <option
+                      key={
+                        item.value
+                      }
+                      value={
+                        item.value
+                      }
+                    >
+                      {
+                        item.label
+                      }
+                    </option>
+                  )
+                )}
               </select>
             </CampoFiltro>
 
             <CampoFiltro
               label="Prioridade"
-              icon={<AlertTriangle size={16} />}
+              icon={
+                <Gauge
+                  size={15}
+                />
+              }
             >
               <select
-                value={filtrosEdicao.prioridade}
-                onChange={(event) =>
-                  setFiltrosEdicao((anterior) => ({
-                    ...anterior,
-                    prioridade: event.target.value,
-                  }))
+                value={
+                  filtrosEdicao.prioridade
                 }
-                className={inputClass}
+                onChange={(
+                  event
+                ) =>
+                  setFiltrosEdicao(
+                    (
+                      anterior
+                    ) => ({
+                      ...anterior,
+                      prioridade:
+                        event
+                          .target
+                          .value,
+                    })
+                  )
+                }
+                className={
+                  inputClass
+                }
               >
-                <option value="">Todas as prioridades</option>
+                <option value="">
+                  Todas
+                </option>
 
-                {PRIORIDADE_OPTIONS.map((prioridade) => (
-                  <option
-                    key={prioridade.value}
-                    value={prioridade.value}
-                  >
-                    {prioridade.label}
-                  </option>
-                ))}
+                {PRIORIDADE_OPTIONS.map(
+                  (item) => (
+                    <option
+                      key={
+                        item.value
+                      }
+                      value={
+                        item.value
+                      }
+                    >
+                      {
+                        item.label
+                      }
+                    </option>
+                  )
+                )}
               </select>
             </CampoFiltro>
 
             <CampoFiltro
               label="Setor"
-              icon={<Building2 size={16} />}
+              icon={
+                <Building2
+                  size={15}
+                />
+              }
             >
               <select
-                value={filtrosEdicao.setor}
-                onChange={(event) =>
-                  setFiltrosEdicao((anterior) => ({
-                    ...anterior,
-                    setor: event.target.value,
-                    maquina: "",
-                  }))
+                value={
+                  filtrosEdicao.setor
                 }
-                className={inputClass}
+                onChange={(
+                  event
+                ) =>
+                  setFiltrosEdicao(
+                    (
+                      anterior
+                    ) => ({
+                      ...anterior,
+                      setor:
+                        event
+                          .target
+                          .value,
+                      maquina: "",
+                    })
+                  )
+                }
+                className={
+                  inputClass
+                }
               >
-                <option value="">Todos os setores</option>
+                <option value="">
+                  Todos
+                </option>
 
-                {setores.map((setor) => (
-                  <option key={setor.id} value={setor.id}>
-                    {setor.nome}
-                  </option>
-                ))}
+                {setores.map(
+                  (setor) => (
+                    <option
+                      key={
+                        setor.id
+                      }
+                      value={
+                        setor.id
+                      }
+                    >
+                      {
+                        setor.nome
+                      }
+                    </option>
+                  )
+                )}
               </select>
             </CampoFiltro>
 
             <CampoFiltro
               label="Máquina"
-              icon={<Wrench size={16} />}
+              icon={
+                <Wrench
+                  size={15}
+                />
+              }
             >
               <select
-                value={filtrosEdicao.maquina}
-                onChange={(event) =>
-                  setFiltrosEdicao((anterior) => ({
-                    ...anterior,
-                    maquina: event.target.value,
-                  }))
+                value={
+                  filtrosEdicao.maquina
                 }
-                className={inputClass}
+                onChange={(
+                  event
+                ) =>
+                  setFiltrosEdicao(
+                    (
+                      anterior
+                    ) => ({
+                      ...anterior,
+                      maquina:
+                        event
+                          .target
+                          .value,
+                    })
+                  )
+                }
+                className={
+                  inputClass
+                }
               >
-                <option value="">Todas as máquinas</option>
+                <option value="">
+                  Todas
+                </option>
 
-                {maquinasDisponiveis.map((maquina) => (
-                  <option
-                    key={maquina.id}
-                    value={maquina.id}
-                  >
-                    {maquina.nome}
-                  </option>
-                ))}
+                {maquinasDisponiveis.map(
+                  (maquina) => (
+                    <option
+                      key={
+                        maquina.id
+                      }
+                      value={
+                        maquina.id
+                      }
+                    >
+                      {
+                        maquina.nome
+                      }
+                    </option>
+                  )
+                )}
               </select>
             </CampoFiltro>
 
             <CampoFiltro
               label="Colaborador"
-              icon={<Users size={16} />}
+              icon={
+                <Users
+                  size={15}
+                />
+              }
             >
               <select
-                value={filtrosEdicao.colaborador}
-                onChange={(event) =>
-                  setFiltrosEdicao((anterior) => ({
-                    ...anterior,
-                    colaborador: event.target.value,
-                  }))
+                value={
+                  filtrosEdicao.colaborador
                 }
-                className={inputClass}
+                onChange={(
+                  event
+                ) =>
+                  setFiltrosEdicao(
+                    (
+                      anterior
+                    ) => ({
+                      ...anterior,
+                      colaborador:
+                        event
+                          .target
+                          .value,
+                    })
+                  )
+                }
+                className={
+                  inputClass
+                }
               >
                 <option value="">
-                  Todos os colaboradores
+                  Todos
                 </option>
 
-                {colaboradores.map((colaborador) => (
-                  <option
-                    key={colaborador.id}
-                    value={colaborador.id}
-                  >
-                    {colaborador.nome}
-                  </option>
-                ))}
+                {colaboradores.map(
+                  (
+                    colaborador
+                  ) => (
+                    <option
+                      key={
+                        colaborador.id
+                      }
+                      value={
+                        colaborador.id
+                      }
+                    >
+                      {
+                        colaborador.nome
+                      }
+                    </option>
+                  )
+                )}
               </select>
             </CampoFiltro>
-          </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <button
-              type="submit"
-              className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300"
-            >
-              <Filter size={17} />
-              Aplicar filtros
-            </button>
+            <div className="flex items-end gap-2">
+              <button
+                type="submit"
+                className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-cyan-400 px-4 text-sm font-black text-slate-950 transition hover:bg-cyan-300"
+              >
+                <Filter
+                  size={16}
+                />
+                Aplicar
+              </button>
 
-            <button
-              type="button"
-              onClick={limparFiltros}
-              className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-black text-white transition hover:bg-white/10"
-            >
-              <RotateCcw size={17} />
-              Limpar filtros
-            </button>
-
-            <button
-              type="button"
-              onClick={gerarPDF}
-              disabled={gerandoPDF}
-              className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-5 text-sm font-black text-emerald-300 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Download size={17} />
-
-              {gerandoPDF
-                ? "Gerando PDF..."
-                : "Gerar PDF dos gráficos"}
-            </button>
+              <button
+                type="button"
+                onClick={
+                  limparFiltros
+                }
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 text-sm font-black text-slate-300 transition hover:bg-white/[0.06] hover:text-white"
+              >
+                <RotateCcw
+                  size={16}
+                />
+                Limpar
+              </button>
+            </div>
           </div>
         </form>
       </section>
 
-      <div ref={relatorioRef} className="space-y-6 bg-[#050816]">
-        <section className="rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-400/10 via-white/[0.04] to-blue-500/10 p-5 sm:p-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.2em] text-cyan-300">
-                Sistema de manutenção
-              </p>
+      {/* =====================================================
+          KPIs
+      ====================================================== */}
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <KpiCard
+          label="Total de OS"
+          value={
+            metricas.total
+          }
+          helper="Ordens no filtro atual"
+          icon={
+            <BarChart3
+              size={19}
+            />
+          }
+          tone="cyan"
+        />
 
-              <h2 className="mt-2 text-2xl font-black sm:text-3xl">
-                Relatório gráfico geral de OS
-              </h2>
+        <KpiCard
+          label="Concluídas"
+          value={
+            metricas.concluidas
+          }
+          helper="Serviços finalizados"
+          icon={
+            <CheckCircle2
+              size={19}
+            />
+          }
+          tone="green"
+        />
 
-              <p className="mt-2 text-sm text-slate-400">
-                Emitido em{" "}
-                {new Intl.DateTimeFormat("pt-BR", {
-                  dateStyle: "short",
-                  timeStyle: "short",
-                }).format(new Date())}
-              </p>
+        <KpiCard
+          label="Pendentes"
+          value={
+            metricas.pendentes
+          }
+          helper="Não iniciadas + em andamento"
+          icon={
+            <Clock3
+              size={19}
+            />
+          }
+          tone="blue"
+        />
+
+        <KpiCard
+          label="Taxa de conclusão"
+          value={`${metricas.taxaConclusao}%`}
+          helper={`${metricas.concluidas}/${metricas.baseTaxa} OS válidas • canceladas fora da conta`}
+          icon={
+            <Gauge
+              size={19}
+            />
+          }
+          tone="violet"
+        />
+
+        <KpiCard
+          label="Tempo médio total"
+          value={formatarDuracaoMedia(
+            metricas.tempoMedio
+          )}
+          helper={`Abertura → término real do relatório • ${metricas.amostraTempo} OS`}
+          icon={
+            <TrendingUp
+              size={19}
+            />
+          }
+          tone="orange"
+        />
+
+        <KpiCard
+          label="Cobertura técnica"
+          value={`${metricas.coberturaRelatorio}%`}
+          helper={`${metricas.concluidasComRelatorio}/${metricas.concluidas} concluídas com data de relatório válida`}
+          icon={
+            <FileCheck2
+              size={19}
+            />
+          }
+          tone="slate"
+        />
+      </section>
+
+      {/* =====================================================
+          EVOLUÇÃO — PRINCIPAL
+      ====================================================== */}
+      <CardGrafico
+        title="Evolução real das ordens"
+        subtitle="Criadas pela abertura da OS • concluídas pela data/hora de término informada no relatório técnico"
+        icon={
+          <TrendingUp
+            size={20}
+          />
+        }
+        right={
+          <div className="hidden items-center gap-4 text-[10px] font-black uppercase tracking-[0.08em] sm:flex">
+            <span className="flex items-center gap-1.5 text-cyan-300">
+              <span className="h-2 w-2 rounded-full bg-cyan-400" />
+              Criadas
+            </span>
+
+            <span className="flex items-center gap-1.5 text-emerald-300">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              Concluídas
+            </span>
+          </div>
+        }
+      >
+        <div className="mb-3 grid gap-2.5 sm:grid-cols-3">
+          <ResumoEvolucao
+            label="Criadas"
+            value={
+              resumoEvolucao.criadas
+            }
+            tone="cyan"
+          />
+
+          <ResumoEvolucao
+            label="Concluídas"
+            value={
+              resumoEvolucao.concluidas
+            }
+            tone="green"
+          />
+
+          <ResumoEvolucao
+            label="Saldo"
+            value={
+              resumoEvolucao.saldo
+            }
+            signed
+            tone={
+              resumoEvolucao.saldo >=
+              0
+                ? "green"
+                : "orange"
+            }
+          />
+        </div>
+
+        <div className="h-[330px] sm:h-[390px]">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+          >
+            <ComposedChart
+              data={
+                dadosEvolucao
+              }
+              margin={{
+                top: 12,
+                right: 18,
+                left: 0,
+                bottom: 0,
+              }}
+            >
+              <defs>
+                <linearGradient
+                  id="areaCriadasOS"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="0%"
+                    stopColor="#22d3ee"
+                    stopOpacity={
+                      0.22
+                    }
+                  />
+
+                  <stop
+                    offset="100%"
+                    stopColor="#22d3ee"
+                    stopOpacity={
+                      0
+                    }
+                  />
+                </linearGradient>
+              </defs>
+
+              <CartesianGrid
+                vertical={
+                  false
+                }
+                stroke="rgba(148,163,184,.10)"
+                strokeDasharray="4 6"
+              />
+
+              <XAxis
+                dataKey="mes"
+                axisLine={
+                  false
+                }
+                tickLine={
+                  false
+                }
+                tickMargin={10}
+                tick={{
+                  fill:
+                    "#94a3b8",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              />
+
+              <YAxis
+                allowDecimals={
+                  false
+                }
+                axisLine={
+                  false
+                }
+                tickLine={
+                  false
+                }
+                width={42}
+                tick={{
+                  fill:
+                    "#64748b",
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}
+              />
+
+              <Tooltip
+                contentStyle={
+                  tooltipStyle
+                }
+                formatter={(
+                  value,
+                  name
+                ) => [
+                  `${value} OS`,
+                  name ===
+                  "criadas"
+                    ? "Criadas"
+                    : "Concluídas pelo relatório",
+                ]}
+              />
+
+              <Area
+                type="monotone"
+                dataKey="criadas"
+                stroke="#22d3ee"
+                strokeWidth={3.5}
+                fill="url(#areaCriadasOS)"
+                dot={{
+                  r: 4,
+                  fill:
+                    "#07101f",
+                  stroke:
+                    "#22d3ee",
+                  strokeWidth: 2,
+                }}
+                activeDot={{
+                  r: 6,
+                  fill:
+                    "#22d3ee",
+                  stroke:
+                    "#cffafe",
+                  strokeWidth: 2,
+                }}
+              />
+
+              <Line
+                type="monotone"
+                dataKey="concluidas"
+                stroke="#34d399"
+                strokeWidth={3.5}
+                strokeDasharray="8 5"
+                dot={{
+                  r: 4,
+                  fill:
+                    "#07101f",
+                  stroke:
+                    "#34d399",
+                  strokeWidth: 2,
+                }}
+                activeDot={{
+                  r: 6,
+                  fill:
+                    "#34d399",
+                  stroke:
+                    "#d1fae5",
+                  strokeWidth: 2,
+                }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="mt-3 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.025] px-3 py-2.5">
+          <p className="text-xs leading-5 text-slate-500">
+            Uma OS concluída administrativamente em novembro pode aparecer como concluída em outubro se o relatório técnico registrar término em outubro. Não há fallback para <strong className="text-slate-400">dataConclusao</strong> ou <strong className="text-slate-400">updatedAt</strong>.
+          </p>
+        </div>
+      </CardGrafico>
+
+      {/* =====================================================
+          STATUS + PRIORIDADE
+      ====================================================== */}
+      <section className="grid gap-5 xl:grid-cols-2">
+        <CardGrafico
+          title="Distribuição por status"
+          subtitle="Situação atual das ordens no filtro aplicado"
+          icon={
+            <PieChartIcon
+              size={20}
+            />
+          }
+        >
+          <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr] lg:items-center">
+            <div className="h-[310px]">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
+                <PieChart>
+                  <Pie
+                    data={
+                      dadosStatus
+                    }
+                    dataKey="valor"
+                    nameKey="nome"
+                    innerRadius={78}
+                    outerRadius={112}
+                    paddingAngle={3}
+                    stroke="#070c1b"
+                    strokeWidth={2}
+                  >
+                    {dadosStatus.map(
+                      (
+                        entry
+                      ) => (
+                        <Cell
+                          key={
+                            entry.nome
+                          }
+                          fill={
+                            entry.cor
+                          }
+                        />
+                      )
+                    )}
+                  </Pie>
+
+                  <Tooltip
+                    contentStyle={
+                      tooltipStyle
+                    }
+                    formatter={(
+                      value
+                    ) => [
+                      `${value} OS`,
+                      "Quantidade",
+                    ]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
 
-            <div className="grid gap-2 text-sm sm:grid-cols-2 lg:max-w-3xl lg:grid-cols-3">
-              <ResumoFiltro
-                label="Período"
-                value={resumoFiltros.periodo}
-              />
-              <ResumoFiltro
-                label="Setor"
-                value={resumoFiltros.setor}
-              />
-              <ResumoFiltro
-                label="Máquina"
-                value={resumoFiltros.maquina}
-              />
-              <ResumoFiltro
-                label="Colaborador"
-                value={resumoFiltros.colaborador}
-              />
-              <ResumoFiltro
-                label="Status"
-                value={resumoFiltros.status}
-              />
-              <ResumoFiltro
-                label="Prioridade"
-                value={resumoFiltros.prioridade}
-              />
+            <div className="grid gap-2">
+              {dadosStatus.map(
+                (item) => (
+                  <div
+                    key={
+                      item.nome
+                    }
+                    className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-[#030817] px-3 py-2.5"
+                  >
+                    <span className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{
+                          backgroundColor:
+                            item.cor,
+                        }}
+                      />
+                      {
+                        item.nome
+                      }
+                    </span>
+
+                    <strong className="text-sm font-black text-white">
+                      {
+                        item.valor
+                      }
+                    </strong>
+                  </div>
+                )
+              )}
             </div>
           </div>
-        </section>
+        </CardGrafico>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <CardMetrica
-            titulo="Total de OS"
-            valor={metricas.total}
-            descricao="Ordens encontradas"
-            icon={<BarChart3 size={23} />}
-            destaque="cyan"
-          />
-
-          <CardMetrica
-            titulo="Concluídas"
-            valor={metricas.concluidas}
-            descricao="Serviços finalizados"
-            icon={<CheckCircle2 size={23} />}
-            destaque="emerald"
-          />
-
-          <CardMetrica
-            titulo="Pendentes"
-            valor={metricas.pendentes}
-            descricao="Não iniciadas ou em andamento"
-            icon={<Clock3 size={23} />}
-            destaque="blue"
-          />
-
-          <CardMetrica
-            titulo="OS atrasadas"
-            valor={metricas.atrasadas}
-            descricao="Abertas fora do prazo"
-            icon={<AlertTriangle size={23} />}
-            destaque="red"
-          />
-
-          <CardMetrica
-            titulo="Taxa de conclusão"
-            valor={`${metricas.taxaConclusao}%`}
-            descricao="Percentual concluído"
-            icon={<Gauge size={23} />}
-            destaque="violet"
-          />
-
-          <CardMetrica
-            titulo="Tempo médio"
-            valor={formatarDuracaoMedia(metricas.tempoMedio)}
-            descricao="Da criação até a conclusão"
-            icon={<TrendingUp size={23} />}
-            destaque="orange"
-          />
-        </section>
-
-        {ordensFiltradas.length === 0 ? (
-          <section className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] px-6 py-20 text-center">
-            <BarChart3
-              size={44}
-              className="mx-auto text-slate-600"
+        <CardGrafico
+          title="Distribuição por prioridade"
+          subtitle="Volume de OS por criticidade"
+          icon={
+            <Gauge
+              size={20}
             />
-
-            <h2 className="mt-4 text-xl font-black">
-              Nenhum dado encontrado
-            </h2>
-
-            <p className="mt-2 text-sm text-slate-400">
-              Altere os filtros para visualizar os gráficos.
-            </p>
-          </section>
-        ) : (
-          <>
-            <section className="grid gap-6 xl:grid-cols-2">
-              <CardGrafico
-                titulo="Distribuição por status"
-                descricao="Visão geral da situação atual das ordens."
-                icon={<PieChartIcon size={21} />}
-              >
-                <ResponsiveContainer width="100%" height={340}>
-                  <PieChart>
-                    <Pie
-                      data={dadosStatus}
-                      dataKey="valor"
-                      nameKey="nome"
-                      cx="50%"
-                      cy="48%"
-                      innerRadius={74}
-                      outerRadius={118}
-                      paddingAngle={4}
-                    >
-                      {dadosStatus.map((item) => (
-                        <Cell
-                          key={item.nome}
-                          fill={item.cor}
-                        />
-                      ))}
-                    </Pie>
-
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      itemStyle={{ color: "#ffffff" }}
-                    />
-
-                    <Legend
-                      verticalAlign="bottom"
-                      iconType="circle"
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardGrafico>
-
-              <CardGrafico
-                titulo="Distribuição por prioridade"
-                descricao="Quantidade de OS em cada nível de urgência."
-                icon={<AlertTriangle size={21} />}
-              >
-                <ResponsiveContainer width="100%" height={340}>
-                  <BarChart data={dadosPrioridades}>
-                    <CartesianGrid
-                      stroke="rgba(255,255,255,0.08)"
-                      vertical={false}
-                    />
-
-                    <XAxis
-                      dataKey="nome"
-                      tick={{
-                        fill: "#94a3b8",
-                        fontSize: 12,
-                      }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-
-                    <YAxis
-                      allowDecimals={false}
-                      tick={{
-                        fill: "#94a3b8",
-                        fontSize: 12,
-                      }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      cursor={{
-                        fill: "rgba(255,255,255,0.04)",
-                      }}
-                    />
-
-                    <Bar
-                      dataKey="quantidade"
-                      name="Quantidade"
-                      radius={[10, 10, 0, 0]}
-                    >
-                      {dadosPrioridades.map((item) => (
-                        <Cell
-                          key={item.nome}
-                          fill={item.cor}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardGrafico>
-            </section>
-
-            <CardGrafico
-              titulo="OS por setor"
-              descricao="Comparativo de concluídas, pendentes e canceladas."
-              icon={<Building2 size={21} />}
+          }
+        >
+          <div className="h-[350px]">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
             >
-              <ResponsiveContainer width="100%" height={390}>
+              <BarChart
+                data={
+                  dadosPrioridades
+                }
+                margin={{
+                  top: 16,
+                  right: 12,
+                  left: 0,
+                  bottom: 0,
+                }}
+              >
+                <CartesianGrid
+                  vertical={
+                    false
+                  }
+                  stroke="rgba(148,163,184,.10)"
+                  strokeDasharray="4 6"
+                />
+
+                <XAxis
+                  dataKey="nome"
+                  axisLine={
+                    false
+                  }
+                  tickLine={
+                    false
+                  }
+                  tick={{
+                    fill:
+                      "#94a3b8",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                />
+
+                <YAxis
+                  allowDecimals={
+                    false
+                  }
+                  axisLine={
+                    false
+                  }
+                  tickLine={
+                    false
+                  }
+                  width={42}
+                  tick={{
+                    fill:
+                      "#64748b",
+                    fontSize: 10,
+                  }}
+                />
+
+                <Tooltip
+                  contentStyle={
+                    tooltipStyle
+                  }
+                  formatter={(
+                    value
+                  ) => [
+                    `${value} OS`,
+                    "Quantidade",
+                  ]}
+                />
+
+                <Bar
+                  dataKey="quantidade"
+                  radius={[
+                    8,
+                    8,
+                    0,
+                    0,
+                  ]}
+                >
+                  {dadosPrioridades.map(
+                    (
+                      entry
+                    ) => (
+                      <Cell
+                        key={
+                          entry.nome
+                        }
+                        fill={
+                          entry.cor
+                        }
+                      />
+                    )
+                  )}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardGrafico>
+      </section>
+
+      {/* =====================================================
+          SETORES
+      ====================================================== */}
+      <CardGrafico
+        title="Desempenho por setor"
+        subtitle="Concluídas, pendentes e canceladas • eficiência sem considerar canceladas"
+        icon={
+          <Building2
+            size={20}
+          />
+        }
+      >
+        <div className="h-[430px]">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+          >
+            <BarChart
+              data={
+                dadosSetores
+              }
+              margin={{
+                top: 10,
+                right: 16,
+                left: 0,
+                bottom: 60,
+              }}
+            >
+              <CartesianGrid
+                vertical={
+                  false
+                }
+                stroke="rgba(148,163,184,.10)"
+                strokeDasharray="4 6"
+              />
+
+              <XAxis
+                dataKey="setor"
+                interval={0}
+                angle={-28}
+                textAnchor="end"
+                axisLine={
+                  false
+                }
+                tickLine={
+                  false
+                }
+                height={80}
+                tick={{
+                  fill:
+                    "#94a3b8",
+                  fontSize: 10,
+                }}
+              />
+
+              <YAxis
+                allowDecimals={
+                  false
+                }
+                axisLine={
+                  false
+                }
+                tickLine={
+                  false
+                }
+                width={42}
+                tick={{
+                  fill:
+                    "#64748b",
+                  fontSize: 10,
+                }}
+              />
+
+              <Tooltip
+                contentStyle={
+                  tooltipStyle
+                }
+              />
+
+              <Bar
+                dataKey="concluidas"
+                name="Concluídas"
+                stackId="a"
+                fill="#10b981"
+              />
+
+              <Bar
+                dataKey="pendentes"
+                name="Pendentes"
+                stackId="a"
+                fill="#3b82f6"
+              />
+
+              <Bar
+                dataKey="canceladas"
+                name="Canceladas"
+                stackId="a"
+                fill="#64748b"
+                radius={[
+                  6,
+                  6,
+                  0,
+                  0,
+                ]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {dadosSetores
+            .slice(
+              0,
+              4
+            )
+            .map(
+              (item) => (
+                <MiniRanking
+                  key={
+                    item.setor
+                  }
+                  label={
+                    item.setor
+                  }
+                  value={`${item.eficiencia}%`}
+                  helper={`${item.concluidas}/${item.baseValida} OS válidas`}
+                />
+              )
+            )}
+        </div>
+      </CardGrafico>
+
+      {/* =====================================================
+          COLABORADORES + MÁQUINAS
+      ====================================================== */}
+      <section className="grid gap-5 xl:grid-cols-2">
+        <CardGrafico
+          title="Desempenho por colaborador"
+          subtitle="Atribuídas, concluídas e pendentes • canceladas não reduzem a eficiência"
+          icon={
+            <Users
+              size={20}
+            />
+          }
+        >
+          {dadosColaboradores.length ===
+          0 ? (
+            <MensagemSemDados text="Nenhuma OS possui responsável nos filtros aplicados." />
+          ) : (
+            <div className="h-[430px]">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
                 <BarChart
-                  data={dadosSetores}
+                  data={
+                    dadosColaboradores
+                  }
+                  layout="vertical"
                   margin={{
-                    top: 10,
-                    right: 15,
-                    left: 0,
-                    bottom: 45,
+                    top: 5,
+                    right: 18,
+                    left: 34,
+                    bottom: 5,
                   }}
                 >
                   <CartesianGrid
-                    stroke="rgba(255,255,255,0.08)"
-                    vertical={false}
+                    horizontal={
+                      false
+                    }
+                    stroke="rgba(148,163,184,.10)"
+                    strokeDasharray="4 6"
                   />
 
                   <XAxis
-                    dataKey="setor"
-                    interval={0}
-                    angle={-20}
-                    textAnchor="end"
-                    height={70}
+                    type="number"
+                    allowDecimals={
+                      false
+                    }
+                    axisLine={
+                      false
+                    }
+                    tickLine={
+                      false
+                    }
                     tick={{
-                      fill: "#94a3b8",
-                      fontSize: 11,
+                      fill:
+                        "#64748b",
+                      fontSize: 10,
                     }}
-                    axisLine={false}
-                    tickLine={false}
                   />
 
                   <YAxis
-                    allowDecimals={false}
+                    type="category"
+                    dataKey="colaborador"
+                    width={120}
+                    axisLine={
+                      false
+                    }
+                    tickLine={
+                      false
+                    }
                     tick={{
-                      fill: "#94a3b8",
-                      fontSize: 12,
+                      fill:
+                        "#cbd5e1",
+                      fontSize: 10,
                     }}
-                    axisLine={false}
-                    tickLine={false}
                   />
 
                   <Tooltip
-                    contentStyle={tooltipStyle}
-                    cursor={{
-                      fill: "rgba(255,255,255,0.04)",
-                    }}
+                    contentStyle={
+                      tooltipStyle
+                    }
                   />
-
-                  <Legend />
 
                   <Bar
                     dataKey="concluidas"
                     name="Concluídas"
-                    stackId="status"
                     fill="#10b981"
+                    radius={[
+                      0,
+                      6,
+                      6,
+                      0,
+                    ]}
                   />
 
                   <Bar
                     dataKey="pendentes"
                     name="Pendentes"
-                    stackId="status"
                     fill="#3b82f6"
-                  />
-
-                  <Bar
-                    dataKey="canceladas"
-                    name="Canceladas"
-                    stackId="status"
-                    fill="#64748b"
-                    radius={[8, 8, 0, 0]}
+                    radius={[
+                      0,
+                      6,
+                      6,
+                      0,
+                    ]}
                   />
                 </BarChart>
               </ResponsiveContainer>
-            </CardGrafico>
+            </div>
+          )}
+        </CardGrafico>
 
-            <CardGrafico
-              titulo="Evolução das ordens"
-              descricao="OS criadas e concluídas ao longo dos meses."
-              icon={<TrendingUp size={21} />}
-            >
-              <ResponsiveContainer width="100%" height={380}>
-                <LineChart
-                  data={dadosEvolucao}
+        <CardGrafico
+          title="Máquinas com mais ocorrências"
+          subtitle="Ranking dos equipamentos com maior volume de OS"
+          icon={
+            <Wrench
+              size={20}
+            />
+          }
+        >
+          {dadosMaquinas.length ===
+          0 ? (
+            <MensagemSemDados text="Nenhuma máquina encontrada nos filtros aplicados." />
+          ) : (
+            <div className="h-[430px]">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
+                <BarChart
+                  data={
+                    dadosMaquinas
+                  }
+                  layout="vertical"
                   margin={{
-                    top: 15,
-                    right: 20,
-                    left: 0,
-                    bottom: 10,
+                    top: 5,
+                    right: 18,
+                    left: 44,
+                    bottom: 5,
                   }}
                 >
                   <CartesianGrid
-                    stroke="rgba(255,255,255,0.08)"
-                    vertical={false}
+                    horizontal={
+                      false
+                    }
+                    stroke="rgba(148,163,184,.10)"
+                    strokeDasharray="4 6"
                   />
 
                   <XAxis
-                    dataKey="mes"
+                    type="number"
+                    allowDecimals={
+                      false
+                    }
+                    axisLine={
+                      false
+                    }
+                    tickLine={
+                      false
+                    }
                     tick={{
-                      fill: "#94a3b8",
-                      fontSize: 12,
+                      fill:
+                        "#64748b",
+                      fontSize: 10,
                     }}
-                    axisLine={false}
-                    tickLine={false}
                   />
 
                   <YAxis
-                    allowDecimals={false}
+                    type="category"
+                    dataKey="maquina"
+                    width={135}
+                    axisLine={
+                      false
+                    }
+                    tickLine={
+                      false
+                    }
                     tick={{
-                      fill: "#94a3b8",
-                      fontSize: 12,
+                      fill:
+                        "#cbd5e1",
+                      fontSize: 10,
                     }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Legend />
-
-                  <Line
-                    type="monotone"
-                    dataKey="criadas"
-                    name="Criadas"
-                    stroke="#22d3ee"
-                    strokeWidth={4}
-                    dot={{
-                      r: 4,
-                      fill: "#22d3ee",
-                    }}
-                    activeDot={{ r: 7 }}
-                  />
-
-                  <Line
-                    type="monotone"
-                    dataKey="concluidas"
-                    name="Concluídas"
-                    stroke="#10b981"
-                    strokeWidth={4}
-                    dot={{
-                      r: 4,
-                      fill: "#10b981",
-                    }}
-                    activeDot={{ r: 7 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardGrafico>
-
-            <section className="grid gap-6 xl:grid-cols-2">
-              <CardGrafico
-                titulo="Desempenho por colaborador"
-                descricao="OS atribuídas, concluídas e pendentes."
-                icon={<Users size={21} />}
-              >
-                {dadosColaboradores.length === 0 ? (
-                  <MensagemSemDados text="Nenhuma OS possui responsável nos filtros aplicados." />
-                ) : (
-                  <ResponsiveContainer width="100%" height={390}>
-                    <BarChart
-                      data={dadosColaboradores}
-                      layout="vertical"
-                      margin={{
-                        top: 5,
-                        right: 20,
-                        left: 35,
-                        bottom: 5,
-                      }}
-                    >
-                      <CartesianGrid
-                        stroke="rgba(255,255,255,0.08)"
-                        horizontal={false}
-                      />
-
-                      <XAxis
-                        type="number"
-                        allowDecimals={false}
-                        tick={{
-                          fill: "#94a3b8",
-                          fontSize: 11,
-                        }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-
-                      <YAxis
-                        type="category"
-                        dataKey="colaborador"
-                        width={120}
-                        tick={{
-                          fill: "#cbd5e1",
-                          fontSize: 11,
-                        }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-
-                      <Tooltip
-                        contentStyle={tooltipStyle}
-                        cursor={{
-                          fill: "rgba(255,255,255,0.04)",
-                        }}
-                      />
-
-                      <Legend />
-
-                      <Bar
-                        dataKey="atribuidas"
-                        name="Atribuídas"
-                        fill="#22d3ee"
-                        radius={[0, 7, 7, 0]}
-                      />
-
-                      <Bar
-                        dataKey="concluidas"
-                        name="Concluídas"
-                        fill="#10b981"
-                        radius={[0, 7, 7, 0]}
-                      />
-
-                      <Bar
-                        dataKey="pendentes"
-                        name="Pendentes"
-                        fill="#f97316"
-                        radius={[0, 7, 7, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardGrafico>
-
-              <CardGrafico
-                titulo="Máquinas com mais ocorrências"
-                descricao="Ranking dos equipamentos com maior número de OS."
-                icon={<Wrench size={21} />}
-              >
-                {dadosMaquinas.length === 0 ? (
-                  <MensagemSemDados text="Nenhuma máquina encontrada nos filtros aplicados." />
-                ) : (
-                  <ResponsiveContainer width="100%" height={390}>
-                    <BarChart
-                      data={dadosMaquinas}
-                      layout="vertical"
-                      margin={{
-                        top: 5,
-                        right: 20,
-                        left: 55,
-                        bottom: 5,
-                      }}
-                    >
-                      <CartesianGrid
-                        stroke="rgba(255,255,255,0.08)"
-                        horizontal={false}
-                      />
-
-                      <XAxis
-                        type="number"
-                        allowDecimals={false}
-                        tick={{
-                          fill: "#94a3b8",
-                          fontSize: 11,
-                        }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-
-                      <YAxis
-                        type="category"
-                        dataKey="maquina"
-                        width={150}
-                        tick={{
-                          fill: "#cbd5e1",
-                          fontSize: 11,
-                        }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-
-                      <Tooltip
-                        contentStyle={tooltipStyle}
-                        cursor={{
-                          fill: "rgba(255,255,255,0.04)",
-                        }}
-                      />
-
-                      <Legend />
-
-                      <Bar
-                        dataKey="ocorrencias"
-                        name="Ocorrências"
-                        fill="#8b5cf6"
-                        radius={[0, 7, 7, 0]}
-                      />
-
-                      <Bar
-                        dataKey="concluidas"
-                        name="Concluídas"
-                        fill="#10b981"
-                        radius={[0, 7, 7, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardGrafico>
-            </section>
-
-            <CardGrafico
-              titulo="Cumprimento dos prazos"
-              descricao="Situação das ordens em relação às datas previstas."
-              icon={<Clock3 size={21} />}
-            >
-              <ResponsiveContainer width="100%" height={360}>
-                <BarChart data={dadosPrazos}>
-                  <CartesianGrid
-                    stroke="rgba(255,255,255,0.08)"
-                    vertical={false}
-                  />
-
-                  <XAxis
-                    dataKey="nome"
-                    interval={0}
-                    tick={{
-                      fill: "#94a3b8",
-                      fontSize: 11,
-                    }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-
-                  <YAxis
-                    allowDecimals={false}
-                    tick={{
-                      fill: "#94a3b8",
-                      fontSize: 12,
-                    }}
-                    axisLine={false}
-                    tickLine={false}
                   />
 
                   <Tooltip
-                    contentStyle={tooltipStyle}
-                    cursor={{
-                      fill: "rgba(255,255,255,0.04)",
-                    }}
+                    contentStyle={
+                      tooltipStyle
+                    }
                   />
 
                   <Bar
-                    dataKey="quantidade"
-                    name="Quantidade"
+                    dataKey="ocorrencias"
+                    name="Ocorrências"
                     fill="#22d3ee"
-                    radius={[10, 10, 0, 0]}
+                    radius={[
+                      0,
+                      7,
+                      7,
+                      0,
+                    ]}
                   />
                 </BarChart>
               </ResponsiveContainer>
-            </CardGrafico>
-          </>
-        )}
-      </div>
+            </div>
+          )}
+        </CardGrafico>
+      </section>
+
+      {/* =====================================================
+          METODOLOGIA
+      ====================================================== */}
+      <section className="rounded-[24px] border border-white/[0.07] bg-[#070c1b] p-5 shadow-[0_12px_35px_rgba(0,0,0,.16)]">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/[0.05] text-cyan-300">
+            <FileCheck2
+              size={18}
+            />
+          </div>
+
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-[0.12em] text-cyan-300">
+              Metodologia
+            </p>
+
+            <h2 className="mt-0.5 text-lg font-black text-white">
+              Regras dos indicadores
+            </h2>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <Regra
+            title="Conclusões"
+            text="Usam exclusivamente Data/Hora de término do relatório técnico."
+          />
+
+          <Regra
+            title="Taxa de conclusão"
+            text="Concluídas ÷ (Total - Canceladas). Canceladas não entram na conta."
+          />
+
+          <Regra
+            title="Tempo médio total"
+            text="Da abertura da OS até o término real registrado no relatório."
+          />
+
+          <Regra
+            title="Eficiência"
+            text="Setores, colaboradores e máquinas também ignoram canceladas no denominador."
+          />
+
+          <Regra
+            title="Cobertura técnica"
+            text="Mostra quantas OS concluídas têm data real de relatório reconhecida."
+          />
+
+          <Regra
+            title="Período"
+            text="O filtro de período usa a abertura da OS; a conclusão permanece posicionada pela data real do relatório."
+          />
+        </div>
+      </section>
     </div>
   );
 }
 
 const inputClass =
-  "h-14 w-full rounded-2xl border border-white/10 bg-[#050816] px-4 text-sm font-semibold text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20";
+  "h-11 w-full rounded-xl border border-white/[0.08] bg-[#030817] px-3 text-sm font-semibold text-white outline-none transition focus:border-cyan-400/40";
 
 function CampoFiltro({
   label,
@@ -2426,7 +3872,7 @@ function CampoFiltro({
 }) {
   return (
     <div>
-      <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-400">
+      <label className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
         {icon}
         {label}
       </label>
@@ -2436,77 +3882,60 @@ function CampoFiltro({
   );
 }
 
-function ResumoFiltro({
+function KpiCard({
   label,
   value,
+  helper,
+  icon,
+  tone,
 }: {
   label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-[#050816]/80 px-3 py-2">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-        {label}
-      </p>
-
-      <p className="mt-1 break-words text-xs font-black text-white">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function CardMetrica({
-  titulo,
-  valor,
-  descricao,
-  icon,
-  destaque,
-}: {
-  titulo: string;
-  valor: number | string;
-  descricao: string;
+  value: string | number;
+  helper: string;
   icon: ReactNode;
-  destaque:
+  tone:
     | "cyan"
-    | "emerald"
+    | "green"
     | "blue"
-    | "red"
     | "violet"
-    | "orange";
+    | "orange"
+    | "slate";
 }) {
-  const estilos = {
-    cyan: "border-cyan-400/20 bg-cyan-400/10 text-cyan-300",
-    emerald:
-      "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
-    blue: "border-blue-400/20 bg-blue-400/10 text-blue-300",
-    red: "border-red-400/20 bg-red-400/10 text-red-300",
+  const tones = {
+    cyan:
+      "border-cyan-400/15 bg-cyan-400/[0.035] text-cyan-300",
+    green:
+      "border-emerald-400/15 bg-emerald-400/[0.035] text-emerald-300",
+    blue:
+      "border-blue-400/15 bg-blue-400/[0.035] text-blue-300",
     violet:
-      "border-violet-400/20 bg-violet-400/10 text-violet-300",
+      "border-violet-400/15 bg-violet-400/[0.035] text-violet-300",
     orange:
-      "border-orange-400/20 bg-orange-400/10 text-orange-300",
+      "border-orange-400/15 bg-orange-400/[0.035] text-orange-300",
+    slate:
+      "border-white/[0.08] bg-white/[0.025] text-slate-300",
   };
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-[#080d1f] p-5 shadow-xl shadow-black/20">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-bold text-slate-400">
-            {titulo}
+    <div
+      className={`rounded-[20px] border p-4 ${tones[tone]}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
+            {label}
           </p>
 
-          <p className="mt-3 break-words text-3xl font-black text-white">
-            {valor}
+          <p className="mt-2 text-3xl font-black tracking-[-0.04em] text-white">
+            {value}
           </p>
 
-          <p className="mt-2 text-xs font-medium text-slate-500">
-            {descricao}
+          <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-600">
+            {helper}
           </p>
         </div>
 
-        <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${estilos[destaque]}`}
-        >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-black/10">
           {icon}
         </div>
       </div>
@@ -2515,43 +3944,145 @@ function CardMetrica({
 }
 
 function CardGrafico({
-  titulo,
-  descricao,
+  title,
+  subtitle,
   icon,
+  right,
   children,
 }: {
-  titulo: string;
-  descricao: string;
+  title: string;
+  subtitle: string;
   icon: ReactNode;
+  right?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl shadow-black/25 sm:p-6">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-300">
-          {icon}
+    <section className="min-w-0 rounded-[24px] border border-white/[0.07] bg-[#070c1b] p-4 shadow-[0_12px_35px_rgba(0,0,0,.18)] sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/[0.05] text-cyan-300">
+            {icon}
+          </div>
+
+          <div className="min-w-0">
+            <h2 className="text-lg font-black tracking-[-0.02em] text-white">
+              {title}
+            </h2>
+
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {subtitle}
+            </p>
+          </div>
         </div>
 
-        <div className="min-w-0">
-          <h2 className="break-words text-xl font-black">
-            {titulo}
-          </h2>
-
-          <p className="break-words text-sm text-slate-400">
-            {descricao}
-          </p>
-        </div>
+        {right}
       </div>
 
-      <div className="min-w-0">{children}</div>
+      <div className="mt-4">
+        {children}
+      </div>
     </section>
   );
 }
 
-function MensagemSemDados({ text }: { text: string }) {
+function ResumoEvolucao({
+  label,
+  value,
+  tone,
+  signed = false,
+}: {
+  label: string;
+  value: number;
+  tone:
+    | "cyan"
+    | "green"
+    | "orange";
+  signed?: boolean;
+}) {
+  const tones = {
+    cyan:
+      "border-cyan-400/12 bg-cyan-400/[0.035] text-cyan-300",
+    green:
+      "border-emerald-400/12 bg-emerald-400/[0.035] text-emerald-300",
+    orange:
+      "border-orange-400/12 bg-orange-400/[0.035] text-orange-300",
+  };
+
   return (
-    <div className="flex h-[390px] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#050816] px-6 text-center text-sm text-slate-500">
-      {text}
+    <div
+      className={`rounded-xl border px-3 py-2.5 ${tones[tone]}`}
+    >
+      <p className="text-[9px] font-black uppercase tracking-[0.08em] opacity-75">
+        {label}
+      </p>
+
+      <p className="mt-1 text-xl font-black tracking-[-0.04em] text-white">
+        {signed &&
+        value > 0
+          ? "+"
+          : ""}
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function MiniRanking({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string;
+  helper: string;
+}) {
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-[#030817] px-3 py-2.5">
+      <p className="truncate text-[10px] font-black uppercase tracking-[0.06em] text-slate-500">
+        {label}
+      </p>
+
+      <p className="mt-1 text-xl font-black text-emerald-300">
+        {value}
+      </p>
+
+      <p className="mt-0.5 text-[10px] text-slate-600">
+        {helper}
+      </p>
+    </div>
+  );
+}
+
+function MensagemSemDados({
+  text,
+}: {
+  text: string;
+}) {
+  return (
+    <div className="flex h-[300px] items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-[#030817] p-6 text-center">
+      <p className="text-sm text-slate-500">
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function Regra({
+  title,
+  text,
+}: {
+  title: string;
+  text: string;
+}) {
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-[#030817] p-3.5">
+      <p className="text-[10px] font-black uppercase tracking-[0.07em] text-cyan-300">
+        {title}
+      </p>
+
+      <p className="mt-2 text-xs leading-5 text-slate-500">
+        {text}
+      </p>
     </div>
   );
 }
